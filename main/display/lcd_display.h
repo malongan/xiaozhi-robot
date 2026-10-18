@@ -69,6 +69,26 @@ protected:
     AvatarExpression avatar_override_ = kAvatarExpressionNone;
     uint32_t avatar_override_until_ = 0;
 
+    // Idle/listening gaze: eyes wander in eight directions with zoom, tilt
+    // and squint, while the whole face sways like a head looking around.
+    float gaze_x_ = 0.0f;
+    float gaze_y_ = 0.0f;
+    float gaze_zoom_ = 1.0f;
+    float gaze_eye_ = 1.0f;
+    float gaze_tilt_ = 0.0f;
+    float gaze_from_x_ = 0.0f;
+    float gaze_from_y_ = 0.0f;
+    float gaze_from_zoom_ = 1.0f;
+    float gaze_from_eye_ = 1.0f;
+    float gaze_from_tilt_ = 0.0f;
+    float gaze_to_x_ = 0.0f;
+    float gaze_to_y_ = 0.0f;
+    float gaze_to_zoom_ = 1.0f;
+    float gaze_to_eye_ = 1.0f;
+    float gaze_to_tilt_ = 0.0f;
+    uint32_t gaze_start_ = 0;
+    uint32_t gaze_next_ = 0;
+
     // Procedural avatar animation (breathing, blink, state motion).
     lv_timer_t* avatar_anim_timer_ = nullptr;
     AvatarMood avatar_mood_ = kAvatarMoodIdle;
@@ -80,6 +100,7 @@ protected:
     const lv_font_t* GetChatFont();
     static void AvatarAnimTimerCb(lv_timer_t* timer);
     void SetAvatarEmotion(const char* emotion);
+    void PickAvatarGaze();
     void RewrapMessage(size_t index);
     void RewrapAllMessages();
     void RebuildChatPages();

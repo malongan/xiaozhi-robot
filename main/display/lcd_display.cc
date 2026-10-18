@@ -1110,6 +1110,8 @@ void LcdDisplay::SetupUI() {
         lv_obj_set_style_bg_opa(eye, LV_OPA_COVER, 0);
         lv_obj_set_style_border_width(eye, 0, 0);
         lv_obj_set_style_pad_all(eye, 0, 0);
+        lv_obj_set_style_transform_pivot_x(eye, lv_pct(50), 0);
+        lv_obj_set_style_transform_pivot_y(eye, lv_pct(50), 0);
         lv_obj_align(eye, LV_ALIGN_CENTER, 0, 0);
         return eye;
     };
@@ -1638,6 +1640,7 @@ void LcdDisplay::SetAvatarMood(AvatarMood mood) {
     avatar_anim_epoch_ = lv_tick_get();
     avatar_blink_at_ = avatar_anim_epoch_ + 2600 + (esp_random() % 3500);
     avatar_blink_start_ = 0;
+    gaze_next_ = 0;
 }
 
 void LcdDisplay::AvatarAnimTimerCb(lv_timer_t* timer) {
@@ -1706,42 +1709,71 @@ void LcdDisplay::AvatarAnimTimerCb(lv_timer_t* timer) {
     lv_coord_t look_y = 0;
     lv_coord_t breath = 0;
     lv_coord_t bob = 0;
-    int32_t tilt = 0;
+    lv_coord_t face_tx = 0;
+    int32_t face_rot = 0;  // 0.1 degree units
+    int32_t eye_rot = 0;   // 0.1 degree units
+    bool gaze_active = false;
 
     switch (expression) {
         case kAvatarExpressionListening:
-            eye_gap = 9;
-            eye_w = 7;
-            eye_h = 20;
-            look_x = static_cast<lv_coord_t>(3.0f * sinf(t * 2 * kPi / 1.9f));
-            look_y = static_cast<lv_coord_t>(1.2f * sinf(t * 2 * kPi / 1.3f));
-            breath = static_cast<lv_coord_t>(9.0f * sinf(t * 2 * kPi / 2.4f));
-            tilt = static_cast<int32_t>(25.0f * sinf(t * 2 * kPi / 2.8f));
+            gaze_active = true;
+            breath = static_cast<lv_coord_t>(12.0f * sinf(t * 2 * kPi / 2.6f));
             break;
         case kAvatarExpressionSpeaking:
             look_x = static_cast<lv_coord_t>(1.5f * sinf(t * 2 * kPi / 1.7f));
-            breath = static_cast<lv_coord_t>(4.0f * sinf(t * 2 * kPi / 1.2f));
+            breath = static_cast<lv_coord_t>(5.0f * sinf(t * 2 * kPi / 1.2f));
             bob = -static_cast<lv_coord_t>(fabsf(sinf(t * 2 * kPi / 0.6f)) * 2.0f);
-            tilt = static_cast<int32_t>(10.0f * sinf(t * 2 * kPi / 2.2f));
+            face_rot = static_cast<int32_t>(100.0f * sinf(t * 2 * kPi / 2.2f));
             break;
         case kAvatarExpressionThinking:
             look_x = 4 + static_cast<lv_coord_t>(0.8f * sinf(t * 2 * kPi / 1.1f));
             look_y = -4;
             breath = static_cast<lv_coord_t>(4.0f * sinf(t * 2 * kPi / 2.6f));
-            tilt = static_cast<int32_t>(30.0f * sinf(t * 2 * kPi / 3.2f));
+            face_rot = static_cast<int32_t>(300.0f * sinf(t * 2 * kPi / 3.2f));
             break;
         case kAvatarExpressionHappy:
-            breath = static_cast<lv_coord_t>(8.0f * sinf(t * 2 * kPi / 0.9f));
+            breath = static_cast<lv_coord_t>(9.0f * sinf(t * 2 * kPi / 0.9f));
             bob = -static_cast<lv_coord_t>(fabsf(sinf(t * 2 * kPi / 0.55f)) * 3.0f);
-            tilt = static_cast<int32_t>(30.0f * sinf(t * 2 * kPi / 1.1f));
+            face_rot = static_cast<int32_t>(300.0f * sinf(t * 2 * kPi / 1.1f));
             break;
         case kAvatarExpressionIdle:
         default:
-            look_x = static_cast<lv_coord_t>(2.0f * sinf(t * 2 * kPi / 5.3f));
-            look_y = static_cast<lv_coord_t>(1.5f * sinf(t * 2 * kPi / 3.7f));
-            breath = static_cast<lv_coord_t>(7.0f * sinf(t * 2 * kPi / 3.6f));
-            tilt = static_cast<int32_t>(12.0f * sinf(t * 2 * kPi / 6.4f));
+            gaze_active = true;
+            breath = static_cast<lv_coord_t>(10.0f * sinf(t * 2 * kPi / 3.2f));
             break;
+    }
+
+    if (gaze_active) {
+        if (self->gaze_next_ == 0 || now >= self->gaze_next_) {
+            self->PickAvatarGaze();
+            self->gaze_next_ = now + 1500 + (esp_random() % 1600);
+        }
+        float progress = (now - self->gaze_start_) / 240.0f;
+        if (progress > 1.0f) {
+            progress = 1.0f;
+        }
+        const float eased = progress * progress * (3.0f - 2.0f * progress);
+        self->gaze_x_ = self->gaze_from_x_ + (self->gaze_to_x_ - self->gaze_from_x_) * eased;
+        self->gaze_y_ = self->gaze_from_y_ + (self->gaze_to_y_ - self->gaze_from_y_) * eased;
+        self->gaze_zoom_ =
+            self->gaze_from_zoom_ + (self->gaze_to_zoom_ - self->gaze_from_zoom_) * eased;
+        self->gaze_eye_ =
+            self->gaze_from_eye_ + (self->gaze_to_eye_ - self->gaze_from_eye_) * eased;
+        self->gaze_tilt_ =
+            self->gaze_from_tilt_ + (self->gaze_to_tilt_ - self->gaze_from_tilt_) * eased;
+
+        const bool listening = expression == kAvatarExpressionListening;
+        const lv_coord_t base_w = listening ? 7 : 8;
+        const lv_coord_t base_h = listening ? 20 : 22;
+        eye_gap = listening ? 9 : 10;
+        eye_w = static_cast<lv_coord_t>(base_w * self->gaze_zoom_);
+        eye_h = static_cast<lv_coord_t>(base_h * self->gaze_zoom_ * self->gaze_eye_);
+        look_x = static_cast<lv_coord_t>(self->gaze_x_);
+        look_y = static_cast<lv_coord_t>(self->gaze_y_);
+        bob = static_cast<lv_coord_t>(self->gaze_y_ * 0.25f);
+        face_tx = static_cast<lv_coord_t>(self->gaze_x_ * 0.45f);
+        face_rot = static_cast<int32_t>(self->gaze_tilt_ * 45.0f);  // 4.5 deg max
+        eye_rot = static_cast<int32_t>(self->gaze_tilt_ * 100.0f);  // 10 deg max
     }
 
     if (!happy) {
@@ -1756,8 +1788,8 @@ void LcdDisplay::AvatarAnimTimerCb(lv_timer_t* timer) {
                 self->avatar_blink_start_ = 0;
                 self->avatar_blink_at_ = now + 2600 + (esp_random() % 3500);
             } else {
-                const float progress = static_cast<float>(elapsed) / kBlinkDurationMs;
-                const float envelope = progress < 0.5f ? progress * 2.0f : (1.0f - progress) * 2.0f;
+                const float p = static_cast<float>(elapsed) / kBlinkDurationMs;
+                const float envelope = p < 0.5f ? p * 2.0f : (1.0f - p) * 2.0f;
                 eye_h_draw = static_cast<lv_coord_t>(eye_h * (1.0f - 0.85f * envelope));
                 if (eye_h_draw < 3) {
                     eye_h_draw = 3;
@@ -1768,6 +1800,8 @@ void LcdDisplay::AvatarAnimTimerCb(lv_timer_t* timer) {
         lv_obj_set_size(self->avatar_eye_right_, eye_w, eye_h_draw);
         lv_obj_align(self->avatar_eye_left_, LV_ALIGN_CENTER, -eye_gap + look_x, look_y);
         lv_obj_align(self->avatar_eye_right_, LV_ALIGN_CENTER, eye_gap + look_x, look_y);
+        lv_obj_set_style_transform_rotation(self->avatar_eye_left_, eye_rot, 0);
+        lv_obj_set_style_transform_rotation(self->avatar_eye_right_, eye_rot, 0);
     } else {
         lv_obj_align(self->avatar_eye_happy_left_, LV_ALIGN_CENTER, -eye_gap, 0);
         lv_obj_align(self->avatar_eye_happy_right_, LV_ALIGN_CENTER, eye_gap, 0);
@@ -1775,8 +1809,40 @@ void LcdDisplay::AvatarAnimTimerCb(lv_timer_t* timer) {
 
     lv_obj_set_style_transform_scale_x(self->emoji_box_, 256 + breath, 0);
     lv_obj_set_style_transform_scale_y(self->emoji_box_, 256 + breath, 0);
+    lv_obj_set_style_translate_x(self->emoji_box_, face_tx, 0);
     lv_obj_set_style_translate_y(self->emoji_box_, bob, 0);
-    lv_obj_set_style_transform_rotation(self->emoji_box_, tilt, 0);
+    lv_obj_set_style_transform_rotation(self->emoji_box_, face_rot, 0);
+}
+
+void LcdDisplay::PickAvatarGaze() {
+    static constexpr int8_t kDirX[] = {0, 1, -1, 0, 0, 1, 1, -1, -1};
+    static constexpr int8_t kDirY[] = {0, 0, 0, 1, -1, 1, -1, 1, -1};
+    const uint32_t dir = esp_random() % 9;
+    const float mag_x = 2.5f + static_cast<float>(esp_random() % 45) / 10.0f;  // 2.5..6.9
+    const float mag_y = 1.5f + static_cast<float>(esp_random() % 35) / 10.0f;  // 1.5..4.9
+
+    gaze_from_x_ = gaze_x_;
+    gaze_from_y_ = gaze_y_;
+    gaze_from_zoom_ = gaze_zoom_;
+    gaze_from_eye_ = gaze_eye_;
+    gaze_from_tilt_ = gaze_tilt_;
+
+    gaze_to_x_ = kDirX[dir] * mag_x;
+    gaze_to_y_ = kDirY[dir] * mag_y;
+    gaze_to_zoom_ = 0.94f + static_cast<float>(esp_random() % 24) / 100.0f;  // 0.94..1.17
+
+    const uint32_t eye_roll = esp_random() % 100;
+    if (eye_roll < 18) {
+        gaze_to_eye_ = 0.72f;  // squint
+    } else if (eye_roll < 30) {
+        gaze_to_eye_ = 1.10f;  // wide eyes
+    } else {
+        gaze_to_eye_ = 0.92f + static_cast<float>(esp_random() % 14) / 100.0f;
+    }
+
+    gaze_to_tilt_ = kDirX[dir] * (3.0f + static_cast<float>(esp_random() % 9));
+    gaze_to_tilt_ += static_cast<float>(esp_random() % 5) - 2.0f;
+    gaze_start_ = lv_tick_get();
 }
 
 void LcdDisplay::SetAvatarEmotion(const char* emotion) {
