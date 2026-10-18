@@ -103,8 +103,6 @@ protected:
     lv_obj_t* avatar_eye_happy_left_ = nullptr;
     lv_obj_t* avatar_eye_happy_right_ = nullptr;
     lv_obj_t* avatar_think_dots_ = nullptr;
-    lv_obj_t* avatar_eye_sleep_left_ = nullptr;
-    lv_obj_t* avatar_eye_sleep_right_ = nullptr;
     TaskHandle_t sleep_sound_task_ = nullptr;
     AvatarExpression avatar_override_ = kAvatarExpressionNone;
     uint32_t avatar_override_until_ = 0;

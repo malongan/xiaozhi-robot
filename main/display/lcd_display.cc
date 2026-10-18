@@ -1159,6 +1159,8 @@ void LcdDisplay::SetupUI() {
     avatar_eye_happy_left_ = create_happy_eye();
     avatar_eye_happy_right_ = create_happy_eye();
 
+    avatar_eye_happy_right_ = create_happy_eye();
+
     auto create_sleep_eye = [this]() {
         lv_obj_t* arc = lv_arc_create(avatar_face_);
         lv_obj_remove_flag(arc, LV_OBJ_FLAG_CLICKABLE);
@@ -1178,8 +1180,7 @@ void LcdDisplay::SetupUI() {
         lv_obj_add_flag(arc, LV_OBJ_FLAG_HIDDEN);
         return arc;
     };
-    avatar_eye_sleep_left_ = create_sleep_eye();
-    avatar_eye_sleep_right_ = create_sleep_eye();
+
 
     avatar_think_dots_ = lv_label_create(screen);
     lv_obj_set_style_text_font(avatar_think_dots_, text_font, 0);
@@ -1822,7 +1823,7 @@ void LcdDisplay::ApplyChatLayout() {
         lv_obj_align_to(avatar_think_dots_, emoji_box_, LV_ALIGN_TOP_RIGHT, 6, -4);
     }
     if (sleep_zzz_ != nullptr) {
-        lv_obj_align_to(sleep_zzz_, emoji_box_, LV_ALIGN_TOP_MID, 0, -30);
+        lv_obj_align_to(sleep_zzz_, emoji_box_, LV_ALIGN_TOP_MID, 26, -26);
     }
     if (media_bar_ != nullptr) {
         lv_obj_align(media_bar_, LV_ALIGN_BOTTOM_MID, 0, -10);
@@ -1962,20 +1963,25 @@ void LcdDisplay::SleepSoundTask(void* arg) {
             if (codec != nullptr) {
                 const int rate = codec->output_sample_rate();
                 if (buffer.empty()) {
-                    buffer.resize(static_cast<size_t>(rate * 30 / 100));  // 300 ms breath
+                    buffer.resize(static_cast<size_t>(rate * 50 / 100));  // 500 ms breath
                 }
                 for (size_t i = 0; i < buffer.size(); ++i) {
-                    const float phase = 2.0f * 3.14159265f * 95.0f *
+                    const float phase = 2.0f * 3.14159265f * 210.0f *
                                         static_cast<float>(i) / static_cast<float>(rate);
                     const float envelope = sinf(3.14159265f * static_cast<float>(i) /
                                                 static_cast<float>(buffer.size()));
-                    buffer[i] = static_cast<int16_t>(sinf(phase) * envelope * 1400.0f);
+                    buffer[i] = static_cast<int16_t>(sinf(phase) * envelope * 4000.0f);
                 }
+                const int previous_volume = codec->output_volume();
+                codec->SetOutputVolume(85);
                 codec->EnableOutput(true);
+                vTaskDelay(pdMS_TO_TICKS(30));
+                ESP_LOGI("SleepSound", "playing breath (rate=%d)", rate);
                 codec->OutputData(buffer);
                 codec->EnableOutput(false);
+                codec->SetOutputVolume(previous_volume);
             }
-            vTaskDelay(pdMS_TO_TICKS(4500));
+            vTaskDelay(pdMS_TO_TICKS(4000));
         } else {
             vTaskDelay(pdMS_TO_TICKS(400));
         }
@@ -2083,19 +2089,6 @@ void LcdDisplay::AvatarAnimTimerCb(lv_timer_t* timer) {
         lv_obj_add_flag(self->avatar_eye_happy_left_, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(self->avatar_eye_happy_right_, LV_OBJ_FLAG_HIDDEN);
     }
-    if (sleeping) {
-        if (!lv_obj_has_flag(self->avatar_eye_left_, LV_OBJ_FLAG_HIDDEN)) {
-            lv_obj_add_flag(self->avatar_eye_left_, LV_OBJ_FLAG_HIDDEN);
-            lv_obj_add_flag(self->avatar_eye_right_, LV_OBJ_FLAG_HIDDEN);
-        }
-        lv_obj_add_flag(self->avatar_eye_happy_left_, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag(self->avatar_eye_happy_right_, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_remove_flag(self->avatar_eye_sleep_left_, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_remove_flag(self->avatar_eye_sleep_right_, LV_OBJ_FLAG_HIDDEN);
-    } else {
-        lv_obj_add_flag(self->avatar_eye_sleep_left_, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag(self->avatar_eye_sleep_right_, LV_OBJ_FLAG_HIDDEN);
-    }
     if (thinking) {
         lv_obj_remove_flag(self->avatar_think_dots_, LV_OBJ_FLAG_HIDDEN);
     } else {
@@ -2149,9 +2142,9 @@ void LcdDisplay::AvatarAnimTimerCb(lv_timer_t* timer) {
         look_y = 0;
         // Slow breathing plus a gentle nod (head sinks periodically).
         const float nod = fmaxf(0.0f, sinf(t * 2 * kPi / 2.4f));
-        bob = static_cast<lv_coord_t>(3.0f * nod);
+        bob = static_cast<lv_coord_t>(6.0f * nod);
         breath = static_cast<lv_coord_t>(5.0f * sinf(t * 2 * kPi / 6.0f));
-        face_rot = static_cast<int32_t>(30.0f * sinf(t * 2 * kPi / 7.0f));
+        face_rot = static_cast<int32_t>(50.0f * sinf(t * 2 * kPi / 7.0f));
     }
 
     const bool closed = expression == kAvatarExpressionClosed;
@@ -2269,17 +2262,6 @@ void LcdDisplay::AvatarAnimTimerCb(lv_timer_t* timer) {
     }
 
     const float fs = self->avatar_face_scale_;
-    if (sleeping) {
-        const lv_coord_t sleep_gap = static_cast<lv_coord_t>(10 * fs);
-        const lv_coord_t arc_size = static_cast<lv_coord_t>(20 * fs);
-        const lv_coord_t arc_width = LV_MAX(static_cast<lv_coord_t>(2), static_cast<lv_coord_t>(4 * fs));
-        lv_obj_set_size(self->avatar_eye_sleep_left_, arc_size, arc_size);
-        lv_obj_set_size(self->avatar_eye_sleep_right_, arc_size, arc_size);
-        lv_obj_set_style_arc_width(self->avatar_eye_sleep_left_, arc_width, LV_PART_MAIN);
-        lv_obj_set_style_arc_width(self->avatar_eye_sleep_right_, arc_width, LV_PART_MAIN);
-        lv_obj_align(self->avatar_eye_sleep_left_, LV_ALIGN_CENTER, -sleep_gap, 0);
-        lv_obj_align(self->avatar_eye_sleep_right_, LV_ALIGN_CENTER, sleep_gap, 0);
-    }
     if (fs != 1.0f) {
         eye_left_x = static_cast<lv_coord_t>(eye_left_x * fs);
         eye_left_y = static_cast<lv_coord_t>(eye_left_y * fs);
@@ -2293,9 +2275,7 @@ void LcdDisplay::AvatarAnimTimerCb(lv_timer_t* timer) {
         face_tx = static_cast<lv_coord_t>(face_tx * fs);
     }
 
-    if (sleeping) {
-        // sleeping arcs are already placed above
-    } else if (!happy) {
+    if (!happy) {
         lv_coord_t left_h_draw = eye_left_h;
         lv_coord_t right_h_draw = eye_right_h;
         bool do_blink = !closed && !wink;
