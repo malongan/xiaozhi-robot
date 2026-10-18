@@ -1810,8 +1810,9 @@ void LcdDisplay::ApplyChatLayout() {
         lv_obj_set_style_text_font(avatar_think_dots_, font, 0);
         lv_obj_set_style_text_color(avatar_think_dots_, lvgl_theme->text_color(), 0);
     }
-    lv_obj_t* themed_labels[] = {media_title_, media_hint_, bt_title_,
-                                 bt_empty_,    bt_status_,  bt_disconnect_label_};
+    lv_obj_t* themed_labels[] = {media_title_,        media_hint_, bt_title_,
+                                 bt_empty_,           bt_status_,  bt_disconnect_label_,
+                                 sleep_zzz_};
     for (lv_obj_t* label : themed_labels) {
         if (label != nullptr) {
             lv_obj_set_style_text_font(label, font, 0);
