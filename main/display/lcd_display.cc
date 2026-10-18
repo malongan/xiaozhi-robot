@@ -1243,13 +1243,13 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_ext_click_area(media_bar_, 4);
     lv_obj_add_event_cb(media_bar_, &LcdDisplay::OnMediaBarClicked, LV_EVENT_CLICKED, this);
 
+    // Minimal media-entry glyph: two rows of four light-grey dots, no frame.
     lv_obj_t* keyboard = lv_obj_create(media_bar_);
     lv_obj_set_size(keyboard, 32, 20);
     lv_obj_align(keyboard, LV_ALIGN_BOTTOM_MID, 0, 0);
-    lv_obj_set_style_radius(keyboard, 5, 0);
+    lv_obj_set_style_radius(keyboard, 0, 0);
     lv_obj_set_style_bg_opa(keyboard, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(keyboard, 2, 0);
-    lv_obj_set_style_border_color(keyboard, lvgl_theme->text_color(), 0);
+    lv_obj_set_style_border_width(keyboard, 0, 0);
     lv_obj_set_style_pad_all(keyboard, 0, 0);
     lv_obj_remove_flag(keyboard, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_remove_flag(keyboard, LV_OBJ_FLAG_CLICKABLE);
@@ -1257,10 +1257,10 @@ void LcdDisplay::SetupUI() {
     for (int row = 0; row < 2; ++row) {
         for (int col = 0; col < 4; ++col) {
             lv_obj_t* key = lv_obj_create(keyboard);
-            lv_obj_set_size(key, 3, 2);
-            lv_obj_set_pos(key, 4 + col * 6, 4 + row * 5);
-            lv_obj_set_style_radius(key, 1, 0);
-            lv_obj_set_style_bg_color(key, lvgl_theme->text_color(), 0);
+            lv_obj_set_size(key, 4, 4);
+            lv_obj_set_pos(key, 2 + col * 8, 3 + row * 9);
+            lv_obj_set_style_radius(key, 2, 0);
+            lv_obj_set_style_bg_color(key, lv_color_hex(0xB8B8B8), 0);
             lv_obj_set_style_bg_opa(key, LV_OPA_COVER, 0);
             lv_obj_set_style_border_width(key, 0, 0);
             lv_obj_set_style_pad_all(key, 0, 0);
@@ -1268,15 +1268,6 @@ void LcdDisplay::SetupUI() {
             lv_obj_remove_flag(key, LV_OBJ_FLAG_CLICKABLE);
         }
     }
-    lv_obj_t* spacebar = lv_obj_create(keyboard);
-    lv_obj_set_size(spacebar, 10, 2);
-    lv_obj_set_pos(spacebar, 11, 15);
-    lv_obj_set_style_radius(spacebar, 1, 0);
-    lv_obj_set_style_bg_color(spacebar, lvgl_theme->text_color(), 0);
-    lv_obj_set_style_bg_opa(spacebar, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_width(spacebar, 0, 0);
-    lv_obj_remove_flag(spacebar, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_remove_flag(spacebar, LV_OBJ_FLAG_CLICKABLE);
 
     /* Media screen: full-screen overlay with six outline media keys. */
     media_screen_ = lv_obj_create(screen);
