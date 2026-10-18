@@ -448,6 +448,23 @@ bool MediaBle::SendKey(MediaBleKey key) {
     if (!connected_ || conn_handle_ == 0xFFFF || report_val_handle_ == 0) {
         return false;
     }
+    if (key == MediaBleKey::kNext || key == MediaBleKey::kPrevious) {
+        // Some hosts only react to the keyboard-page media usages.
+        const uint8_t keycode = key == MediaBleKey::kNext ? 0xB5 : 0xB6;
+        uint8_t keyboard[10] = {};
+        keyboard[2] = keycode;
+        uint8_t zeros[10] = {};
+        struct os_mbuf* om = ble_hs_mbuf_from_flat(keyboard, sizeof(keyboard));
+        if (om != nullptr) {
+            ble_gatts_notify_custom(conn_handle_, report_val_handle_, om);
+        }
+        vTaskDelay(pdMS_TO_TICKS(20));
+        om = ble_hs_mbuf_from_flat(zeros, sizeof(zeros));
+        if (om != nullptr) {
+            ble_gatts_notify_custom(conn_handle_, report_val_handle_, om);
+        }
+        return true;
+    }
     const uint8_t bit = static_cast<uint8_t>(1u << static_cast<uint8_t>(key));
     int rc = 0;
     auto notify = [this, &rc](const uint8_t* data) {
