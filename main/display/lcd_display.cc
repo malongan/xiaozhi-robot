@@ -1767,12 +1767,29 @@ void LcdDisplay::ApplyChatLayout() {
     const lv_coord_t text_space = LV_VER_RES - bottom_reserve - text_top;
     const lv_coord_t chat_y = text_top + LV_MAX((text_space - chat_h) / 2, 0);
 
+    const bool big_idle = avatar_mood_ == kAvatarMoodIdle;
     lv_obj_set_size(emoji_box_, kAvatarSize, kAvatarSize);
-    lv_obj_align(emoji_box_, LV_ALIGN_TOP_MID, 0, avatar_y);
+    if (big_idle) {
+        // Idle: one large face in the middle of the screen, chat text hidden.
+        avatar_layout_scale_ = 480;
+        lv_obj_align(emoji_box_, LV_ALIGN_CENTER, 0, 8);
+        lv_obj_add_flag(chat_area_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_set_ext_click_area(emoji_box_, 40);
+    } else {
+        avatar_layout_scale_ = 256;
+        lv_obj_align(emoji_box_, LV_ALIGN_TOP_MID, 0, avatar_y);
+        lv_obj_remove_flag(chat_area_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_set_ext_click_area(emoji_box_, 8);
+    }
 
     if (page_progress_ != nullptr) {
         lv_obj_set_size(page_progress_, kAvatarSize + 14, kAvatarSize + 14);
         lv_obj_align_to(page_progress_, emoji_box_, LV_ALIGN_CENTER, 0, 0);
+        if (big_idle) {
+            lv_obj_add_flag(page_progress_, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_remove_flag(page_progress_, LV_OBJ_FLAG_HIDDEN);
+        }
     }
     if (avatar_think_dots_ != nullptr) {
         lv_obj_align_to(avatar_think_dots_, emoji_box_, LV_ALIGN_TOP_RIGHT, 6, -4);
@@ -2200,8 +2217,9 @@ void LcdDisplay::AvatarAnimTimerCb(lv_timer_t* timer) {
         lv_obj_align(self->avatar_eye_happy_right_, LV_ALIGN_CENTER, eye_gap, 0);
     }
 
-    lv_obj_set_style_transform_scale_x(self->emoji_box_, 256 + breath, 0);
-    lv_obj_set_style_transform_scale_y(self->emoji_box_, 256 + breath, 0);
+    const int base_scale = self->avatar_layout_scale_;
+    lv_obj_set_style_transform_scale_x(self->emoji_box_, base_scale + breath, 0);
+    lv_obj_set_style_transform_scale_y(self->emoji_box_, base_scale + breath, 0);
     lv_obj_set_style_translate_x(self->emoji_box_, face_tx, 0);
     lv_obj_set_style_translate_y(self->emoji_box_, bob, 0);
     lv_obj_set_style_transform_rotation(self->emoji_box_, face_rot, 0);

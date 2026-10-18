@@ -73,6 +73,7 @@ protected:
     bool media_repeat_active_ = false;
     uint32_t media_repeat_next_ = 0;
     bool media_playing_ = false;
+    int avatar_layout_scale_ = 256;  // 256 = 80px, 480 = ~150px for the idle screen
     lv_obj_t* media_hint_ = nullptr;
     lv_obj_t* media_bt_icon_ = nullptr;
     lv_obj_t* media_title_ = nullptr;
