@@ -198,20 +198,23 @@ void MediaBle::InitGattServices() {
     g_hid_chrs[2] = {};
     g_hid_chrs[2].uuid = &kHidControlUuid.u;
     g_hid_chrs[2].access_cb = ControlPointAccess;
-    g_hid_chrs[2].flags = BLE_GATT_CHR_F_WRITE_NO_RSP;
+    g_hid_chrs[2].flags = BLE_GATT_CHR_F_WRITE_NO_RSP | BLE_GATT_CHR_F_WRITE_ENC;
     g_hid_chrs[3] = {};
     g_hid_chrs[3].uuid = &kProtocolModeUuid.u;
     g_hid_chrs[3].access_cb = ProtocolModeAccess;
-    g_hid_chrs[3].flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE_NO_RSP;
+    g_hid_chrs[3].flags =
+        BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE_NO_RSP | BLE_GATT_CHR_F_WRITE_ENC;
     g_hid_chrs[4] = {};
     g_hid_chrs[4].uuid = &kReportUuid.u;
     g_hid_chrs[4].access_cb = ReportAccess;
-    g_hid_chrs[4].flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_NOTIFY;
+    g_hid_chrs[4].flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_NOTIFY | BLE_GATT_CHR_F_READ_ENC |
+                          BLE_GATT_CHR_F_WRITE_ENC;
     g_hid_chrs[4].descriptors = &g_hid_dscs[0];
     g_hid_chrs[5] = {};
     g_hid_chrs[5].uuid = &kReportUuid.u;
     g_hid_chrs[5].access_cb = ReportAccess;
-    g_hid_chrs[5].flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_NOTIFY;
+    g_hid_chrs[5].flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_NOTIFY | BLE_GATT_CHR_F_READ_ENC |
+                          BLE_GATT_CHR_F_WRITE_ENC;
     g_hid_chrs[5].descriptors = &g_hid_dscs[1];
     g_hid_chrs[6] = {};
 
@@ -361,6 +364,8 @@ int MediaBle::GapEvent(struct ble_gap_event* event, void*) {
                 } else {
                     ESP_LOGI(TAG, "host connected, handle=%d", self.conn_handle_);
                 }
+                const int sec_rc = ble_gap_security_initiate(self.conn_handle_);
+                ESP_LOGI(TAG, "security initiate rc=%d", sec_rc);
                 if (self.status_callback_) {
                     self.status_callback_(true);
                 }
