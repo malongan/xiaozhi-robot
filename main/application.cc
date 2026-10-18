@@ -773,6 +773,26 @@ void Application::DismissAlert() {
 
 void Application::ToggleChatState() { xEventGroupSetBits(event_group_, MAIN_EVENT_TOGGLE_CHAT); }
 
+void Application::StartNewSession() {
+    auto state = GetDeviceState();
+    if (state == kDeviceStateNotifying) {
+        StopNotification();
+    } else if (state == kDeviceStateSpeaking) {
+        AbortSpeaking(kAbortReasonNone);
+    } else if (state == kDeviceStateListening || state == kDeviceStateConnecting) {
+        if (protocol_ && protocol_->IsAudioChannelOpened()) {
+            protocol_->CloseAudioChannel();
+        }
+    }
+    auto display = Board::GetInstance().GetDisplay();
+    if (display != nullptr) {
+        display->ClearChatMessages();
+    }
+    if (GetDeviceState() == kDeviceStateIdle) {
+        StartListening();
+    }
+}
+
 void Application::StartListening() { xEventGroupSetBits(event_group_, MAIN_EVENT_START_LISTENING); }
 
 void Application::StopListening() { xEventGroupSetBits(event_group_, MAIN_EVENT_STOP_LISTENING); }
@@ -1012,7 +1032,9 @@ void Application::HandleStateChangedEvent() {
             // otherwise wipe the status, emotion, and chat message.
             if (last_error_message_.empty()) {
                 display->SetStatus(Lang::Strings::STANDBY);
-                display->ClearChatMessages();  // Clear messages first
+                if (!display->KeepsChatHistory()) {
+                    display->ClearChatMessages();  // Clear messages first
+                }
                 display->SetEmotion(
                     "neutral");  // Then set emotion (wechat mode checks child count)
             }
@@ -1118,6 +1140,10 @@ void Application::StartNotification(std::string audio_url, std::vector<NotifySub
         return;
     }
 
+    auto* display = board.GetDisplay();
+    if (display != nullptr && !display->KeepsChatHistory()) {
+        display->ClearChatMessages();
+    }
     audio_service_.ResetDecoder();
     uint32_t playback_id = ++notification_playback_id_;
     if (playback_id == 0) {

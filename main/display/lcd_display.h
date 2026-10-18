@@ -7,7 +7,9 @@
 #include <esp_lcd_panel_io.h>
 #include <esp_lcd_panel_ops.h>
 #include <atomic>
+#include <deque>
 #include <memory>
+#include <string>
 
 #define PREVIEW_IMAGE_DURATION_MS 5000
 
@@ -29,9 +31,40 @@ protected:
     std::unique_ptr<LvglGif> gif_controller_ = nullptr;
     lv_obj_t* emoji_box_ = nullptr;
     lv_obj_t* chat_message_label_ = nullptr;
+    std::string chat_message_text_;
+    std::string last_chat_role_;
     esp_timer_handle_t preview_timer_ = nullptr;
     std::unique_ptr<LvglImage> preview_image_cached_ = nullptr;
     bool hide_subtitle_ = false;  // Control whether to hide chat messages/subtitles
+
+    // Persistent chat history (default message style only)
+    struct ChatMessage {
+        std::string role;
+        std::string text;
+        lv_obj_t* container = nullptr;
+        lv_obj_t* label = nullptr;
+    };
+    std::deque<ChatMessage> chat_messages_;
+    lv_obj_t* latest_button_ = nullptr;
+    lv_obj_t* latest_icon_ = nullptr;
+    lv_obj_t* latest_label_ = nullptr;
+    lv_obj_t* new_session_button_ = nullptr;
+    lv_obj_t* mic_button_ = nullptr;
+    lv_obj_t* new_session_confirm_ = nullptr;
+    bool auto_follow_ = true;
+
+    lv_obj_t* CreateChatMessageBlock(const std::string& role, const std::string& text);
+    void ScrollToLatest(bool animated);
+    void UpdateAutoFollowFromScroll();
+    void ShowNewSessionConfirm();
+
+    static void OnContentScrolled(lv_event_t* e);
+    static void OnLatestButtonClicked(lv_event_t* e);
+    static void OnMicButtonClicked(lv_event_t* e);
+    static void OnNewSessionButtonClicked(lv_event_t* e);
+    static void OnNewSessionConfirmClicked(lv_event_t* e);
+    static void OnNewSessionCancelClicked(lv_event_t* e);
+    static void OnNewSessionOverlayDeleted(lv_event_t* e);
 
     void InitializeLcdThemes();
     virtual bool Lock(int timeout_ms = 0) override;
@@ -47,6 +80,7 @@ public:
     virtual void SetEmotion(const char* emotion) override;
     virtual void SetChatMessage(const char* role, const char* content) override;
     virtual void ClearChatMessages() override;
+    virtual bool KeepsChatHistory() const override { return true; }
     virtual void SetPreviewImage(std::unique_ptr<LvglImage> image) override;
     virtual void SetupUI() override;
     // Add theme switching function
@@ -61,7 +95,7 @@ class SpiLcdDisplay : public LcdDisplay {
 public:
     SpiLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_t panel, int width,
                   int height, int offset_x, int offset_y, bool mirror_x, bool mirror_y,
-                  bool swap_xy);
+                  bool swap_xy, bool double_buffer = false);
 };
 
 // RGB LCD display

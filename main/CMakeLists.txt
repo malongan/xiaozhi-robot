@@ -40,6 +40,7 @@ set(SOURCES "audio/audio_codec.cc"
             "settings.cc"
             "device_state_machine.cc"
             "assets.cc"
+            "assets/font_puhui_16_4.c"
             "main.cc"
             )
 

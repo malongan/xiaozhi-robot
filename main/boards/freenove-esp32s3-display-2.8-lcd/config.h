@@ -33,7 +33,7 @@
 #define DISPLAY_CS_PIN        GPIO_NUM_10
 #define DISPLAY_MOSI_PIN      GPIO_NUM_11
 #define DISPLAY_MIS0_PIN      GPIO_NUM_13
-#define DISPLAY_SPI_SCLK_HZ   (20 * 1000 * 1000)
+#define DISPLAY_SPI_SCLK_HZ   (40 * 1000 * 1000)
 
 #define LCD_SPI_HOST          SPI3_HOST
 

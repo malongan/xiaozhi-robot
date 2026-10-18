@@ -96,6 +96,8 @@ public:
      */
     void ToggleChatState();
 
+    void StartNewSession();
+
     /**
      * Start listening (event-based, thread-safe)
      * Sends MAIN_EVENT_START_LISTENING to be handled in Run()

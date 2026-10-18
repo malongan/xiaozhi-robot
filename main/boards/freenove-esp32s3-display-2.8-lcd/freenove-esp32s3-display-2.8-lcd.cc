@@ -1,6 +1,9 @@
 #include <esp_lcd_panel_vendor.h>
 #include <esp_lcd_panel_io.h>
 #include <esp_lcd_panel_ops.h>
+#include <esp_lcd_touch.h>
+#include <esp_lcd_touch_ft5x06.h>
+#include <esp_lvgl_port.h>
 
 #include <wifi_station.h>
 #include "wifi_board.h"
@@ -12,6 +15,7 @@
 #include "mcp_server.h"
 #include "adc_battery_monitor.h"
 
+#include <esp_err.h>
 #include <esp_log.h>
 #include <driver/i2c_master.h>
 #include <driver/spi_common.h>
@@ -25,103 +29,69 @@
 
 #define TAG "FreenoveESP32S3Display"
 
-class TouchDriver {
-public:
-    TouchDriver() : dev_(nullptr) {}
-
-    bool Init(i2c_master_bus_handle_t bus, uint8_t addr) {
-        i2c_device_config_t cfg = {
-            .device_address = addr,
-            .scl_speed_hz = 400000,
-            .scl_wait_us = 0,
-        };
-        return i2c_master_bus_add_device(bus, &cfg, &dev_) == ESP_OK;
-    }
-
-    bool Read(bool &touched, uint16_t &x, uint16_t &y) {
-        touched = false;
-        x = y = 0;
-        if (!dev_) return false;
-
-        uint8_t reg = 0x02;
-        uint8_t buf[5];
-        if (i2c_master_transmit_receive(dev_, &reg, 1, buf, 5, 50) != ESP_OK) return false;
-
-        uint8_t points = buf[0] & 0x0F;
-        if (points == 0) return true;
-
-        touched = true;
-        x = ((buf[1] & 0x0F) << 8) | buf[2];
-        y = ((buf[3] & 0x0F) << 8) | buf[4];
-        return true;
-    }
-
-private:
-    i2c_master_dev_handle_t dev_;
-};
-
 class FreenoveESP32S3Display : public WifiBoard {
 private:
     Button boot_button_;
     LcdDisplay *display_;
     i2c_master_bus_handle_t codec_i2c_bus_;
-    TouchDriver touch_;
+    esp_lcd_touch_handle_t touch_handle_ = nullptr;
+    esp_lcd_panel_io_handle_t touch_io_handle_ = nullptr;
     AdcBatteryMonitor* adc_battery_monitor_;
 
     void InitializeBatteryMonitor() {
         adc_battery_monitor_ = new AdcBatteryMonitor(ADC_UNIT_1, ADC_CHANNEL_8, 200000, 200000, GPIO_NUM_NC);
     }
 
-    static void TouchTask(void *arg) {
-        auto *self = static_cast<FreenoveESP32S3Display*>(arg);
-        auto &app = Application::GetInstance();
-
-        uint32_t last_tap = 0;
-        uint32_t down_start = 0;
-        bool down = false;
-
-        while (true) {
-            bool t;
-            uint16_t x, y;
-            self->touch_.Read(t, x, y);
-
-            uint32_t now = esp_timer_get_time() / 1000;
-
-            if (t) {
-                if (!down) {
-                    down = true;
-                    down_start = now;
-                }
-            }
-
-            if (!t && down) {
-                down = false;
-
-                uint32_t press = now - down_start;
-
-                // long tap
-                if (press > 3000) {
-                    self->EnterWifiConfigMode();
-                } else {
-                    // double tap
-                    if (now - last_tap < 250) {
-                        app.StartListening();
-                        last_tap = 0;
-                    } else {
-                        // single tap
-                        app.ToggleChatState();
-                        last_tap = now;
-                    }
-                }
-            }
-
-            vTaskDelay(pdMS_TO_TICKS(50));
-        }
-    }
-
     void InitializeTouch() {
-        if (!touch_.Init(codec_i2c_bus_, 0x38)) return;
-        xTaskCreatePinnedToCore(TouchTask, "touch_task", 4096, this, 5, nullptr, 0);
+        // The panel is rotated to landscape (DISPLAY_SWAP_XY), so the raw
+        // portrait touch coordinates are swapped by the LVGL touch port.
+        esp_lcd_panel_io_i2c_config_t tp_io_config = {};
+        tp_io_config.dev_addr = 0x38;
+        tp_io_config.control_phase_bytes = 1;
+        tp_io_config.dc_bit_offset = 0;
+        tp_io_config.lcd_cmd_bits = 8;
+        tp_io_config.flags.disable_control_phase = 1;
+        tp_io_config.scl_speed_hz = 400 * 1000;
+
+        esp_err_t ret =
+            esp_lcd_new_panel_io_i2c(codec_i2c_bus_, &tp_io_config, &touch_io_handle_);
+        if (ret != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to create touch panel IO: %s", esp_err_to_name(ret));
+            return;
+        }
+
+        // esp_lcd_touch mirrors the raw portrait axes BEFORE swapping them,
+        // so x_max/y_max must stay 240/320 (raw) for mirroring to be correct.
+        esp_lcd_touch_config_t tp_cfg = {};
+        tp_cfg.x_max = 240;
+        tp_cfg.y_max = 320;
+        tp_cfg.rst_gpio_num = GPIO_NUM_NC;
+        tp_cfg.int_gpio_num = GPIO_NUM_NC;
+        tp_cfg.levels.reset = 0;
+        tp_cfg.levels.interrupt = 0;
+        tp_cfg.flags.swap_xy = DISPLAY_SWAP_XY;
+        tp_cfg.flags.mirror_x = true;
+        tp_cfg.flags.mirror_y = false;
+
+        ret = esp_lcd_touch_new_i2c_ft5x06(touch_io_handle_, &tp_cfg, &touch_handle_);
+        if (ret != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to initialize FT6236 touch: %s", esp_err_to_name(ret));
+            return;
+        }
+
+        const lvgl_port_touch_cfg_t touch_cfg = {
+            .disp = lv_display_get_default(),
+            .handle = touch_handle_,
+        };
+        if (touch_cfg.disp == nullptr) {
+            ESP_LOGE(TAG, "Touch display is not initialized");
+            return;
+        }
+        if (lvgl_port_add_touch(&touch_cfg) == nullptr) {
+            ESP_LOGE(TAG, "Failed to add touch to LVGL");
+            return;
+        }
+        ESP_LOGI(TAG, "FT6236 touch registered with LVGL");
     }
 
     void InitializeI2c() {
@@ -193,7 +163,7 @@ private:
         display_ = new SpiLcdDisplay(panel_io, panel,
             DISPLAY_WIDTH, DISPLAY_HEIGHT,
             DISPLAY_OFFSET_X, DISPLAY_OFFSET_Y,
-            DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY);
+            DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY, true);
     }
 
     void InitializeTools() {
