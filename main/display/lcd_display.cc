@@ -883,25 +883,33 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_bg_color(container_, lvgl_theme->background_color(), 0);
     lv_obj_set_style_border_color(container_, lvgl_theme->border_color(), 0);
 
-    /* This layout draws no status icons, but LvglDisplay::UpdateStatusBar() keeps
-       writing to them, so create them hidden instead of leaving dangling pointers. */
-    network_label_ = lv_label_create(screen);
+    /* Top bar (official layout): WiFi icon left, clock / conversation state in
+       the middle, mute + battery right. LvglDisplay::UpdateStatusBar() drives
+       all three icons and writes HH:MM into status_label_ while idle; during a
+       conversation the same slot shows the device state instead. */
+    top_bar_ = lv_obj_create(screen);
+    lv_obj_set_style_radius(top_bar_, 0, 0);
+    lv_obj_set_style_bg_opa(top_bar_, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(top_bar_, 0, 0);
+    lv_obj_set_style_pad_all(top_bar_, 0, 0);
+    lv_obj_set_scrollbar_mode(top_bar_, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_remove_flag(top_bar_, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_remove_flag(top_bar_, LV_OBJ_FLAG_CLICKABLE);
+
+    network_label_ = lv_label_create(top_bar_);
     lv_label_set_text(network_label_, "");
     lv_obj_set_style_text_font(network_label_, icon_font, 0);
     lv_obj_set_style_text_color(network_label_, lvgl_theme->text_color(), 0);
-    lv_obj_add_flag(network_label_, LV_OBJ_FLAG_HIDDEN);
 
-    mute_label_ = lv_label_create(screen);
+    mute_label_ = lv_label_create(top_bar_);
     lv_label_set_text(mute_label_, "");
     lv_obj_set_style_text_font(mute_label_, icon_font, 0);
     lv_obj_set_style_text_color(mute_label_, lvgl_theme->text_color(), 0);
-    lv_obj_add_flag(mute_label_, LV_OBJ_FLAG_HIDDEN);
 
-    battery_label_ = lv_label_create(screen);
+    battery_label_ = lv_label_create(top_bar_);
     lv_label_set_text(battery_label_, "");
     lv_obj_set_style_text_font(battery_label_, icon_font, 0);
     lv_obj_set_style_text_color(battery_label_, lvgl_theme->text_color(), 0);
-    lv_obj_add_flag(battery_label_, LV_OBJ_FLAG_HIDDEN);
 
     /* Avatar: centered, doubles as the talk button (no separate mic button) */
     emoji_box_ = lv_obj_create(screen);
@@ -930,15 +938,15 @@ void LcdDisplay::SetupUI() {
     lv_obj_center(emoji_image_);
     lv_obj_add_flag(emoji_image_, LV_OBJ_FLAG_HIDDEN);
 
-    /* Status line under the avatar (also hosts the idle clock) */
-    status_label_ = lv_label_create(screen);
+    /* Center of the top bar: clock when idle, conversation state otherwise */
+    status_label_ = lv_label_create(top_bar_);
     lv_obj_set_style_text_font(status_label_, text_font, 0);
     lv_obj_set_style_text_align(status_label_, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_text_color(status_label_, lvgl_theme->text_color(), 0);
     lv_label_set_long_mode(status_label_, LV_LABEL_LONG_SCROLL_CIRCULAR);
     lv_label_set_text(status_label_, Lang::Strings::INITIALIZING);
 
-    notification_label_ = lv_label_create(screen);
+    notification_label_ = lv_label_create(top_bar_);
     lv_obj_set_style_text_font(notification_label_, text_font, 0);
     lv_obj_set_style_text_align(notification_label_, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_text_color(notification_label_, lvgl_theme->text_color(), 0);
@@ -1077,7 +1085,7 @@ void LcdDisplay::SetChatMessage(const char* role, const char* content) {
 }
 
 void LcdDisplay::ApplyChatLayout() {
-    if (chat_area_ == nullptr || chat_message_label_ == nullptr) {
+    if (chat_area_ == nullptr || chat_message_label_ == nullptr || top_bar_ == nullptr) {
         return;
     }
     auto lvgl_theme = static_cast<LvglTheme*>(current_theme_);
@@ -1087,36 +1095,49 @@ void LcdDisplay::ApplyChatLayout() {
     }
     const lv_font_t* font = text_font->font();
 
-    /* Portrait 240x320 block: a 64px avatar, one status line, then five text
-       lines. Everything follows the active text font, so swapping the built-in
-       font for the Common 20px assets font keeps five full lines visible. */
+    /* Top bar: WiFi icon (left), clock / conversation state (center), mute and
+       battery (right), matching the upstream layout but without any buttons. */
+    constexpr lv_coord_t kTopPad = 6;
+    constexpr lv_coord_t kIconGap = 4;
+    const lv_coord_t line_h = font->line_height;
+    const lv_coord_t top_h = line_h;
+    const lv_coord_t icon_w =
+        lvgl_theme->icon_font() != nullptr && lvgl_theme->icon_font()->font() != nullptr
+            ? lvgl_theme->icon_font()->font()->line_height
+            : 20;
+    const lv_coord_t center_w = LV_HOR_RES - 2 * (kTopPad + 2 * icon_w + kIconGap);
+
+    lv_obj_set_size(top_bar_, LV_HOR_RES, top_h);
+    lv_obj_align(top_bar_, LV_ALIGN_TOP_MID, 0, 0);
+
+    lv_obj_align(network_label_, LV_ALIGN_LEFT_MID, kTopPad, 0);
+    lv_obj_align(mute_label_, LV_ALIGN_RIGHT_MID, -(kTopPad + icon_w + kIconGap), 0);
+    lv_obj_align(battery_label_, LV_ALIGN_RIGHT_MID, -kTopPad, 0);
+
+    lv_obj_set_style_text_font(status_label_, font, 0);
+    lv_obj_set_width(status_label_, center_w);
+    lv_obj_set_height(status_label_, top_h);
+    lv_obj_align(status_label_, LV_ALIGN_CENTER, 0, 0);
+
+    lv_obj_set_style_text_font(notification_label_, font, 0);
+    lv_obj_set_width(notification_label_, center_w);
+    lv_obj_set_height(notification_label_, top_h);
+    lv_obj_align(notification_label_, LV_ALIGN_CENTER, 0, 0);
+
+    /* Avatar + five text lines, centered in the space below the top bar. */
     constexpr int kChatLines = 5;
     constexpr lv_coord_t kSidePad = 8;
     constexpr lv_coord_t kAvatarSize = 64;
     constexpr lv_coord_t kAvatarGap = 8;
-    constexpr lv_coord_t kStatusGap = 10;
 
-    const lv_coord_t line_h = font->line_height;
-    const lv_coord_t status_h = line_h;
     const lv_coord_t chat_w = LV_HOR_RES - 2 * kSidePad;
     const lv_coord_t chat_h = line_h * kChatLines;
-    const lv_coord_t block_h = kAvatarSize + kAvatarGap + status_h + kStatusGap + chat_h;
-    const lv_coord_t top = LV_MAX((LV_VER_RES - block_h) / 2, 0);
-    const lv_coord_t status_y = top + kAvatarSize + kAvatarGap;
-    const lv_coord_t chat_y = status_y + status_h + kStatusGap;
+    const lv_coord_t block_h = kAvatarSize + kAvatarGap + chat_h;
+    const lv_coord_t body_top = top_h + LV_MAX((LV_VER_RES - top_h - block_h) / 2, 0);
+    const lv_coord_t chat_y = body_top + kAvatarSize + kAvatarGap;
 
     lv_obj_set_size(emoji_box_, kAvatarSize, kAvatarSize);
-    lv_obj_align(emoji_box_, LV_ALIGN_TOP_MID, 0, top);
-
-    lv_obj_set_style_text_font(status_label_, font, 0);
-    lv_obj_set_width(status_label_, chat_w);
-    lv_obj_set_height(status_label_, status_h);
-    lv_obj_align(status_label_, LV_ALIGN_TOP_MID, 0, status_y);
-
-    lv_obj_set_style_text_font(notification_label_, font, 0);
-    lv_obj_set_width(notification_label_, chat_w);
-    lv_obj_set_height(notification_label_, status_h);
-    lv_obj_align(notification_label_, LV_ALIGN_TOP_MID, 0, status_y);
+    lv_obj_align(emoji_box_, LV_ALIGN_TOP_MID, 0, body_top);
 
     lv_obj_set_pos(chat_area_, kSidePad, chat_y);
     lv_obj_set_size(chat_area_, chat_w, chat_h);
