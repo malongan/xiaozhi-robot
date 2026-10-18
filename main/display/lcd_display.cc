@@ -1229,7 +1229,7 @@ void LcdDisplay::SetupUI() {
 
     /* Bottom media entry: line-art keyboard icon, shown only while idle. */
     media_bar_ = lv_obj_create(screen);
-    lv_obj_set_size(media_bar_, 84, 42);
+    lv_obj_set_size(media_bar_, 72, 44);
     lv_obj_set_style_bg_opa(media_bar_, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(media_bar_, 0, 0);
     lv_obj_set_style_pad_all(media_bar_, 0, 0);
@@ -1240,7 +1240,7 @@ void LcdDisplay::SetupUI() {
     lv_obj_add_event_cb(media_bar_, &LcdDisplay::OnMediaBarClicked, LV_EVENT_CLICKED, this);
 
     lv_obj_t* keyboard = lv_obj_create(media_bar_);
-    lv_obj_set_size(keyboard, 38, 24);
+    lv_obj_set_size(keyboard, 32, 20);
     lv_obj_align(keyboard, LV_ALIGN_BOTTOM_MID, 0, 0);
     lv_obj_set_style_radius(keyboard, 5, 0);
     lv_obj_set_style_bg_opa(keyboard, LV_OPA_TRANSP, 0);
@@ -1253,8 +1253,8 @@ void LcdDisplay::SetupUI() {
     for (int row = 0; row < 2; ++row) {
         for (int col = 0; col < 4; ++col) {
             lv_obj_t* key = lv_obj_create(keyboard);
-            lv_obj_set_size(key, 4, 2);
-            lv_obj_set_pos(key, 5 + col * 8, 5 + row * 5);
+            lv_obj_set_size(key, 3, 2);
+            lv_obj_set_pos(key, 4 + col * 6, 4 + row * 5);
             lv_obj_set_style_radius(key, 1, 0);
             lv_obj_set_style_bg_color(key, lvgl_theme->text_color(), 0);
             lv_obj_set_style_bg_opa(key, LV_OPA_COVER, 0);
@@ -1265,8 +1265,8 @@ void LcdDisplay::SetupUI() {
         }
     }
     lv_obj_t* spacebar = lv_obj_create(keyboard);
-    lv_obj_set_size(spacebar, 12, 2);
-    lv_obj_set_pos(spacebar, 13, 16);
+    lv_obj_set_size(spacebar, 10, 2);
+    lv_obj_set_pos(spacebar, 11, 15);
     lv_obj_set_style_radius(spacebar, 1, 0);
     lv_obj_set_style_bg_color(spacebar, lvgl_theme->text_color(), 0);
     lv_obj_set_style_bg_opa(spacebar, LV_OPA_COVER, 0);
@@ -1274,16 +1274,16 @@ void LcdDisplay::SetupUI() {
     lv_obj_remove_flag(spacebar, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_remove_flag(spacebar, LV_OBJ_FLAG_CLICKABLE);
 
-    media_cable_pts_[0] = {0, 12};
-    media_cable_pts_[1] = {3, 5};
-    media_cable_pts_[2] = {9, 1};
-    media_cable_pts_[3] = {13, 0};
+    media_cable_pts_[0] = {0, 10};
+    media_cable_pts_[1] = {2, 4};
+    media_cable_pts_[2] = {7, 1};
+    media_cable_pts_[3] = {10, 0};
     lv_obj_t* cable = lv_line_create(media_bar_);
     lv_line_set_points(cable, media_cable_pts_, 4);
     lv_obj_set_style_line_width(cable, 2, 0);
     lv_obj_set_style_line_color(cable, lvgl_theme->text_color(), 0);
     lv_obj_set_style_line_rounded(cable, true, 0);
-    lv_obj_align(cable, LV_ALIGN_TOP_MID, 4, 0);
+    lv_obj_align(cable, LV_ALIGN_TOP_MID, 2, 0);
     lv_obj_remove_flag(cable, LV_OBJ_FLAG_CLICKABLE);
 
     /* Media screen: full-screen overlay with six outline media keys. */
@@ -1402,7 +1402,7 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_text_align(bt_empty_, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_text_font(bt_empty_, text_font, 0);
     lv_obj_set_style_text_color(bt_empty_, lvgl_theme->text_color(), 0);
-    lv_label_set_text(bt_empty_, "尚未配对任何设备\n在电脑/手机蓝牙里\n搜索 Xiaozhi-Media 配对");
+    lv_label_set_text(bt_empty_, "蓝牙功能开发中\n即将支持 Xiaozhi-Media\n（第二阶段接入）");
     lv_obj_align(bt_empty_, LV_ALIGN_CENTER, 0, 10);
 
     chat_lines_per_page_ = 5;  // idle layout: five lines + media entry icon
@@ -1706,7 +1706,7 @@ void LcdDisplay::ApplyChatLayout() {
         lv_obj_align_to(avatar_think_dots_, emoji_box_, LV_ALIGN_TOP_RIGHT, 6, -4);
     }
     if (media_bar_ != nullptr) {
-        lv_obj_align(media_bar_, LV_ALIGN_BOTTOM_MID, 0, -2);
+        lv_obj_align(media_bar_, LV_ALIGN_BOTTOM_MID, 0, -10);
     }
 
     lv_obj_set_pos(chat_area_, kChatSidePad, chat_y);
@@ -1776,9 +1776,9 @@ void LcdDisplay::OnChatAreaClicked(lv_event_t* e) {
     lv_obj_get_coords(self->chat_area_, &area);
     const lv_coord_t middle = (area.x1 + area.x2) / 2;
     if (point.x < middle) {
-        self->GoToPage(self->page_index_ + 1, true);
-    } else {
         self->GoToPage(self->page_index_ - 1, true);
+    } else {
+        self->GoToPage(self->page_index_ + 1, true);
     }
 }
 

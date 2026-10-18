@@ -71,7 +71,9 @@ private:
         tp_cfg.levels.reset = 0;
         tp_cfg.levels.interrupt = 0;
         tp_cfg.flags.swap_xy = DISPLAY_SWAP_XY;
-        tp_cfg.flags.mirror_x = true;
+        // Portrait panel: the raw X axis already matches the visible layout,
+        // mirroring it swapped left/right taps (seen as back/bluetooth swapped).
+        tp_cfg.flags.mirror_x = false;
         tp_cfg.flags.mirror_y = false;
 
         ret = esp_lcd_touch_new_i2c_ft5x06(touch_io_handle_, &tp_cfg, &touch_handle_);
