@@ -63,23 +63,8 @@ protected:
     lv_obj_t* bluetooth_screen_ = nullptr;  // paired-device list
     bool media_screen_visible_ = false;
     bool bluetooth_screen_visible_ = false;
-    lv_obj_t* media_keys_[9] = {};
-    lv_obj_t* media_key_icons_[9] = {};
-    lv_timer_t* media_repeat_timer_ = nullptr;
-    int media_repeat_key_ = -1;
-    bool media_repeat_active_ = false;
-    uint32_t media_repeat_next_ = 0;
-    bool media_playing_ = false;
-    lv_obj_t* keyboard_panel_ = nullptr;
-    lv_obj_t* numpad_panel_ = nullptr;
-    int media_panel_ = 0;  // 0 media, 1 keyboard, 2 numpad
-    lv_obj_t* keyboard_labels_[64] = {};
-    int keyboard_label_count_ = 0;
-    bool shift_active_ = false;
-    lv_obj_t* kb_shift_btn_ = nullptr;
-    lv_timer_t* media_title_timer_ = nullptr;
+    lv_obj_t* media_keys_[6] = {};
     lv_obj_t* media_hint_ = nullptr;
-    lv_obj_t* media_mode_label_ = nullptr;
     lv_obj_t* media_title_ = nullptr;
     lv_obj_t* bt_title_ = nullptr;
     lv_obj_t* bt_empty_ = nullptr;
@@ -90,7 +75,6 @@ protected:
     lv_obj_t* bt_forget_buttons_[8] = {};
     lv_obj_t* bt_disconnect_btn_ = nullptr;
     lv_obj_t* bt_disconnect_label_ = nullptr;
-    lv_obj_t* bt_clear_label_ = nullptr;
     lv_obj_t* page_progress_ = nullptr;  // faint press ring around the avatar
     LvglCBinFont* chat_font_ = nullptr;  // 18px Common font loaded from the assets partition
 
@@ -154,20 +138,9 @@ protected:
     static void OnMediaBarClicked(lv_event_t* e);
     static void OnMediaBackClicked(lv_event_t* e);
     static void OnMediaKeyClicked(lv_event_t* e);
-    static void MediaRepeatTimerCb(lv_timer_t* timer);
-    static void OnMediaPanelCycle(lv_event_t* e);
-    static void OnKeyboardKeyClicked(lv_event_t* e);
-    static void OnMediaModeClicked(lv_event_t* e);
-    static void MediaTitleTimerCb(lv_timer_t* timer);
-    void ShowTitleFeedback(const char* text);
-    void UpdatePanelTitle();
-    void SetMediaPanel(int panel);
-    void HandleMediaKeyDown(int index);
-    void HandleMediaKeyUp();
     static void OnBluetoothEntryClicked(lv_event_t* e);
     static void OnBluetoothBackClicked(lv_event_t* e);
     static void OnBtForgetClicked(lv_event_t* e);
-    static void OnBtClearAllClicked(lv_event_t* e);
     static void OnBtDisconnectClicked(lv_event_t* e);
     void RefreshBluetoothList();
     void ShowMediaScreen(bool show);
