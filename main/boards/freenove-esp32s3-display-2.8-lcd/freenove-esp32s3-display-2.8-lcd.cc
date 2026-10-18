@@ -1,45 +1,47 @@
-#include <esp_lcd_panel_vendor.h>
 #include <esp_lcd_panel_io.h>
 #include <esp_lcd_panel_ops.h>
+#include <esp_lcd_panel_vendor.h>
 #include <esp_lcd_touch.h>
 #include <esp_lcd_touch_ft5x06.h>
 #include <esp_lvgl_port.h>
 
 #include <wifi_station.h>
-#include "wifi_board.h"
-#include "codecs/es8311_audio_codec.h"
-#include "display/lcd_display.h"
+#include "adc_battery_monitor.h"
 #include "application.h"
 #include "button.h"
+#include "codecs/es8311_audio_codec.h"
 #include "config.h"
+#include "display/lcd_display.h"
 #include "mcp_server.h"
-#include "adc_battery_monitor.h"
+#include "settings.h"
+#include "wifi_board.h"
 
-#include <esp_err.h>
-#include <esp_log.h>
 #include <driver/i2c_master.h>
 #include <driver/spi_common.h>
+#include <esp_err.h>
+#include <esp_log.h>
+#include <esp_timer.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
-#include <esp_timer.h>
 
+#include "esp_lcd_ili9341.h"
 #include "led/single_led.h"
 #include "system_reset.h"
-#include "esp_lcd_ili9341.h"
 
 #define TAG "FreenoveESP32S3Display"
 
 class FreenoveESP32S3Display : public WifiBoard {
 private:
     Button boot_button_;
-    LcdDisplay *display_;
+    LcdDisplay* display_;
     i2c_master_bus_handle_t codec_i2c_bus_;
     esp_lcd_touch_handle_t touch_handle_ = nullptr;
     esp_lcd_panel_io_handle_t touch_io_handle_ = nullptr;
     AdcBatteryMonitor* adc_battery_monitor_;
 
     void InitializeBatteryMonitor() {
-        adc_battery_monitor_ = new AdcBatteryMonitor(ADC_UNIT_1, ADC_CHANNEL_8, 200000, 200000, GPIO_NUM_NC);
+        adc_battery_monitor_ =
+            new AdcBatteryMonitor(ADC_UNIT_1, ADC_CHANNEL_8, 200000, 200000, GPIO_NUM_NC);
     }
 
     void InitializeTouch() {
@@ -53,8 +55,7 @@ private:
         tp_io_config.flags.disable_control_phase = 1;
         tp_io_config.scl_speed_hz = 400 * 1000;
 
-        esp_err_t ret =
-            esp_lcd_new_panel_io_i2c(codec_i2c_bus_, &tp_io_config, &touch_io_handle_);
+        esp_err_t ret = esp_lcd_new_panel_io_i2c(codec_i2c_bus_, &tp_io_config, &touch_io_handle_);
         if (ret != ESP_OK) {
             ESP_LOGW(TAG, "Failed to create touch panel IO: %s", esp_err_to_name(ret));
             return;
@@ -103,9 +104,10 @@ private:
             .glitch_ignore_cnt = 7,
             .intr_priority = 0,
             .trans_queue_depth = 0,
-            .flags = {
-                .enable_internal_pullup = 1,
-            },
+            .flags =
+                {
+                    .enable_internal_pullup = 1,
+                },
         };
         ESP_ERROR_CHECK(i2c_new_master_bus(&i2c_bus_cfg, &codec_i2c_bus_));
     }
@@ -123,7 +125,7 @@ private:
 
     void InitializeButtons() {
         boot_button_.OnClick([this]() {
-            auto &app = Application::GetInstance();
+            auto& app = Application::GetInstance();
             if (app.GetDeviceState() == kDeviceStateStarting) {
                 EnterWifiConfigMode();
             }
@@ -160,18 +162,24 @@ private:
         esp_lcd_panel_invert_color(panel, DISPLAY_INVERT_COLOR);
         esp_lcd_panel_swap_xy(panel, DISPLAY_SWAP_XY);
         esp_lcd_panel_mirror(panel, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y);
-        display_ = new SpiLcdDisplay(panel_io, panel,
-            DISPLAY_WIDTH, DISPLAY_HEIGHT,
-            DISPLAY_OFFSET_X, DISPLAY_OFFSET_Y,
-            DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY, true);
+        display_ = new SpiLcdDisplay(panel_io, panel, DISPLAY_WIDTH, DISPLAY_HEIGHT,
+                                     DISPLAY_OFFSET_X, DISPLAY_OFFSET_Y, DISPLAY_MIRROR_X,
+                                     DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY, true);
     }
 
-    void InitializeTools() {
-    }
+    void InitializeTools() {}
 
 public:
-    FreenoveESP32S3Display(): boot_button_(BOOT_BUTTON_GPIO)
-    {
+    FreenoveESP32S3Display() : boot_button_(BOOT_BUTTON_GPIO) {
+        // This build uses the dark UI (white glowing avatar on black).
+        // Apply it once so a later manual theme change still persists.
+        {
+            Settings display_settings("display", true);
+            if (!display_settings.GetBool("dark_default", false)) {
+                display_settings.SetString("theme", "dark");
+                display_settings.SetBool("dark_default", true);
+            }
+        }
         InitializeI2c();
         InitializeBatteryMonitor();
         InitializeSpi();
@@ -182,27 +190,27 @@ public:
         GetBacklight()->SetBrightness(100);
     }
 
-    virtual Led *GetLed() override {
+    virtual Led* GetLed() override {
         static SingleLed led(BUILTIN_LED_GPIO);
         return &led;
     }
 
     virtual AudioCodec* GetAudioCodec() override {
-        static Es8311AudioCodec audio_codec(codec_i2c_bus_, AUDIO_CODEC_I2C_NUM,
-            AUDIO_INPUT_SAMPLE_RATE, AUDIO_OUTPUT_SAMPLE_RATE, AUDIO_I2S_GPIO_MCLK, AUDIO_I2S_GPIO_BCLK,
-            AUDIO_I2S_GPIO_WS, AUDIO_I2S_GPIO_DOUT, AUDIO_I2S_GPIO_DIN, AUDIO_CODEC_PA_PIN,
-            AUDIO_CODEC_ES8311_ADDR, true, true);
+        static Es8311AudioCodec audio_codec(
+            codec_i2c_bus_, AUDIO_CODEC_I2C_NUM, AUDIO_INPUT_SAMPLE_RATE, AUDIO_OUTPUT_SAMPLE_RATE,
+            AUDIO_I2S_GPIO_MCLK, AUDIO_I2S_GPIO_BCLK, AUDIO_I2S_GPIO_WS, AUDIO_I2S_GPIO_DOUT,
+            AUDIO_I2S_GPIO_DIN, AUDIO_CODEC_PA_PIN, AUDIO_CODEC_ES8311_ADDR, true, true);
         return &audio_codec;
     }
 
-    virtual Display *GetDisplay() override { return display_; }
+    virtual Display* GetDisplay() override { return display_; }
 
-    virtual Backlight *GetBacklight() override {
+    virtual Backlight* GetBacklight() override {
         static PwmBacklight backlight(DISPLAY_BACKLIGHT_PIN, DISPLAY_BACKLIGHT_OUTPUT_INVERT);
         return &backlight;
     }
 
-    virtual bool GetBatteryLevel(int &level, bool& charging, bool& discharging) override {
+    virtual bool GetBatteryLevel(int& level, bool& charging, bool& discharging) override {
         charging = adc_battery_monitor_->IsCharging();
         discharging = adc_battery_monitor_->IsDischarging();
         level = adc_battery_monitor_->GetBatteryLevel();

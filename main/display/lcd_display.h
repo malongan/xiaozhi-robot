@@ -59,6 +59,16 @@ protected:
     lv_obj_t* page_progress_ = nullptr;  // faint press ring around the avatar
     LvglCBinFont* chat_font_ = nullptr;  // 18px Common font loaded from the assets partition
 
+    // Procedural round-face avatar (white circle + two pill eyes).
+    lv_obj_t* avatar_face_ = nullptr;
+    lv_obj_t* avatar_eye_left_ = nullptr;
+    lv_obj_t* avatar_eye_right_ = nullptr;
+    lv_obj_t* avatar_eye_happy_left_ = nullptr;
+    lv_obj_t* avatar_eye_happy_right_ = nullptr;
+    lv_obj_t* avatar_think_dots_ = nullptr;
+    AvatarExpression avatar_override_ = kAvatarExpressionNone;
+    uint32_t avatar_override_until_ = 0;
+
     // Procedural avatar animation (breathing, blink, state motion).
     lv_timer_t* avatar_anim_timer_ = nullptr;
     AvatarMood avatar_mood_ = kAvatarMoodIdle;
@@ -69,6 +79,7 @@ protected:
     void ApplyChatLayout();
     const lv_font_t* GetChatFont();
     static void AvatarAnimTimerCb(lv_timer_t* timer);
+    void SetAvatarEmotion(const char* emotion);
     void RewrapMessage(size_t index);
     void RewrapAllMessages();
     void RebuildChatPages();

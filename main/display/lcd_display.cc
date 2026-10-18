@@ -84,7 +84,7 @@ LcdDisplay::LcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_
 
     // Load theme from settings
     Settings settings("display", false);
-    std::string theme_name = settings.GetString("theme", "light");
+    std::string theme_name = settings.GetString("theme", "dark");
     current_theme_ = LvglThemeManager::GetInstance().GetTheme(theme_name);
 
     // Create a timer to hide the preview image
@@ -867,9 +867,11 @@ constexpr int kChatLinesPerPage = 6;
 constexpr size_t kMaxChatMessages = 40;
 constexpr size_t kMaxChatTextBytes = 1000;
 constexpr lv_coord_t kChatSidePad = 8;
-constexpr lv_coord_t kAvatarSize = 64;
-constexpr lv_coord_t kAvatarTopGap = 7;
-constexpr lv_coord_t kAvatarGap = 16;
+constexpr lv_coord_t kAvatarSize = 80;
+constexpr lv_coord_t kAvatarTopGap = 5;
+constexpr lv_coord_t kAvatarGap = 10;
+constexpr uint32_t kAvatarFaceColor = 0xF2F6FF;
+constexpr uint32_t kAvatarEyeColor = 0x0B0B0D;
 constexpr uint16_t kAvatarLongPressMs = 2000;
 constexpr lv_coord_t kTopBarPad = 6;
 constexpr lv_coord_t kTopBarIconGap = 4;
@@ -1084,6 +1086,64 @@ void LcdDisplay::SetupUI() {
     lv_obj_add_event_cb(emoji_box_, &LcdDisplay::OnAvatarLongPressed, LV_EVENT_LONG_PRESSED, this);
     lv_obj_add_event_cb(emoji_box_, &LcdDisplay::OnMicButtonClicked, LV_EVENT_CLICKED, this);
 
+    /* Procedural round face: white circle with two pill eyes (dark UI). */
+    avatar_face_ = lv_obj_create(emoji_box_);
+    lv_obj_remove_flag(avatar_face_, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_remove_flag(avatar_face_, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollbar_mode(avatar_face_, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_set_size(avatar_face_, LV_PCT(100), LV_PCT(100));
+    lv_obj_set_style_radius(avatar_face_, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(avatar_face_, lv_color_hex(kAvatarFaceColor), 0);
+    lv_obj_set_style_bg_opa(avatar_face_, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(avatar_face_, 0, 0);
+    lv_obj_set_style_pad_all(avatar_face_, 0, 0);
+    lv_obj_set_style_clip_corner(avatar_face_, true, 0);
+
+    auto create_pill_eye = [this]() {
+        lv_obj_t* eye = lv_obj_create(avatar_face_);
+        lv_obj_remove_flag(eye, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_remove_flag(eye, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_set_scrollbar_mode(eye, LV_SCROLLBAR_MODE_OFF);
+        lv_obj_set_size(eye, 8, 22);
+        lv_obj_set_style_radius(eye, 4, 0);
+        lv_obj_set_style_bg_color(eye, lv_color_hex(kAvatarEyeColor), 0);
+        lv_obj_set_style_bg_opa(eye, LV_OPA_COVER, 0);
+        lv_obj_set_style_border_width(eye, 0, 0);
+        lv_obj_set_style_pad_all(eye, 0, 0);
+        lv_obj_align(eye, LV_ALIGN_CENTER, 0, 0);
+        return eye;
+    };
+    avatar_eye_left_ = create_pill_eye();
+    avatar_eye_right_ = create_pill_eye();
+
+    auto create_happy_eye = [this]() {
+        lv_obj_t* arc = lv_arc_create(avatar_face_);
+        lv_obj_remove_flag(arc, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_remove_flag(arc, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_set_scrollbar_mode(arc, LV_SCROLLBAR_MODE_OFF);
+        lv_obj_set_size(arc, 20, 20);
+        lv_obj_set_style_bg_opa(arc, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_border_width(arc, 0, 0);
+        lv_obj_set_style_arc_width(arc, 4, LV_PART_MAIN);
+        lv_obj_set_style_arc_color(arc, lv_color_hex(kAvatarEyeColor), LV_PART_MAIN);
+        lv_obj_set_style_arc_opa(arc, LV_OPA_COVER, LV_PART_MAIN);
+        lv_obj_set_style_arc_opa(arc, LV_OPA_TRANSP, LV_PART_INDICATOR);
+        lv_obj_set_style_bg_opa(arc, LV_OPA_TRANSP, LV_PART_KNOB);
+        lv_obj_set_style_border_width(arc, 0, LV_PART_KNOB);
+        lv_arc_set_bg_angles(arc, 200, 340);
+        lv_arc_set_angles(arc, 0, 0);
+        lv_obj_add_flag(arc, LV_OBJ_FLAG_HIDDEN);
+        return arc;
+    };
+    avatar_eye_happy_left_ = create_happy_eye();
+    avatar_eye_happy_right_ = create_happy_eye();
+
+    avatar_think_dots_ = lv_label_create(screen);
+    lv_obj_set_style_text_font(avatar_think_dots_, text_font, 0);
+    lv_obj_set_style_text_color(avatar_think_dots_, lvgl_theme->text_color(), 0);
+    lv_label_set_text(avatar_think_dots_, "···");
+    lv_obj_add_flag(avatar_think_dots_, LV_OBJ_FLAG_HIDDEN);
+
     emoji_label_ = lv_label_create(emoji_box_);
     lv_obj_set_style_text_font(emoji_label_, large_icon_font, 0);
     lv_obj_set_style_text_color(emoji_label_, lvgl_theme->text_color(), 0);
@@ -1092,6 +1152,7 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_transform_pivot_x(emoji_label_, lv_pct(50), 0);
     lv_obj_set_style_transform_pivot_y(emoji_label_, lv_pct(50), 0);
     lv_obj_center(emoji_label_);
+    lv_obj_add_flag(emoji_label_, LV_OBJ_FLAG_HIDDEN);
 
     emoji_image_ = lv_img_create(emoji_box_);
     lv_obj_center(emoji_image_);
@@ -1445,8 +1506,11 @@ void LcdDisplay::ApplyChatLayout() {
     lv_obj_align(emoji_box_, LV_ALIGN_TOP_MID, 0, avatar_y);
 
     if (page_progress_ != nullptr) {
-        lv_obj_set_size(page_progress_, kAvatarSize + 12, kAvatarSize + 12);
+        lv_obj_set_size(page_progress_, kAvatarSize + 14, kAvatarSize + 14);
         lv_obj_align_to(page_progress_, emoji_box_, LV_ALIGN_CENTER, 0, 0);
+    }
+    if (avatar_think_dots_ != nullptr) {
+        lv_obj_align_to(avatar_think_dots_, emoji_box_, LV_ALIGN_TOP_RIGHT, 6, -4);
     }
 
     lv_obj_set_pos(chat_area_, kChatSidePad, chat_y);
@@ -1454,6 +1518,11 @@ void LcdDisplay::ApplyChatLayout() {
 
     if (chat_font != nullptr) {
         lv_obj_set_style_text_font(chat_message_label_, chat_font, 0);
+    }
+    if (avatar_think_dots_ != nullptr) {
+        // Rebind: SetTextFont() replaces the theme font when assets load.
+        lv_obj_set_style_text_font(avatar_think_dots_, font, 0);
+        lv_obj_set_style_text_color(avatar_think_dots_, lvgl_theme->text_color(), 0);
     }
     lv_obj_set_style_text_line_space(chat_message_label_, chat_line_space, 0);
     lv_obj_set_width(chat_message_label_, chat_w);
@@ -1573,7 +1642,7 @@ void LcdDisplay::SetAvatarMood(AvatarMood mood) {
 
 void LcdDisplay::AvatarAnimTimerCb(lv_timer_t* timer) {
     auto* self = static_cast<LcdDisplay*>(lv_timer_get_user_data(timer));
-    if (self == nullptr || self->emoji_box_ == nullptr) {
+    if (self == nullptr || self->emoji_box_ == nullptr || self->avatar_face_ == nullptr) {
         return;
     }
     // The preview image temporarily hides the avatar; skip while hidden.
@@ -1585,55 +1654,154 @@ void LcdDisplay::AvatarAnimTimerCb(lv_timer_t* timer) {
     const uint32_t now = lv_tick_get();
     const float t = (now - self->avatar_anim_epoch_) / 1000.0f;
 
-    lv_coord_t breath = 0;
-    lv_coord_t translate_y = 0;
-    int32_t rotation = 0;
+    AvatarExpression expression = kAvatarExpressionIdle;
     switch (self->avatar_mood_) {
         case kAvatarMoodListening:
-            // Attentive: faster, slightly deeper breathing.
-            breath = static_cast<lv_coord_t>(10.0f * sinf(t * 2 * kPi / 2.4f));
+            expression = kAvatarExpressionListening;
             break;
         case kAvatarMoodSpeaking:
-            // Talking: gentle bob plus a light breath.
-            breath = static_cast<lv_coord_t>(5.0f * sinf(t * 2 * kPi / 1.2f));
-            translate_y = -static_cast<lv_coord_t>(fabsf(sinf(t * 2 * kPi / 0.6f)) * 2.0f);
+            expression = kAvatarExpressionSpeaking;
             break;
         case kAvatarMoodThinking:
-            // Waiting for the reply: slow rotation with a calm breath.
-            rotation = static_cast<int32_t>(45.0f * sinf(t * 2 * kPi / 3.0f));
-            breath = static_cast<lv_coord_t>(4.0f * sinf(t * 2 * kPi / 3.0f + 1.2f));
+            expression = kAvatarExpressionThinking;
             break;
         case kAvatarMoodIdle:
         default:
-            // Idle: slow, subtle breathing.
-            breath = static_cast<lv_coord_t>(8.0f * sinf(t * 2 * kPi / 4.0f));
+            expression = kAvatarExpressionIdle;
+            break;
+    }
+    if (self->avatar_override_ != kAvatarExpressionNone && now < self->avatar_override_until_) {
+        expression = self->avatar_override_;
+    }
+
+    const bool happy = expression == kAvatarExpressionHappy;
+    const bool thinking = expression == kAvatarExpressionThinking;
+
+    // Happy shows two arcs instead of the pill eyes; thinking adds dots.
+    if (happy) {
+        if (!lv_obj_has_flag(self->avatar_eye_left_, LV_OBJ_FLAG_HIDDEN)) {
+            lv_obj_add_flag(self->avatar_eye_left_, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(self->avatar_eye_right_, LV_OBJ_FLAG_HIDDEN);
+        }
+        lv_obj_remove_flag(self->avatar_eye_happy_left_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(self->avatar_eye_happy_right_, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        if (lv_obj_has_flag(self->avatar_eye_left_, LV_OBJ_FLAG_HIDDEN)) {
+            lv_obj_remove_flag(self->avatar_eye_left_, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_remove_flag(self->avatar_eye_right_, LV_OBJ_FLAG_HIDDEN);
+        }
+        lv_obj_add_flag(self->avatar_eye_happy_left_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(self->avatar_eye_happy_right_, LV_OBJ_FLAG_HIDDEN);
+    }
+    if (thinking) {
+        lv_obj_remove_flag(self->avatar_think_dots_, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        lv_obj_add_flag(self->avatar_think_dots_, LV_OBJ_FLAG_HIDDEN);
+    }
+
+    lv_coord_t eye_gap = 10;
+    lv_coord_t eye_w = 8;
+    lv_coord_t eye_h = 22;
+    lv_coord_t look_x = 0;
+    lv_coord_t look_y = 0;
+    lv_coord_t breath = 0;
+    lv_coord_t bob = 0;
+    int32_t tilt = 0;
+
+    switch (expression) {
+        case kAvatarExpressionListening:
+            eye_gap = 9;
+            eye_w = 7;
+            eye_h = 20;
+            look_x = static_cast<lv_coord_t>(3.0f * sinf(t * 2 * kPi / 1.9f));
+            look_y = static_cast<lv_coord_t>(1.2f * sinf(t * 2 * kPi / 1.3f));
+            breath = static_cast<lv_coord_t>(9.0f * sinf(t * 2 * kPi / 2.4f));
+            tilt = static_cast<int32_t>(25.0f * sinf(t * 2 * kPi / 2.8f));
+            break;
+        case kAvatarExpressionSpeaking:
+            look_x = static_cast<lv_coord_t>(1.5f * sinf(t * 2 * kPi / 1.7f));
+            breath = static_cast<lv_coord_t>(4.0f * sinf(t * 2 * kPi / 1.2f));
+            bob = -static_cast<lv_coord_t>(fabsf(sinf(t * 2 * kPi / 0.6f)) * 2.0f);
+            tilt = static_cast<int32_t>(10.0f * sinf(t * 2 * kPi / 2.2f));
+            break;
+        case kAvatarExpressionThinking:
+            look_x = 4 + static_cast<lv_coord_t>(0.8f * sinf(t * 2 * kPi / 1.1f));
+            look_y = -4;
+            breath = static_cast<lv_coord_t>(4.0f * sinf(t * 2 * kPi / 2.6f));
+            tilt = static_cast<int32_t>(30.0f * sinf(t * 2 * kPi / 3.2f));
+            break;
+        case kAvatarExpressionHappy:
+            breath = static_cast<lv_coord_t>(8.0f * sinf(t * 2 * kPi / 0.9f));
+            bob = -static_cast<lv_coord_t>(fabsf(sinf(t * 2 * kPi / 0.55f)) * 3.0f);
+            tilt = static_cast<int32_t>(30.0f * sinf(t * 2 * kPi / 1.1f));
+            break;
+        case kAvatarExpressionIdle:
+        default:
+            look_x = static_cast<lv_coord_t>(2.0f * sinf(t * 2 * kPi / 5.3f));
+            look_y = static_cast<lv_coord_t>(1.5f * sinf(t * 2 * kPi / 3.7f));
+            breath = static_cast<lv_coord_t>(7.0f * sinf(t * 2 * kPi / 3.6f));
+            tilt = static_cast<int32_t>(12.0f * sinf(t * 2 * kPi / 6.4f));
             break;
     }
 
-    lv_coord_t scale_x = 256 + breath;
-    lv_coord_t scale_y = 256 + breath;
-
-    // Blink: squash the avatar vertically for ~140 ms every few seconds.
-    if (self->avatar_blink_start_ == 0 && now >= self->avatar_blink_at_) {
-        self->avatar_blink_start_ = now;
-    }
-    if (self->avatar_blink_start_ != 0) {
-        constexpr uint32_t kBlinkDurationMs = 140;
-        const uint32_t elapsed = now - self->avatar_blink_start_;
-        if (elapsed >= kBlinkDurationMs) {
-            self->avatar_blink_start_ = 0;
-            self->avatar_blink_at_ = now + 2600 + (esp_random() % 3500);
-        } else {
-            const float progress = static_cast<float>(elapsed) / kBlinkDurationMs;
-            const float envelope = progress < 0.5f ? progress * 2.0f : (1.0f - progress) * 2.0f;
-            scale_y = static_cast<lv_coord_t>(scale_y * (1.0f - 0.75f * envelope));
+    if (!happy) {
+        lv_coord_t eye_h_draw = eye_h;
+        if (self->avatar_blink_start_ == 0 && now >= self->avatar_blink_at_) {
+            self->avatar_blink_start_ = now;
         }
+        if (self->avatar_blink_start_ != 0) {
+            constexpr uint32_t kBlinkDurationMs = 120;
+            const uint32_t elapsed = now - self->avatar_blink_start_;
+            if (elapsed >= kBlinkDurationMs) {
+                self->avatar_blink_start_ = 0;
+                self->avatar_blink_at_ = now + 2600 + (esp_random() % 3500);
+            } else {
+                const float progress = static_cast<float>(elapsed) / kBlinkDurationMs;
+                const float envelope = progress < 0.5f ? progress * 2.0f : (1.0f - progress) * 2.0f;
+                eye_h_draw = static_cast<lv_coord_t>(eye_h * (1.0f - 0.85f * envelope));
+                if (eye_h_draw < 3) {
+                    eye_h_draw = 3;
+                }
+            }
+        }
+        lv_obj_set_size(self->avatar_eye_left_, eye_w, eye_h_draw);
+        lv_obj_set_size(self->avatar_eye_right_, eye_w, eye_h_draw);
+        lv_obj_align(self->avatar_eye_left_, LV_ALIGN_CENTER, -eye_gap + look_x, look_y);
+        lv_obj_align(self->avatar_eye_right_, LV_ALIGN_CENTER, eye_gap + look_x, look_y);
+    } else {
+        lv_obj_align(self->avatar_eye_happy_left_, LV_ALIGN_CENTER, -eye_gap, 0);
+        lv_obj_align(self->avatar_eye_happy_right_, LV_ALIGN_CENTER, eye_gap, 0);
     }
 
-    lv_obj_set_style_transform_scale_x(self->emoji_box_, scale_x, 0);
-    lv_obj_set_style_transform_scale_y(self->emoji_box_, scale_y, 0);
-    lv_obj_set_style_translate_y(self->emoji_box_, translate_y, 0);
-    lv_obj_set_style_transform_rotation(self->emoji_box_, rotation, 0);
+    lv_obj_set_style_transform_scale_x(self->emoji_box_, 256 + breath, 0);
+    lv_obj_set_style_transform_scale_y(self->emoji_box_, 256 + breath, 0);
+    lv_obj_set_style_translate_y(self->emoji_box_, bob, 0);
+    lv_obj_set_style_transform_rotation(self->emoji_box_, tilt, 0);
+}
+
+void LcdDisplay::SetAvatarEmotion(const char* emotion) {
+    if (emotion == nullptr) {
+        return;
+    }
+    DisplayLockGuard lock(this);
+    const std::string name = emotion;
+    if (name == "neutral" || name.rfind("robot", 0) == 0) {
+        avatar_override_ = kAvatarExpressionNone;
+        return;
+    }
+    AvatarExpression expression = kAvatarExpressionNone;
+    if (name == "happy" || name == "laughing" || name == "funny" || name == "delicious" ||
+        name == "cool" || name == "confident" || name == "relaxed" || name == "kissy" ||
+        name == "loving" || name == "winking") {
+        expression = kAvatarExpressionHappy;
+    } else if (name == "thinking" || name == "confused") {
+        expression = kAvatarExpressionThinking;
+    }
+    if (expression == kAvatarExpressionNone) {
+        return;  // Not part of the core set yet: keep the current mood face.
+    }
+    avatar_override_ = expression;
+    avatar_override_until_ = lv_tick_get() + 2500;
 }
 
 void LcdDisplay::SetEmotion(const char* emotion) {
@@ -1641,6 +1809,12 @@ void LcdDisplay::SetEmotion(const char* emotion) {
         ESP_LOGW(TAG, "SetEmotion('%s') called before SetupUI() - emotion will not be displayed!",
                  emotion);
     }
+#if !CONFIG_USE_WECHAT_MESSAGE_STYLE
+    if (avatar_face_ != nullptr) {
+        SetAvatarEmotion(emotion);
+        return;
+    }
+#endif
     if (emoji_image_ == nullptr) {
         if (setup_ui_called_) {
             ESP_LOGW(TAG,

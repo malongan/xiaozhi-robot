@@ -42,6 +42,16 @@ enum AvatarMood {
     kAvatarMoodThinking,
 };
 
+// Procedural face expressions (core set).
+enum AvatarExpression {
+    kAvatarExpressionNone = 0,
+    kAvatarExpressionIdle,
+    kAvatarExpressionListening,
+    kAvatarExpressionSpeaking,
+    kAvatarExpressionThinking,
+    kAvatarExpressionHappy,
+};
+
 class Display {
 public:
     Display();
