@@ -70,6 +70,11 @@ protected:
     bool media_repeat_active_ = false;
     uint32_t media_repeat_next_ = 0;
     bool media_playing_ = false;
+    lv_obj_t* keyboard_panel_ = nullptr;
+    lv_obj_t* numpad_panel_ = nullptr;
+    int media_panel_ = 0;  // 0 media, 1 keyboard, 2 numpad
+    lv_obj_t* keyboard_labels_[64] = {};
+    int keyboard_label_count_ = 0;
     lv_obj_t* media_hint_ = nullptr;
     lv_obj_t* media_title_ = nullptr;
     lv_obj_t* bt_title_ = nullptr;
@@ -145,6 +150,11 @@ protected:
     static void OnMediaBackClicked(lv_event_t* e);
     static void OnMediaKeyClicked(lv_event_t* e);
     static void MediaRepeatTimerCb(lv_timer_t* timer);
+    static void OnMediaPanelPrev(lv_event_t* e);
+    static void OnMediaPanelNext(lv_event_t* e);
+    static void OnMediaPanelCycle(lv_event_t* e);
+    static void OnKeyboardKeyClicked(lv_event_t* e);
+    void SetMediaPanel(int panel);
     void HandleMediaKeyDown(int index);
     void HandleMediaKeyUp();
     static void OnBluetoothEntryClicked(lv_event_t* e);

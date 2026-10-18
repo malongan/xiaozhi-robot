@@ -468,6 +468,10 @@ bool MediaBle::SendShortcut(uint8_t modifiers, uint8_t keycode) {
     return true;
 }
 
+bool MediaBle::SendKeycode(uint8_t keycode, uint8_t modifiers) {
+    return SendShortcut(modifiers, keycode);
+}
+
 bool MediaBle::SendKey(MediaBleKey key) {
     if (!connected_ || conn_handle_ == 0xFFFF || report_val_handle_ == 0) {
         return false;

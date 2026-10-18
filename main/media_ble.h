@@ -35,6 +35,7 @@ public:
     // Pulses one consumer-control bit (press, 20 ms, release).
     bool SendKey(MediaBleKey key);
     bool SendShortcut(uint8_t modifiers, uint8_t keycode);
+    bool SendKeycode(uint8_t keycode, uint8_t modifiers = 0);
 
     bool IsConnected() const { return connected_; }
 

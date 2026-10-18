@@ -1377,6 +1377,159 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_text_color(media_hint_, lvgl_theme->text_color(), 0);
     lv_label_set_text(media_hint_, "等待配对（蓝牙广播中）");
     lv_obj_align(media_hint_, LV_ALIGN_BOTTOM_MID, 0, -14);
+    lv_obj_set_width(media_hint_, 140);
+
+    /* Keyboard panels: full QWERTY with arrows, and a numeric keypad. */
+    struct KeyDef {
+        const char* label;
+        uint8_t code;
+        int16_t x;
+        int16_t y;
+        int16_t w;
+        int16_t h;
+        bool icon;
+    };
+    static const KeyDef kFullKeys[] = {
+        {"1", 0x1E, 2, 44, 22, 24, false},
+        {"2", 0x1F, 26, 44, 22, 24, false},
+        {"3", 0x20, 50, 44, 22, 24, false},
+        {"4", 0x21, 74, 44, 22, 24, false},
+        {"5", 0x22, 98, 44, 22, 24, false},
+        {"6", 0x23, 122, 44, 22, 24, false},
+        {"7", 0x24, 146, 44, 22, 24, false},
+        {"8", 0x25, 170, 44, 22, 24, false},
+        {"9", 0x26, 194, 44, 22, 24, false},
+        {"0", 0x27, 218, 44, 22, 24, false},
+        {"Q", 0x14, 2, 74, 22, 24, false},
+        {"W", 0x1A, 26, 74, 22, 24, false},
+        {"E", 0x08, 50, 74, 22, 24, false},
+        {"R", 0x15, 74, 74, 22, 24, false},
+        {"T", 0x17, 98, 74, 22, 24, false},
+        {"Y", 0x1C, 122, 74, 22, 24, false},
+        {"U", 0x18, 146, 74, 22, 24, false},
+        {"I", 0x0C, 170, 74, 22, 24, false},
+        {"O", 0x12, 194, 74, 22, 24, false},
+        {"P", 0x13, 218, 74, 22, 24, false},
+        {"A", 0x04, 14, 104, 22, 24, false},
+        {"S", 0x16, 38, 104, 22, 24, false},
+        {"D", 0x07, 62, 104, 22, 24, false},
+        {"F", 0x09, 86, 104, 22, 24, false},
+        {"G", 0x0A, 110, 104, 22, 24, false},
+        {"H", 0x0B, 134, 104, 22, 24, false},
+        {"J", 0x0D, 158, 104, 22, 24, false},
+        {"K", 0x0E, 182, 104, 22, 24, false},
+        {"L", 0x0F, 206, 104, 22, 24, false},
+        {"Z", 0x1D, 38, 134, 22, 24, false},
+        {"X", 0x1B, 62, 134, 22, 24, false},
+        {"C", 0x06, 86, 134, 22, 24, false},
+        {"V", 0x19, 110, 134, 22, 24, false},
+        {"B", 0x05, 134, 134, 22, 24, false},
+        {"N", 0x11, 158, 134, 22, 24, false},
+        {"M", 0x10, 182, 134, 22, 24, false},
+        {"退格", 0x2A, 2, 164, 44, 24, false},
+        {"空格", 0x2C, 50, 164, 110, 24, false},
+        {"回车", 0x28, 164, 164, 44, 24, false},
+        {",", 0x36, 6, 228, 32, 24, false},
+        {".", 0x37, 45, 228, 32, 24, false},
+        {"/", 0x38, 84, 228, 32, 24, false},
+        {";", 0x33, 123, 228, 32, 24, false},
+        {"'", 0x34, 162, 228, 32, 24, false},
+        {"-", 0x2D, 201, 228, 32, 24, false},
+        {MATERIAL_SYMBOLS_ARROW_BACK, 0x50, 40, 196, 34, 28, true},
+        {MATERIAL_SYMBOLS_ARROW_UPWARD, 0x52, 82, 196, 34, 28, true},
+        {MATERIAL_SYMBOLS_ARROW_DOWNWARD, 0x51, 124, 196, 34, 28, true},
+        {MATERIAL_SYMBOLS_ARROW_FORWARD, 0x4F, 166, 196, 34, 28, true},
+    };
+    static const KeyDef kNumpadKeys[] = {
+        {"1", 0x1E, 50, 66, 40, 40, false},   {"2", 0x1F, 100, 66, 40, 40, false},
+        {"3", 0x20, 150, 66, 40, 40, false},  {"4", 0x21, 50, 116, 40, 40, false},
+        {"5", 0x22, 100, 116, 40, 40, false}, {"6", 0x23, 150, 116, 40, 40, false},
+        {"7", 0x24, 50, 166, 40, 40, false},  {"8", 0x25, 100, 166, 40, 40, false},
+        {"9", 0x26, 150, 166, 40, 40, false}, {"退格", 0x2A, 50, 216, 40, 40, false},
+        {"0", 0x27, 100, 216, 40, 40, false}, {"回车", 0x28, 150, 216, 40, 40, false},
+    };
+
+    auto build_keyboard = [&](lv_obj_t* panel, const KeyDef* keys, int count) {
+        for (int i = 0; i < count; ++i) {
+            const KeyDef& def = keys[i];
+            lv_obj_t* key = lv_button_create(panel);
+            lv_obj_set_size(key, def.w, def.h);
+            lv_obj_set_pos(key, def.x, def.y);
+            lv_obj_set_style_radius(key, 5, 0);
+            lv_obj_set_style_bg_opa(key, LV_OPA_TRANSP, 0);
+            lv_obj_set_style_border_width(key, 1, 0);
+            lv_obj_set_style_border_color(key, lvgl_theme->text_color(), 0);
+            lv_obj_set_style_shadow_width(key, 0, 0);
+            lv_obj_set_style_pad_all(key, 0, 0);
+            lv_obj_set_style_bg_opa(key, LV_OPA_20, LV_STATE_PRESSED);
+            lv_obj_set_style_bg_color(key, lvgl_theme->text_color(), LV_STATE_PRESSED);
+            lv_obj_set_user_data(key, reinterpret_cast<void*>(static_cast<uintptr_t>(def.code)));
+            lv_obj_add_event_cb(key, &LcdDisplay::OnKeyboardKeyClicked, LV_EVENT_PRESSED, this);
+            lv_obj_t* label = lv_label_create(key);
+            if (def.icon) {
+                lv_obj_set_style_text_font(label, large_icon_font, 0);
+                lv_obj_set_style_text_color(label, lvgl_theme->text_color(), 0);
+            } else {
+                if (keyboard_label_count_ < 64) {
+                    keyboard_labels_[keyboard_label_count_++] = label;
+                }
+            }
+            lv_label_set_text(label, def.label);
+            lv_obj_center(label);
+        }
+    };
+
+    keyboard_panel_ = lv_obj_create(media_screen_);
+    lv_obj_set_size(keyboard_panel_, 240, 230);
+    lv_obj_set_pos(keyboard_panel_, 0, 44);
+    lv_obj_set_style_bg_opa(keyboard_panel_, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(keyboard_panel_, 0, 0);
+    lv_obj_set_style_pad_all(keyboard_panel_, 0, 0);
+    lv_obj_remove_flag(keyboard_panel_, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(keyboard_panel_, LV_OBJ_FLAG_HIDDEN);
+    build_keyboard(keyboard_panel_, kFullKeys, sizeof(kFullKeys) / sizeof(kFullKeys[0]));
+
+    numpad_panel_ = lv_obj_create(media_screen_);
+    lv_obj_set_size(numpad_panel_, 240, 280);
+    lv_obj_set_pos(numpad_panel_, 0, 40);
+    lv_obj_set_style_bg_opa(numpad_panel_, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(numpad_panel_, 0, 0);
+    lv_obj_set_style_pad_all(numpad_panel_, 0, 0);
+    lv_obj_remove_flag(numpad_panel_, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(numpad_panel_, LV_OBJ_FLAG_HIDDEN);
+    build_keyboard(numpad_panel_, kNumpadKeys, sizeof(kNumpadKeys) / sizeof(kNumpadKeys[0]));
+
+    /* Bottom panel switcher: left/right arrows + tap the title to cycle. */
+    lv_obj_t* panel_prev = lv_button_create(media_screen_);
+    lv_obj_set_size(panel_prev, 40, 36);
+    lv_obj_align(panel_prev, LV_ALIGN_BOTTOM_LEFT, 4, -4);
+    lv_obj_set_style_bg_opa(panel_prev, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(panel_prev, 0, 0);
+    lv_obj_set_style_shadow_width(panel_prev, 0, 0);
+    lv_obj_set_style_pad_all(panel_prev, 0, 0);
+    lv_obj_add_event_cb(panel_prev, &LcdDisplay::OnMediaPanelPrev, LV_EVENT_CLICKED, this);
+    lv_obj_t* prev_icon = lv_label_create(panel_prev);
+    lv_obj_set_style_text_font(prev_icon, icon_font, 0);
+    lv_obj_set_style_text_color(prev_icon, lvgl_theme->text_color(), 0);
+    lv_label_set_text(prev_icon, MATERIAL_SYMBOLS_ARROW_BACK);
+    lv_obj_center(prev_icon);
+
+    lv_obj_t* panel_next = lv_button_create(media_screen_);
+    lv_obj_set_size(panel_next, 40, 36);
+    lv_obj_align(panel_next, LV_ALIGN_BOTTOM_RIGHT, -4, -4);
+    lv_obj_set_style_bg_opa(panel_next, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(panel_next, 0, 0);
+    lv_obj_set_style_shadow_width(panel_next, 0, 0);
+    lv_obj_set_style_pad_all(panel_next, 0, 0);
+    lv_obj_add_event_cb(panel_next, &LcdDisplay::OnMediaPanelNext, LV_EVENT_CLICKED, this);
+    lv_obj_t* next_icon = lv_label_create(panel_next);
+    lv_obj_set_style_text_font(next_icon, icon_font, 0);
+    lv_obj_set_style_text_color(next_icon, lvgl_theme->text_color(), 0);
+    lv_label_set_text(next_icon, MATERIAL_SYMBOLS_ARROW_FORWARD);
+    lv_obj_center(next_icon);
+
+    lv_obj_add_flag(media_title_, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(media_title_, &LcdDisplay::OnMediaPanelCycle, LV_EVENT_CLICKED, this);
 
     /* Paired-device screen (populated once BLE HID lands). */
     bluetooth_screen_ = lv_obj_create(screen);
@@ -2310,6 +2463,85 @@ void LcdDisplay::ShowBluetoothScreen(bool show) {
         lv_obj_add_flag(bluetooth_screen_, LV_OBJ_FLAG_HIDDEN);
     }
     UpdateMediaBarVisibility();
+}
+
+void LcdDisplay::SetMediaPanel(int panel) {
+    media_panel_ = ((panel % 3) + 3) % 3;
+    for (int i = 0; i < 9; ++i) {
+        if (media_keys_[i] == nullptr) {
+            continue;
+        }
+        if (media_panel_ == 0) {
+            lv_obj_remove_flag(media_keys_[i], LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(media_keys_[i], LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+    if (keyboard_panel_ != nullptr) {
+        if (media_panel_ == 1) {
+            lv_obj_remove_flag(keyboard_panel_, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(keyboard_panel_, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+    if (numpad_panel_ != nullptr) {
+        if (media_panel_ == 2) {
+            lv_obj_remove_flag(numpad_panel_, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(numpad_panel_, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+    if (media_title_ != nullptr) {
+        lv_label_set_text(media_title_, media_panel_ == 0   ? "媒 体"
+                                        : media_panel_ == 1 ? "全键盘"
+                                                            : "数字键");
+    }
+    if (media_hint_ != nullptr) {
+        lv_label_set_text(media_hint_, media_panel_ == 0   ? "媒体"
+                                       : media_panel_ == 1 ? "点按输入"
+                                                           : "数字输入");
+    }
+}
+
+void LcdDisplay::OnMediaPanelPrev(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self != nullptr) {
+        self->SetMediaPanel(self->media_panel_ - 1);
+    }
+}
+
+void LcdDisplay::OnMediaPanelNext(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self != nullptr) {
+        self->SetMediaPanel(self->media_panel_ + 1);
+    }
+}
+
+void LcdDisplay::OnMediaPanelCycle(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self != nullptr) {
+        self->SetMediaPanel(self->media_panel_ + 1);
+    }
+}
+
+void LcdDisplay::OnKeyboardKeyClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self == nullptr) {
+        return;
+    }
+    lv_obj_t* target = lv_event_get_current_target_obj(e);
+    if (target == nullptr) {
+        return;
+    }
+    const uint8_t code =
+        static_cast<uint8_t>(reinterpret_cast<uintptr_t>(lv_obj_get_user_data(target)));
+    const bool sent = MediaBle::GetInstance().SendKeycode(code);
+    lv_obj_t* label = lv_obj_get_child(target, 0);
+    if (self->media_hint_ != nullptr) {
+        lv_label_set_text(
+            self->media_hint_,
+            sent ? (label != nullptr ? lv_label_get_text(label) : "已发送") : "蓝牙未连接");
+    }
 }
 
 void LcdDisplay::OnMediaBarClicked(lv_event_t* e) {
