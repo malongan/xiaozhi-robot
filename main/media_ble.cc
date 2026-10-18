@@ -72,16 +72,19 @@ const uint8_t kReportMap[] = {
     0x15, 0x00,  //     Logical Minimum (0)
     0x25, 0x01,  //     Logical Maximum (1)
     0x75, 0x01,  //     Report Size (1)
-    0x95, 0x06,  //     Report Count (6)
+    0x95, 0x10,  //     Report Count (16)
     0x09, 0xB5,  //     Usage (Scan Next Track)
     0x09, 0xB6,  //     Usage (Scan Previous Track)
     0x09, 0xCD,  //     Usage (Play/Pause)
     0x09, 0xE2,  //     Usage (Mute)
     0x09, 0xE9,  //     Usage (Volume Increment)
     0x09, 0xEA,  //     Usage (Volume Decrement)
-    0x81, 0x02,  //     Input (Data,Var,Abs) -> consumer byte
-    0x95, 0x02,  //     Report Count (2)
-    0x81, 0x03,  //     Input (Const) -> padding bits
+    0x09, 0xB7,  //     Usage (Stop)
+    0x09, 0xB4,  //     Usage (Rewind)
+    0x09, 0xB3,  //     Usage (Fast Forward)
+    0x09, 0x00, 0x09, 0x00, 0x09, 0x00, 0x09, 0x00,  // padding bits
+    0x09, 0x00, 0x09, 0x00, 0x09, 0x00,
+    0x81, 0x02,  //     Input (Data,Var,Abs) -> 2 consumer bytes
     0xC0,        //   End Collection (Logical)
     0xC0,        // End Collection (Application)
 };
@@ -91,7 +94,7 @@ const uint8_t kReportRefInput[] = {0x01, 0x01};       // report id 1, input
 const uint8_t kManufacturerName[] = "Xiaozhi";
 const uint8_t kPnpId[] = {0x02, 0xE5, 0x02, 0x01, 0x00, 0x00, 0x01};
 uint8_t g_protocol_mode = 1;     // report protocol
-uint8_t g_report_value[9] = {};  // 8 keyboard bytes + 1 consumer byte
+uint8_t g_report_value[10] = {};  // 8 keyboard bytes + 2 consumer bytes
 uint8_t g_battery_level = 100;
 
 uint8_t g_own_addr_type = 0;
@@ -460,12 +463,14 @@ bool MediaBle::SendKey(MediaBleKey key) {
         rc = ble_gatts_notify_custom(conn_handle_, report_val_handle_, om);
     };
     uint8_t pressed[sizeof(g_report_value)] = {};
-    pressed[8] = bit;  // consumer byte follows the 8 keyboard bytes
+    const int consumer_index = 8 + (static_cast<int>(key) >= 8 ? 1 : 0);
+    pressed[consumer_index] |= static_cast<uint8_t>(
+        1u << (static_cast<uint8_t>(key) & 7u));  // consumer bits follow keyboard
     uint8_t released[sizeof(g_report_value)] = {};
     notify(pressed);
     vTaskDelay(pdMS_TO_TICKS(20));
     notify(released);
-    ESP_LOGI(TAG, "send key %d bit=0x%02X val_handle=%d rc=%d", static_cast<int>(key), bit,
-             report_val_handle_, rc);
+    ESP_LOGI(TAG, "send key %d bit=0x%02X val_handle=%d rc=%d", static_cast<int>(key),
+             pressed[consumer_index], report_val_handle_, rc);
     return true;
 }

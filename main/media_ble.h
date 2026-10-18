@@ -12,6 +12,9 @@ enum class MediaBleKey : uint8_t {
     kMute = 3,
     kVolumeUp = 4,
     kVolumeDown = 5,
+    kStop = 6,
+    kRewind = 7,
+    kFastForward = 8,
 };
 
 struct MediaBlePeer {

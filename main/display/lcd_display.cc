@@ -1323,15 +1323,18 @@ void LcdDisplay::SetupUI() {
     lv_label_set_text(bt_icon, MATERIAL_SYMBOLS_BLUETOOTH);
     lv_obj_center(bt_icon);
 
-    const char* media_icons[6] = {
-        MATERIAL_SYMBOLS_SKIP_PREVIOUS, MATERIAL_SYMBOLS_PLAY_ARROW, MATERIAL_SYMBOLS_SKIP_NEXT,
-        MATERIAL_SYMBOLS_VOLUME_DOWN,   MATERIAL_SYMBOLS_VOLUME_OFF, MATERIAL_SYMBOLS_VOLUME_UP,
+    const char* media_icons[9] = {
+        MATERIAL_SYMBOLS_SKIP_PREVIOUS, MATERIAL_SYMBOLS_PLAY_ARROW,
+        MATERIAL_SYMBOLS_SKIP_NEXT,     MATERIAL_SYMBOLS_KEYBOARD_DOUBLE_ARROW_LEFT,
+        MATERIAL_SYMBOLS_STOP,          MATERIAL_SYMBOLS_KEYBOARD_DOUBLE_ARROW_RIGHT,
+        MATERIAL_SYMBOLS_VOLUME_DOWN,   MATERIAL_SYMBOLS_VOLUME_OFF,
+        MATERIAL_SYMBOLS_VOLUME_UP,
     };
-    for (int i = 0; i < 6; ++i) {
+    for (int i = 0; i < 9; ++i) {
         lv_obj_t* key = lv_button_create(media_screen_);
         media_keys_[i] = key;
         lv_obj_set_size(key, 64, 64);
-        lv_obj_set_pos(key, 8 + (i % 3) * 80, 72 + (i / 3) * 88);
+        lv_obj_set_pos(key, 8 + (i % 3) * 80, 58 + (i / 3) * 74);
         lv_obj_set_style_radius(key, 14, 0);
         lv_obj_set_style_bg_opa(key, LV_OPA_TRANSP, 0);
         lv_obj_set_style_border_width(key, 2, 0);
@@ -1340,13 +1343,18 @@ void LcdDisplay::SetupUI() {
         lv_obj_set_style_pad_all(key, 0, 0);
         lv_obj_set_style_bg_opa(key, LV_OPA_20, LV_STATE_PRESSED);
         lv_obj_set_style_bg_color(key, lvgl_theme->text_color(), LV_STATE_PRESSED);
-        lv_obj_add_event_cb(key, &LcdDisplay::OnMediaKeyClicked, LV_EVENT_CLICKED, this);
+        lv_obj_add_event_cb(key, &LcdDisplay::OnMediaKeyClicked, LV_EVENT_PRESSED, this);
+        lv_obj_add_event_cb(key, &LcdDisplay::OnMediaKeyClicked, LV_EVENT_RELEASED, this);
+        lv_obj_add_event_cb(key, &LcdDisplay::OnMediaKeyClicked, LV_EVENT_PRESS_LOST, this);
         lv_obj_t* key_icon = lv_label_create(key);
+        media_key_icons_[i] = key_icon;
         lv_obj_set_style_text_font(key_icon, large_icon_font, 0);
         lv_obj_set_style_text_color(key_icon, lvgl_theme->text_color(), 0);
         lv_label_set_text(key_icon, media_icons[i]);
         lv_obj_center(key_icon);
     }
+    media_repeat_timer_ = lv_timer_create(&LcdDisplay::MediaRepeatTimerCb, 60, this);
+    lv_timer_pause(media_repeat_timer_);
 
     media_hint_ = lv_label_create(media_screen_);
     lv_obj_set_width(media_hint_, 224);
@@ -2304,25 +2312,79 @@ void LcdDisplay::OnMediaBackClicked(lv_event_t* e) {
     }
 }
 
+static const MediaBleKey kMediaKeys[9] = {
+    MediaBleKey::kPrevious,   MediaBleKey::kPlayPause, MediaBleKey::kNext,
+    MediaBleKey::kRewind,     MediaBleKey::kStop,      MediaBleKey::kFastForward,
+    MediaBleKey::kVolumeDown, MediaBleKey::kMute,      MediaBleKey::kVolumeUp,
+};
+// Vol-/Vol+/rewind/forward repeat while held.
+static const bool kMediaRepeat[9] = {false, false, false, true, false, true, true, false, true};
+static const char* kMediaHints[9] = {"上一首", "播放/暂停", "下一首", "快退", "停止",
+                                     "快进",   "音量-",     "静音",   "音量+"};
+
+void LcdDisplay::HandleMediaKeyDown(int index) {
+    const bool sent = MediaBle::GetInstance().SendKey(kMediaKeys[index]);
+    if (media_hint_ != nullptr) {
+        lv_label_set_text(media_hint_, sent ? kMediaHints[index] : "蓝牙未连接");
+    }
+    if (index == 1) {  // play/pause: toggle the icon
+        media_playing_ = !media_playing_;
+        if (media_key_icons_[1] != nullptr) {
+            lv_label_set_text(media_key_icons_[1], media_playing_ ? MATERIAL_SYMBOLS_PAUSE
+                                                                  : MATERIAL_SYMBOLS_PLAY_ARROW);
+        }
+    }
+    if (kMediaRepeat[index]) {
+        media_repeat_key_ = index;
+        media_repeat_active_ = true;
+        media_repeat_next_ = lv_tick_get() + 400;
+        if (media_repeat_timer_ != nullptr) {
+            lv_timer_resume(media_repeat_timer_);
+        }
+    }
+}
+
+void LcdDisplay::HandleMediaKeyUp() {
+    media_repeat_active_ = false;
+    media_repeat_key_ = -1;
+    if (media_repeat_timer_ != nullptr) {
+        lv_timer_pause(media_repeat_timer_);
+    }
+}
+
 void LcdDisplay::OnMediaKeyClicked(lv_event_t* e) {
     auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
     if (self == nullptr) {
         return;
     }
+    const lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_RELEASED || code == LV_EVENT_PRESS_LOST) {
+        self->HandleMediaKeyUp();
+        return;
+    }
+    if (code != LV_EVENT_PRESSED) {
+        return;
+    }
     lv_obj_t* target = lv_event_get_target_obj(e);
-    static const MediaBleKey kKeys[6] = {MediaBleKey::kPrevious, MediaBleKey::kPlayPause,
-                                         MediaBleKey::kNext,     MediaBleKey::kVolumeDown,
-                                         MediaBleKey::kMute,     MediaBleKey::kVolumeUp};
-    static const char* kHints[6] = {"上一首", "播放/暂停", "下一首", "音量-", "静音", "音量+"};
-    for (int i = 0; i < 6; ++i) {
+    for (int i = 0; i < 9; ++i) {
         if (target == self->media_keys_[i]) {
-            const bool sent = MediaBle::GetInstance().SendKey(kKeys[i]);
-            if (self->media_hint_ != nullptr) {
-                lv_label_set_text(self->media_hint_, sent ? kHints[i] : "蓝牙未连接");
-            }
+            self->HandleMediaKeyDown(i);
             return;
         }
     }
+}
+
+void LcdDisplay::MediaRepeatTimerCb(lv_timer_t* timer) {
+    auto* self = static_cast<LcdDisplay*>(lv_timer_get_user_data(timer));
+    if (self == nullptr || !self->media_repeat_active_ || self->media_repeat_key_ < 0) {
+        return;
+    }
+    const uint32_t now = lv_tick_get();
+    if (now < self->media_repeat_next_) {
+        return;
+    }
+    self->media_repeat_next_ = now + 120;
+    MediaBle::GetInstance().SendKey(kMediaKeys[self->media_repeat_key_]);
 }
 
 void LcdDisplay::OnBluetoothEntryClicked(lv_event_t* e) {
