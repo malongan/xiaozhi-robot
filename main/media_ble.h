@@ -12,6 +12,9 @@ enum class MediaBleKey : uint8_t {
     kMute = 3,
     kVolumeUp = 4,
     kVolumeDown = 5,
+    kHome = 6,  // Android: Consumer AC Home
+    kBack = 7,  // Android: Consumer AC Back
+    kMenu = 8,  // Android: keyboard Application key
 };
 
 struct MediaBlePeer {
@@ -31,6 +34,7 @@ public:
 
     // Pulses one consumer-control bit (press, 20 ms, release).
     bool SendKey(MediaBleKey key);
+    bool SendShortcut(uint8_t modifiers, uint8_t keycode);
 
     bool IsConnected() const { return connected_; }
 
