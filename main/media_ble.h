@@ -12,9 +12,9 @@ enum class MediaBleKey : uint8_t {
     kMute = 3,
     kVolumeUp = 4,
     kVolumeDown = 5,
-    kStop = 6,
-    kRewind = 7,
-    kFastForward = 8,
+    kBrightnessDown = 6,  // macOS: display brightness
+    kBrightnessUp = 7,
+    kLockScreen = 8,  // macOS: Ctrl+Cmd+Q via the keyboard report
 };
 
 struct MediaBlePeer {
@@ -34,6 +34,7 @@ public:
 
     // Pulses one consumer-control bit (press, 20 ms, release).
     bool SendKey(MediaBleKey key);
+    bool SendShortcut(uint8_t modifiers, uint8_t keycode);
 
     bool IsConnected() const { return connected_; }
 

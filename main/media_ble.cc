@@ -66,24 +66,23 @@ const uint8_t kReportMap[] = {
     0x29, 0x65,  //   Usage Maximum (101)
     0x81, 0x00,  //   Input (Data,Array) -> 6 keycodes
 
-    0x05, 0x0C,  //   Usage Page (Consumer)
-    0x09, 0x01,  //   Usage (Consumer Control)
-    0xA1, 0x01,  //   Collection (Logical)
-    0x15, 0x00,  //     Logical Minimum (0)
-    0x25, 0x01,  //     Logical Maximum (1)
-    0x75, 0x01,  //     Report Size (1)
-    0x95, 0x10,  //     Report Count (16)
-    0x09, 0xB5,  //     Usage (Scan Next Track)
-    0x09, 0xB6,  //     Usage (Scan Previous Track)
-    0x09, 0xCD,  //     Usage (Play/Pause)
-    0x09, 0xE2,  //     Usage (Mute)
-    0x09, 0xE9,  //     Usage (Volume Increment)
-    0x09, 0xEA,  //     Usage (Volume Decrement)
-    0x09, 0xB7,  //     Usage (Stop)
-    0x09, 0xB4,  //     Usage (Rewind)
-    0x09, 0xB3,  //     Usage (Fast Forward)
+    0x05, 0x0C,                                      //   Usage Page (Consumer)
+    0x09, 0x01,                                      //   Usage (Consumer Control)
+    0xA1, 0x01,                                      //   Collection (Logical)
+    0x15, 0x00,                                      //     Logical Minimum (0)
+    0x25, 0x01,                                      //     Logical Maximum (1)
+    0x75, 0x01,                                      //     Report Size (1)
+    0x95, 0x10,                                      //     Report Count (16)
+    0x09, 0xB5,                                      //     Usage (Scan Next Track)
+    0x09, 0xB6,                                      //     Usage (Scan Previous Track)
+    0x09, 0xCD,                                      //     Usage (Play/Pause)
+    0x09, 0xE2,                                      //     Usage (Mute)
+    0x09, 0xE9,                                      //     Usage (Volume Increment)
+    0x09, 0xEA,                                      //     Usage (Volume Decrement)
+    0x09, 0x70,                                      //     Usage (Brightness Decrement)
+    0x09, 0x6F,                                      //     Usage (Brightness Increment)
     0x09, 0x00, 0x09, 0x00, 0x09, 0x00, 0x09, 0x00,  // padding bits
-    0x09, 0x00, 0x09, 0x00, 0x09, 0x00,
+    0x09, 0x00, 0x09, 0x00, 0x09, 0x00, 0x09, 0x00,
     0x81, 0x02,  //     Input (Data,Var,Abs) -> 2 consumer bytes
     0xC0,        //   End Collection (Logical)
     0xC0,        // End Collection (Application)
@@ -93,7 +92,7 @@ const uint8_t kHidInfo[] = {0x11, 0x01, 0x00, 0x02};  // bcdHID 1.11, flags
 const uint8_t kReportRefInput[] = {0x01, 0x01};       // report id 1, input
 const uint8_t kManufacturerName[] = "Xiaozhi";
 const uint8_t kPnpId[] = {0x02, 0xE5, 0x02, 0x01, 0x00, 0x00, 0x01};
-uint8_t g_protocol_mode = 1;     // report protocol
+uint8_t g_protocol_mode = 1;      // report protocol
 uint8_t g_report_value[10] = {};  // 8 keyboard bytes + 2 consumer bytes
 uint8_t g_battery_level = 100;
 
@@ -447,9 +446,35 @@ bool MediaBle::Disconnect() {
     return ble_gap_terminate(conn_handle_, BLE_ERR_REM_USER_CONN_TERM) == 0;
 }
 
+bool MediaBle::SendShortcut(uint8_t modifiers, uint8_t keycode) {
+    if (!connected_ || conn_handle_ == 0xFFFF || report_val_handle_ == 0) {
+        return false;
+    }
+    uint8_t pressed[sizeof(g_report_value)] = {};
+    pressed[0] = modifiers;
+    pressed[2] = keycode;
+    uint8_t released[sizeof(g_report_value)] = {};
+    auto send = [this](const uint8_t* data) {
+        struct os_mbuf* om = ble_hs_mbuf_from_flat(data, sizeof(g_report_value));
+        if (om != nullptr) {
+            return ble_gatts_notify_custom(conn_handle_, report_val_handle_, om);
+        }
+        return static_cast<int>(BLE_HS_ENOMEM);
+    };
+    int rc = send(pressed);
+    vTaskDelay(pdMS_TO_TICKS(30));
+    send(released);
+    ESP_LOGI(TAG, "send shortcut mod=0x%02X key=0x%02X rc=%d", modifiers, keycode, rc);
+    return true;
+}
+
 bool MediaBle::SendKey(MediaBleKey key) {
     if (!connected_ || conn_handle_ == 0xFFFF || report_val_handle_ == 0) {
         return false;
+    }
+    if (key == MediaBleKey::kLockScreen) {
+        // Ctrl+Cmd+Q
+        return SendShortcut(0x08 | 0x01, 0x14);
     }
     const uint8_t bit = static_cast<uint8_t>(1u << static_cast<uint8_t>(key));
     int rc = 0;

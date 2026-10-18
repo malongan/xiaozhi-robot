@@ -1352,6 +1352,11 @@ void LcdDisplay::SetupUI() {
         lv_obj_set_style_text_color(key_icon, lvgl_theme->text_color(), 0);
         lv_label_set_text(key_icon, media_icons[i]);
         lv_obj_center(key_icon);
+        if (i == 3) {  // brightness down: upside-down sun so the pair is distinct
+            lv_obj_set_style_transform_pivot_x(key_icon, lv_pct(50), 0);
+            lv_obj_set_style_transform_pivot_y(key_icon, lv_pct(50), 0);
+            lv_obj_set_style_transform_rotation(key_icon, 1800, 0);
+        }
     }
     media_repeat_timer_ = lv_timer_create(&LcdDisplay::MediaRepeatTimerCb, 60, this);
     lv_timer_pause(media_repeat_timer_);
@@ -2313,14 +2318,14 @@ void LcdDisplay::OnMediaBackClicked(lv_event_t* e) {
 }
 
 static const MediaBleKey kMediaKeys[9] = {
-    MediaBleKey::kPrevious,   MediaBleKey::kPlayPause, MediaBleKey::kNext,
-    MediaBleKey::kRewind,     MediaBleKey::kStop,      MediaBleKey::kFastForward,
-    MediaBleKey::kVolumeDown, MediaBleKey::kMute,      MediaBleKey::kVolumeUp,
+    MediaBleKey::kPrevious,       MediaBleKey::kPlayPause,    MediaBleKey::kNext,
+    MediaBleKey::kBrightnessDown, MediaBleKey::kBrightnessUp, MediaBleKey::kLockScreen,
+    MediaBleKey::kVolumeDown,     MediaBleKey::kMute,         MediaBleKey::kVolumeUp,
 };
-// Vol-/Vol+/rewind/forward repeat while held.
-static const bool kMediaRepeat[9] = {false, false, false, true, false, true, true, false, true};
-static const char* kMediaHints[9] = {"上一首", "播放/暂停", "下一首", "快退", "停止",
-                                     "快进",   "音量-",     "静音",   "音量+"};
+// Volume and brightness repeat while held.
+static const bool kMediaRepeat[9] = {false, false, false, true, true, false, true, false, true};
+static const char* kMediaHints[9] = {"上一首", "播放/暂停", "下一首", "亮度-", "亮度+",
+                                     "锁屏",   "音量-",     "静音",   "音量+"};
 
 void LcdDisplay::HandleMediaKeyDown(int index) {
     const bool sent = MediaBle::GetInstance().SendKey(kMediaKeys[index]);
