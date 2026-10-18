@@ -3,6 +3,7 @@
 
 #include "gif/lvgl_gif.h"
 #include "lvgl_display.h"
+#include "media_ble.h"
 
 #include <esp_lcd_panel_io.h>
 #include <esp_lcd_panel_ops.h>
@@ -67,6 +68,13 @@ protected:
     lv_obj_t* media_title_ = nullptr;
     lv_obj_t* bt_title_ = nullptr;
     lv_obj_t* bt_empty_ = nullptr;
+    lv_obj_t* bt_status_ = nullptr;
+    lv_obj_t* bt_list_ = nullptr;
+    MediaBlePeer bt_peers_[8] = {};
+    int bt_peer_count_ = 0;
+    lv_obj_t* bt_forget_buttons_[8] = {};
+    lv_obj_t* bt_disconnect_btn_ = nullptr;
+    lv_obj_t* bt_disconnect_label_ = nullptr;
     lv_obj_t* page_progress_ = nullptr;  // faint press ring around the avatar
     LvglCBinFont* chat_font_ = nullptr;  // 18px Common font loaded from the assets partition
 
@@ -132,6 +140,9 @@ protected:
     static void OnMediaKeyClicked(lv_event_t* e);
     static void OnBluetoothEntryClicked(lv_event_t* e);
     static void OnBluetoothBackClicked(lv_event_t* e);
+    static void OnBtForgetClicked(lv_event_t* e);
+    static void OnBtDisconnectClicked(lv_event_t* e);
+    void RefreshBluetoothList();
     void ShowMediaScreen(bool show);
     void ShowBluetoothScreen(bool show);
     void UpdateMediaBarVisibility();

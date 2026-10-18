@@ -14,6 +14,11 @@ enum class MediaBleKey : uint8_t {
     kVolumeDown = 5,
 };
 
+struct MediaBlePeer {
+    uint8_t type;  // 0 = public, 1 = random
+    uint8_t addr[6];
+};
+
 class MediaBle {
 public:
     using StatusCallback = std::function<void(bool connected)>;
@@ -28,6 +33,12 @@ public:
     bool SendKey(MediaBleKey key);
 
     bool IsConnected() const { return connected_; }
+
+    // Bonded peers, newest first.
+    int GetBondedPeers(MediaBlePeer* peers, int max_peers);
+    bool Unpair(const MediaBlePeer& peer);
+    bool GetConnectedPeer(MediaBlePeer* peer);
+    bool Disconnect();
 
 private:
     MediaBle() = default;

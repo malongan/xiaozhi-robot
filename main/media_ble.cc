@@ -352,7 +352,15 @@ int MediaBle::GapEvent(struct ble_gap_event* event, void*) {
             if (event->connect.status == 0) {
                 self.conn_handle_ = event->connect.conn_handle;
                 self.connected_ = true;
-                ESP_LOGI(TAG, "host connected, handle=%d", self.conn_handle_);
+                struct ble_gap_conn_desc desc;
+                if (ble_gap_conn_find(self.conn_handle_, &desc) == 0) {
+                    ESP_LOGI(TAG, "host connected, handle=%d peer=%02X:%02X:%02X:%02X:%02X:%02X",
+                             self.conn_handle_, desc.peer_id_addr.val[5], desc.peer_id_addr.val[4],
+                             desc.peer_id_addr.val[3], desc.peer_id_addr.val[2],
+                             desc.peer_id_addr.val[1], desc.peer_id_addr.val[0]);
+                } else {
+                    ESP_LOGI(TAG, "host connected, handle=%d", self.conn_handle_);
+                }
                 if (self.status_callback_) {
                     self.status_callback_(true);
                 }
@@ -390,6 +398,52 @@ int MediaBle::GapEvent(struct ble_gap_event* event, void*) {
         default:
             return 0;
     }
+}
+
+int MediaBle::GetBondedPeers(MediaBlePeer* peers, int max_peers) {
+    if (peers == nullptr || max_peers <= 0) {
+        return 0;
+    }
+    ble_addr_t addrs[CONFIG_BT_NIMBLE_MAX_BONDS] = {};
+    int count = 0;
+    if (ble_store_util_bonded_peers(addrs, &count, CONFIG_BT_NIMBLE_MAX_BONDS) != 0) {
+        return 0;
+    }
+    if (count > max_peers) {
+        count = max_peers;
+    }
+    for (int i = 0; i < count; ++i) {
+        peers[i].type = addrs[i].type;
+        memcpy(peers[i].addr, addrs[i].val, 6);
+    }
+    return count;
+}
+
+bool MediaBle::Unpair(const MediaBlePeer& peer) {
+    ble_addr_t addr = {};
+    addr.type = peer.type;
+    memcpy(addr.val, peer.addr, 6);
+    return ble_gap_unpair(&addr) == 0;
+}
+
+bool MediaBle::GetConnectedPeer(MediaBlePeer* peer) {
+    if (!connected_ || conn_handle_ == 0xFFFF || peer == nullptr) {
+        return false;
+    }
+    struct ble_gap_conn_desc desc;
+    if (ble_gap_conn_find(conn_handle_, &desc) != 0) {
+        return false;
+    }
+    peer->type = desc.peer_id_addr.type;
+    memcpy(peer->addr, desc.peer_id_addr.val, 6);
+    return true;
+}
+
+bool MediaBle::Disconnect() {
+    if (!connected_ || conn_handle_ == 0xFFFF) {
+        return false;
+    }
+    return ble_gap_terminate(conn_handle_, BLE_ERR_REM_USER_CONN_TERM) == 0;
 }
 
 bool MediaBle::SendKey(MediaBleKey key) {

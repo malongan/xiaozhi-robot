@@ -6,6 +6,8 @@
 #include "lvgl_font.h"
 #include "lvgl_theme.h"
 #include "media_ble.h"
+
+#include <cstdio>
 #include "settings.h"
 
 #include <esp_err.h>
@@ -1351,7 +1353,7 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_text_align(media_hint_, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_text_font(media_hint_, text_font, 0);
     lv_obj_set_style_text_color(media_hint_, lvgl_theme->text_color(), 0);
-    lv_label_set_text(media_hint_, "蓝牙未连接");
+    lv_label_set_text(media_hint_, "等待配对（蓝牙广播中）");
     lv_obj_align(media_hint_, LV_ALIGN_BOTTOM_MID, 0, -14);
 
     /* Paired-device screen (populated once BLE HID lands). */
@@ -1386,12 +1388,46 @@ void LcdDisplay::SetupUI() {
     lv_label_set_text(bt_title_, "已配对设备");
     lv_obj_align(bt_title_, LV_ALIGN_TOP_MID, 0, 10);
 
+    bt_status_ = lv_label_create(bluetooth_screen_);
+    lv_obj_set_style_text_font(bt_status_, text_font, 0);
+    lv_obj_set_style_text_color(bt_status_, lvgl_theme->text_color(), 0);
+    lv_label_set_text(bt_status_, "广播中 · 等待配对");
+    lv_obj_align(bt_status_, LV_ALIGN_TOP_MID, 0, 44);
+
+    bt_list_ = lv_obj_create(bluetooth_screen_);
+    lv_obj_set_size(bt_list_, 224, 216);
+    lv_obj_align(bt_list_, LV_ALIGN_TOP_MID, 0, 78);
+    lv_obj_set_style_bg_opa(bt_list_, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(bt_list_, 0, 0);
+    lv_obj_set_style_pad_all(bt_list_, 0, 0);
+    lv_obj_set_style_pad_row(bt_list_, 6, 0);
+    lv_obj_set_scrollbar_mode(bt_list_, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_set_flex_flow(bt_list_, LV_FLEX_FLOW_COLUMN);
+
+    bt_disconnect_btn_ = lv_button_create(bluetooth_screen_);
+    lv_obj_set_size(bt_disconnect_btn_, 170, 40);
+    lv_obj_align(bt_disconnect_btn_, LV_ALIGN_BOTTOM_MID, 0, -16);
+    lv_obj_set_style_radius(bt_disconnect_btn_, 10, 0);
+    lv_obj_set_style_bg_opa(bt_disconnect_btn_, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(bt_disconnect_btn_, 2, 0);
+    lv_obj_set_style_border_color(bt_disconnect_btn_, lvgl_theme->text_color(), 0);
+    lv_obj_set_style_shadow_width(bt_disconnect_btn_, 0, 0);
+    lv_obj_set_style_pad_all(bt_disconnect_btn_, 0, 0);
+    lv_obj_add_flag(bt_disconnect_btn_, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_event_cb(bt_disconnect_btn_, &LcdDisplay::OnBtDisconnectClicked, LV_EVENT_CLICKED,
+                        this);
+    bt_disconnect_label_ = lv_label_create(bt_disconnect_btn_);
+    lv_obj_set_style_text_font(bt_disconnect_label_, text_font, 0);
+    lv_obj_set_style_text_color(bt_disconnect_label_, lvgl_theme->text_color(), 0);
+    lv_label_set_text(bt_disconnect_label_, "断开当前连接");
+    lv_obj_center(bt_disconnect_label_);
+
     bt_empty_ = lv_label_create(bluetooth_screen_);
     lv_obj_set_width(bt_empty_, 216);
     lv_obj_set_style_text_align(bt_empty_, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_text_font(bt_empty_, text_font, 0);
     lv_obj_set_style_text_color(bt_empty_, lvgl_theme->text_color(), 0);
-    lv_label_set_text(bt_empty_, "蓝牙功能开发中\n即将支持 Xiaozhi-Media\n（第二阶段接入）");
+    lv_label_set_text(bt_empty_, "尚未配对任何设备\n在电脑/手机蓝牙里\n搜索 Xiaozhi-Media 配对");
     lv_obj_align(bt_empty_, LV_ALIGN_CENTER, 0, 10);
 
     chat_lines_per_page_ = 5;  // idle layout: five lines + media entry icon
@@ -1402,7 +1438,10 @@ void LcdDisplay::SetupUI() {
         Application::GetInstance().Schedule([this, connected]() {
             DisplayLockGuard lock(this);
             if (media_hint_ != nullptr) {
-                lv_label_set_text(media_hint_, connected ? "蓝牙已连接" : "蓝牙未连接");
+                lv_label_set_text(media_hint_, connected ? "蓝牙已连接" : "等待配对（蓝牙广播中）");
+            }
+            if (bluetooth_screen_visible_) {
+                RefreshBluetoothList();
             }
         });
     });
@@ -1720,7 +1759,8 @@ void LcdDisplay::ApplyChatLayout() {
         lv_obj_set_style_text_font(avatar_think_dots_, font, 0);
         lv_obj_set_style_text_color(avatar_think_dots_, lvgl_theme->text_color(), 0);
     }
-    lv_obj_t* themed_labels[] = {media_title_, media_hint_, bt_title_, bt_empty_};
+    lv_obj_t* themed_labels[] = {media_title_, media_hint_, bt_title_,
+                                 bt_empty_,    bt_status_,  bt_disconnect_label_};
     for (lv_obj_t* label : themed_labels) {
         if (label != nullptr) {
             lv_obj_set_style_text_font(label, font, 0);
@@ -2241,6 +2281,7 @@ void LcdDisplay::ShowBluetoothScreen(bool show) {
     DisplayLockGuard lock(this);
     bluetooth_screen_visible_ = show;
     if (show) {
+        RefreshBluetoothList();
         lv_obj_remove_flag(bluetooth_screen_, LV_OBJ_FLAG_HIDDEN);
         lv_obj_move_foreground(bluetooth_screen_);
     } else {
@@ -2288,6 +2329,117 @@ void LcdDisplay::OnBluetoothEntryClicked(lv_event_t* e) {
     auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
     if (self != nullptr) {
         self->ShowBluetoothScreen(true);
+    }
+}
+
+static std::string FormatBtAddress(const MediaBlePeer& peer) {
+    char buffer[24];
+    snprintf(buffer, sizeof(buffer), "%02X:%02X:%02X:%02X:%02X:%02X", peer.addr[0], peer.addr[1],
+             peer.addr[2], peer.addr[3], peer.addr[4], peer.addr[5]);
+    return std::string(buffer);
+}
+
+static bool SameBtPeer(const MediaBlePeer& a, const MediaBlePeer& b) {
+    return a.type == b.type && memcmp(a.addr, b.addr, 6) == 0;
+}
+
+void LcdDisplay::RefreshBluetoothList() {
+    auto* theme = static_cast<LvglTheme*>(GetTheme());
+    if (bt_list_ == nullptr || theme == nullptr) {
+        return;
+    }
+    DisplayLockGuard lock(this);
+    auto& ble = MediaBle::GetInstance();
+    bt_peer_count_ = ble.GetBondedPeers(bt_peers_, 8);
+    MediaBlePeer connected = {};
+    const bool has_conn = ble.GetConnectedPeer(&connected);
+
+    lv_obj_clean(bt_list_);
+    for (auto& button : bt_forget_buttons_) {
+        button = nullptr;
+    }
+    if (bt_status_ != nullptr) {
+        if (has_conn) {
+            const std::string text = "已连接 " + FormatBtAddress(connected);
+            lv_label_set_text(bt_status_, text.c_str());
+        } else {
+            lv_label_set_text(bt_status_, "广播中 · 等待配对");
+        }
+    }
+    if (bt_disconnect_btn_ != nullptr) {
+        if (has_conn) {
+            lv_obj_remove_flag(bt_disconnect_btn_, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(bt_disconnect_btn_, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+    if (bt_peer_count_ == 0) {
+        if (bt_empty_ != nullptr) {
+            lv_obj_remove_flag(bt_empty_, LV_OBJ_FLAG_HIDDEN);
+        }
+        return;
+    }
+    if (bt_empty_ != nullptr) {
+        lv_obj_add_flag(bt_empty_, LV_OBJ_FLAG_HIDDEN);
+    }
+
+    for (int i = 0; i < bt_peer_count_; ++i) {
+        lv_obj_t* row = lv_obj_create(bt_list_);
+        lv_obj_set_size(row, 224, 40);
+        lv_obj_set_style_bg_color(row, theme->text_color(), 0);
+        lv_obj_set_style_bg_opa(row, LV_OPA_10, 0);
+        lv_obj_set_style_radius(row, 8, 0);
+        lv_obj_set_style_border_width(row, 0, 0);
+        lv_obj_set_style_pad_all(row, 0, 0);
+        lv_obj_remove_flag(row, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_set_scrollbar_mode(row, LV_SCROLLBAR_MODE_OFF);
+
+        lv_obj_t* label = lv_label_create(row);
+        lv_obj_set_style_text_font(label, theme->text_font()->font(), 0);
+        lv_obj_set_style_text_color(label, theme->text_color(), 0);
+        const bool is_connected = has_conn && SameBtPeer(bt_peers_[i], connected);
+        const std::string text = (is_connected ? "● " : "") + FormatBtAddress(bt_peers_[i]);
+        lv_label_set_text(label, text.c_str());
+        lv_obj_align(label, LV_ALIGN_LEFT_MID, 10, 0);
+
+        lv_obj_t* forget = lv_button_create(row);
+        bt_forget_buttons_[i] = forget;
+        lv_obj_set_size(forget, 34, 34);
+        lv_obj_align(forget, LV_ALIGN_RIGHT_MID, -4, 0);
+        lv_obj_set_style_bg_opa(forget, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_border_width(forget, 0, 0);
+        lv_obj_set_style_shadow_width(forget, 0, 0);
+        lv_obj_set_style_pad_all(forget, 0, 0);
+        lv_obj_add_event_cb(forget, &LcdDisplay::OnBtForgetClicked, LV_EVENT_CLICKED, this);
+        lv_obj_t* icon = lv_label_create(forget);
+        lv_obj_set_style_text_font(icon, theme->icon_font()->font(), 0);
+        lv_obj_set_style_text_color(icon, theme->text_color(), 0);
+        lv_label_set_text(icon, MATERIAL_SYMBOLS_CLOSE);
+        lv_obj_center(icon);
+    }
+}
+
+void LcdDisplay::OnBtDisconnectClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self == nullptr) {
+        return;
+    }
+    MediaBle::GetInstance().Disconnect();
+    self->RefreshBluetoothList();
+}
+
+void LcdDisplay::OnBtForgetClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self == nullptr) {
+        return;
+    }
+    lv_obj_t* target = lv_event_get_target_obj(e);
+    for (int i = 0; i < self->bt_peer_count_; ++i) {
+        if (target == self->bt_forget_buttons_[i]) {
+            MediaBle::GetInstance().Unpair(self->bt_peers_[i]);
+            self->RefreshBluetoothList();
+            return;
+        }
     }
 }
 
