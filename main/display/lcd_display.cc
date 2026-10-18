@@ -1817,29 +1817,32 @@ void LcdDisplay::AvatarAnimTimerCb(lv_timer_t* timer) {
         const lv_coord_t base_h = listening ? 20 : 22;
         const lv_coord_t base_gap = listening ? 9 : 10;
 
-        // Fake 3D: the eye turning toward the silhouette edge (the "far"
-        // side of the ball) shrinks, the near eye grows, spacing compresses.
-        const float yaw_deg = self->gaze_x_ * 3.7f;     // +-26 degrees
-        const float pitch_deg = -self->gaze_y_ * 3.2f;  // +-16 degrees
-        const float yaw = yaw_deg * kPi / 180.0f;
-        const float pitch = pitch_deg * kPi / 180.0f;
+        // Position-driven pseudo-3D, per the user's rules:
+        //  - centred eyes: almost no perspective difference;
+        //  - looking sideways: only a little near/far difference, and the eye
+        //    on the side the face turns to (closer to the edge) gets smaller;
+        //  - overall size follows the position: down = biggest, up = smaller,
+        //    towards either side = smaller, centre = big.
+        const float gx = self->gaze_x_ / 7.0f;  // -1..1
+        const float gy = self->gaze_y_ / 5.0f;  // -1..1, positive = looking down
+        const float abs_gx = fabsf(gx);
+        const float asym = 1.0f + 0.16f * gy - 0.10f * abs_gx;  // vertical bias
+        const float persp = 0.02f + 0.08f * abs_gx;             // 0.02..0.10
+        const float gap_scale = 1.0f - 0.10f * abs_gx;
 
         for (int side = 0; side < 2; ++side) {
             const float sign = side == 0 ? -1.0f : 1.0f;
-            const float depth = sign * sinf(yaw);
-            const float persp = 1.0f / (1.0f + 0.45f * depth);
+            const float eye_scale = asym * (1.0f - sign * persp * gx);
             const lv_coord_t x =
-                static_cast<lv_coord_t>(sign * base_gap * cosf(yaw) * persp + self->gaze_x_);
+                static_cast<lv_coord_t>(sign * base_gap * gap_scale + self->gaze_x_);
             const lv_coord_t y = static_cast<lv_coord_t>(self->gaze_y_);
-            const lv_coord_t w =
-                static_cast<lv_coord_t>(base_w * cosf(yaw) * persp * self->gaze_zoom_);
-            const lv_coord_t h = static_cast<lv_coord_t>(base_h * cosf(pitch) * persp *
-                                                         self->gaze_zoom_ * self->gaze_eye_);
-            const float rot_deg =
-                self->gaze_tilt_ + sign * yaw_deg * 0.18f + sign * pitch_deg * 0.10f;
+            const lv_coord_t w = static_cast<lv_coord_t>(base_w * eye_scale * self->gaze_zoom_);
+            const lv_coord_t h =
+                static_cast<lv_coord_t>(base_h * eye_scale * self->gaze_zoom_ * self->gaze_eye_);
+            const float rot_deg = self->gaze_tilt_ * 0.5f + sign * gx * 4.0f;
 
-            // The farther eye is drawn a touch lighter for depth.
-            const float far = LV_CLAMP(0.0f, (1.0f - persp) * 0.30f, 0.45f);
+            // Only the slightly smaller (edge-side) eye is lightened a touch.
+            const float far = LV_CLAMP(0.0f, -sign * gx * persp * 0.8f, 0.10f);
             lv_color_t eye_color =
                 lv_color_mix(lv_color_hex(kAvatarFaceColor), lv_color_hex(kAvatarEyeColor),
                              static_cast<uint8_t>(far * 255.0f));
@@ -1946,7 +1949,7 @@ void LcdDisplay::PickAvatarGaze() {
 
     gaze_to_x_ = kDirX[dir] * mag_x;
     gaze_to_y_ = kDirY[dir] * mag_y;
-    gaze_to_zoom_ = 0.94f + static_cast<float>(esp_random() % 24) / 100.0f;  // 0.94..1.17
+    gaze_to_zoom_ = 0.98f + static_cast<float>(esp_random() % 9) / 100.0f;  // 0.98..1.06
 
     const uint32_t eye_roll = esp_random() % 100;
     if (eye_roll < 18) {
