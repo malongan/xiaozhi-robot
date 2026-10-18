@@ -855,6 +855,121 @@ void LcdDisplay::ClearChatMessages() {
     ESP_LOGI(TAG, "Chat messages cleared");
 }
 #else
+namespace {
+
+constexpr int kChatLinesPerPage = 5;
+constexpr size_t kMaxChatMessages = 40;
+constexpr size_t kMaxChatTextBytes = 1000;
+constexpr uint16_t kAvatarLongPressMs = 3000;
+constexpr lv_coord_t kChatSidePad = 8;
+constexpr lv_coord_t kAvatarSize = 64;
+constexpr lv_coord_t kAvatarTopGap = 7;
+constexpr lv_coord_t kAvatarGap = 16;
+constexpr lv_coord_t kTopBarPad = 6;
+constexpr lv_coord_t kTopBarIconGap = 4;
+
+const char* RolePrefix(const std::string& role) {
+    if (role == "user") {
+        return "你：";
+    }
+    if (role == "assistant") {
+        return "小智：";
+    }
+    return "系统：";
+}
+
+uint32_t Utf8CharLen(uint8_t lead) {
+    if (lead < 0x80) {
+        return 1;
+    }
+    if ((lead >> 5) == 0x6) {
+        return 2;
+    }
+    if ((lead >> 4) == 0xE) {
+        return 3;
+    }
+    if ((lead >> 3) == 0x1E) {
+        return 4;
+    }
+    return 1;
+}
+
+uint32_t Utf8Decode(const std::string& text, size_t index) {
+    const uint8_t lead = static_cast<uint8_t>(text[index]);
+    const uint32_t len = Utf8CharLen(lead);
+    uint32_t codepoint = 0;
+    if (len == 1) {
+        return lead;
+    }
+    if (len == 2) {
+        codepoint = lead & 0x1F;
+    } else if (len == 3) {
+        codepoint = lead & 0x0F;
+    } else {
+        codepoint = lead & 0x07;
+    }
+    for (uint32_t i = 1; i < len && index + i < text.size(); ++i) {
+        codepoint = (codepoint << 6) | (static_cast<uint8_t>(text[index + i]) & 0x3F);
+    }
+    return codepoint;
+}
+
+/* Word/character wrapping used for pagination. Lines are stored as byte
+   offsets; pages are rendered with explicit line breaks, so this only has to
+   produce lines that fit the viewport width. */
+void WrapChatText(const std::string& text, const lv_font_t* font, lv_coord_t max_width,
+                  std::vector<uint32_t>& line_starts) {
+    line_starts.clear();
+    if (font == nullptr || text.empty()) {
+        return;
+    }
+    line_starts.push_back(0);
+    lv_coord_t line_width = 0;
+    size_t i = 0;
+    while (i < text.size()) {
+        const uint8_t lead = static_cast<uint8_t>(text[i]);
+        const uint32_t len = Utf8CharLen(lead);
+        if (i + len > text.size()) {
+            break;  // Truncated UTF-8 sequence: stop here
+        }
+        const uint32_t codepoint = Utf8Decode(text, i);
+        if (codepoint == '\n' || codepoint == '\r') {
+            i += len;
+            if (i < text.size()) {
+                line_starts.push_back(static_cast<uint32_t>(i));
+                line_width = 0;
+            }
+            continue;
+        }
+        uint32_t next_codepoint = 0;
+        if (i + len < text.size()) {
+            next_codepoint = Utf8Decode(text, i + len);
+        }
+        const lv_coord_t glyph_width = lv_font_get_glyph_width(font, codepoint, next_codepoint);
+        if (line_width + glyph_width > max_width && i > line_starts.back()) {
+            line_starts.push_back(static_cast<uint32_t>(i));
+            line_width = 0;
+        }
+        line_width += glyph_width;
+        i += len;
+    }
+}
+
+/* Keep only the tail of an over-long message: the history is a live viewport,
+   not an archive. Cuts on a UTF-8 boundary. */
+void TrimChatText(std::string& text, size_t limit) {
+    if (text.size() <= limit) {
+        return;
+    }
+    size_t start = text.size() - limit;
+    while (start < text.size() && (static_cast<uint8_t>(text[start]) & 0xC0) == 0x80) {
+        ++start;
+    }
+    text.erase(0, start);
+}
+
+}  // namespace
+
 void LcdDisplay::SetupUI() {
     // Prevent duplicate calls - if already called, return early
     if (setup_ui_called_) {
@@ -879,16 +994,23 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_scrollbar_mode(screen, LV_SCROLLBAR_MODE_OFF);
     ESP_LOGI(TAG, "Layout canvas: %dx%d", (int)LV_HOR_RES, (int)LV_VER_RES);
 
+    /* Avatar long-press (new session) needs 3 seconds instead of the LVGL default. */
+    for (lv_indev_t* indev = lv_indev_get_next(nullptr); indev != nullptr;
+         indev = lv_indev_get_next(indev)) {
+        if (lv_indev_get_type(indev) == LV_INDEV_TYPE_POINTER) {
+            lv_indev_set_long_press_time(indev, kAvatarLongPressMs);
+        }
+    }
+
     /* Container - used as background */
     container_ = lv_obj_create(screen);
-    lv_obj_remove_flag(container_, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_scrollbar_mode(container_, LV_SCROLLBAR_MODE_OFF);
-    lv_obj_set_size(container_, LV_HOR_RES, LV_VER_RES);
     lv_obj_set_style_radius(container_, 0, 0);
     lv_obj_set_style_pad_all(container_, 0, 0);
     lv_obj_set_style_border_width(container_, 0, 0);
     lv_obj_set_style_bg_color(container_, lvgl_theme->background_color(), 0);
     lv_obj_set_style_border_color(container_, lvgl_theme->border_color(), 0);
+    lv_obj_remove_flag(container_, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollbar_mode(container_, LV_SCROLLBAR_MODE_OFF);
 
     /* Top bar (official layout): WiFi icon left, clock / conversation state in
        the middle, mute + battery right. LvglDisplay::UpdateStatusBar() drives
@@ -918,33 +1040,6 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_text_font(battery_label_, icon_font, 0);
     lv_obj_set_style_text_color(battery_label_, lvgl_theme->text_color(), 0);
 
-    /* Avatar: centered, doubles as the talk button (no separate mic button) */
-    emoji_box_ = lv_obj_create(screen);
-    lv_obj_set_style_radius(emoji_box_, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_bg_color(emoji_box_, lvgl_theme->chat_background_color(), 0);
-    lv_obj_set_style_border_width(emoji_box_, 1, 0);
-    lv_obj_set_style_border_color(emoji_box_, lvgl_theme->border_color(), 0);
-    lv_obj_set_style_pad_all(emoji_box_, 0, 0);
-    lv_obj_set_style_clip_corner(emoji_box_, true, 0);
-    lv_obj_remove_flag(emoji_box_, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_scrollbar_mode(emoji_box_, LV_SCROLLBAR_MODE_OFF);
-    lv_obj_add_flag(emoji_box_, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_set_ext_click_area(emoji_box_, 8);
-    lv_obj_add_event_cb(emoji_box_, &LcdDisplay::OnMicButtonClicked, LV_EVENT_CLICKED, this);
-
-    emoji_label_ = lv_label_create(emoji_box_);
-    lv_obj_set_style_text_font(emoji_label_, large_icon_font, 0);
-    lv_obj_set_style_text_color(emoji_label_, lvgl_theme->text_color(), 0);
-    lv_label_set_text(emoji_label_, MATERIAL_SYMBOLS_ROBOT_2);
-    lv_obj_set_style_transform_scale(emoji_label_, 170, 0);
-    lv_obj_set_style_transform_pivot_x(emoji_label_, lv_pct(50), 0);
-    lv_obj_set_style_transform_pivot_y(emoji_label_, lv_pct(50), 0);
-    lv_obj_center(emoji_label_);
-
-    emoji_image_ = lv_img_create(emoji_box_);
-    lv_obj_center(emoji_image_);
-    lv_obj_add_flag(emoji_image_, LV_OBJ_FLAG_HIDDEN);
-
     /* Center of the top bar: clock when idle, conversation state otherwise */
     status_label_ = lv_label_create(top_bar_);
     lv_obj_set_style_text_font(status_label_, text_font, 0);
@@ -963,8 +1058,56 @@ void LcdDisplay::SetupUI() {
     lv_label_set_text(notification_label_, "");
     lv_obj_add_flag(notification_label_, LV_OBJ_FLAG_HIDDEN);
 
-    /* Fixed five-line message viewport. Long replies keep their tail visible
-       (UpdateChatTextOverflow) with no user scrolling and no history. */
+    /* Avatar: tap = continue chatting (history is kept), long press 3s = new
+       session (history is cleared) */
+    emoji_box_ = lv_obj_create(screen);
+    lv_obj_set_style_radius(emoji_box_, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(emoji_box_, lvgl_theme->chat_background_color(), 0);
+    lv_obj_set_style_border_width(emoji_box_, 1, 0);
+    lv_obj_set_style_border_color(emoji_box_, lvgl_theme->border_color(), 0);
+    lv_obj_set_style_pad_all(emoji_box_, 0, 0);
+    lv_obj_set_style_clip_corner(emoji_box_, true, 0);
+    lv_obj_remove_flag(emoji_box_, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollbar_mode(emoji_box_, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_add_flag(emoji_box_, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_ext_click_area(emoji_box_, 8);
+    lv_obj_add_event_cb(emoji_box_, &LcdDisplay::OnAvatarPressed, LV_EVENT_PRESSED, this);
+    lv_obj_add_event_cb(emoji_box_, &LcdDisplay::OnAvatarReleased, LV_EVENT_RELEASED, this);
+    lv_obj_add_event_cb(emoji_box_, &LcdDisplay::OnAvatarReleased, LV_EVENT_PRESS_LOST, this);
+    lv_obj_add_event_cb(emoji_box_, &LcdDisplay::OnAvatarLongPressed, LV_EVENT_LONG_PRESSED, this);
+    lv_obj_add_event_cb(emoji_box_, &LcdDisplay::OnMicButtonClicked, LV_EVENT_CLICKED, this);
+
+    emoji_label_ = lv_label_create(emoji_box_);
+    lv_obj_set_style_text_font(emoji_label_, large_icon_font, 0);
+    lv_obj_set_style_text_color(emoji_label_, lvgl_theme->text_color(), 0);
+    lv_label_set_text(emoji_label_, MATERIAL_SYMBOLS_ROBOT_2);
+    lv_obj_set_style_transform_scale(emoji_label_, 200, 0);
+    lv_obj_set_style_transform_pivot_x(emoji_label_, lv_pct(50), 0);
+    lv_obj_set_style_transform_pivot_y(emoji_label_, lv_pct(50), 0);
+    lv_obj_center(emoji_label_);
+
+    emoji_image_ = lv_img_create(emoji_box_);
+    lv_obj_center(emoji_image_);
+    lv_obj_add_flag(emoji_image_, LV_OBJ_FLAG_HIDDEN);
+
+    /* Long-press progress ring around the avatar */
+    page_progress_ = lv_arc_create(screen);
+    lv_obj_remove_flag(page_progress_, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_remove_flag(page_progress_, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_style_bg_opa(page_progress_, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(page_progress_, 0, 0);
+    lv_obj_set_style_arc_width(page_progress_, 4, LV_PART_MAIN);
+    lv_obj_set_style_arc_color(page_progress_, lvgl_theme->border_color(), LV_PART_MAIN);
+    lv_obj_set_style_arc_width(page_progress_, 4, LV_PART_INDICATOR);
+    lv_obj_set_style_arc_color(page_progress_, lvgl_theme->text_color(), LV_PART_INDICATOR);
+    lv_obj_set_style_bg_opa(page_progress_, LV_OPA_TRANSP, LV_PART_KNOB);
+    lv_obj_set_style_border_width(page_progress_, 0, LV_PART_KNOB);
+    lv_arc_set_range(page_progress_, 0, 100);
+    lv_arc_set_value(page_progress_, 0);
+    lv_obj_add_flag(page_progress_, LV_OBJ_FLAG_HIDDEN);
+
+    /* Fixed five-line conversation viewport. Left half = previous page, right
+       half = next page; the page content itself never scrolls. */
     chat_area_ = lv_obj_create(screen);
     lv_obj_set_style_bg_opa(chat_area_, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(chat_area_, 0, 0);
@@ -972,7 +1115,8 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_radius(chat_area_, 0, 0);
     lv_obj_remove_flag(chat_area_, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_scrollbar_mode(chat_area_, LV_SCROLLBAR_MODE_OFF);
-    lv_obj_remove_flag(chat_area_, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_flag(chat_area_, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(chat_area_, &LcdDisplay::OnChatAreaClicked, LV_EVENT_CLICKED, this);
 
     chat_message_label_ = lv_label_create(chat_area_);
     lv_label_set_long_mode(chat_message_label_, LV_LABEL_LONG_WRAP);
@@ -1055,42 +1199,160 @@ void LcdDisplay::SetChatMessage(const char* role, const char* content) {
         }
         return;
     }
-
-    const std::string role_str = role != nullptr ? role : "";
-    const std::string text = content != nullptr ? content : "";
-
-    // Empty state-change messages reset the viewport (no history is kept).
-    if (text.empty()) {
-        chat_message_text_.clear();
-        last_chat_role_.clear();
-        lv_label_set_text(chat_message_label_, "");
-        lv_obj_set_y(chat_message_label_, 0);
+    // State changes send empty strings; they must never wipe the history.
+    if (content == nullptr || content[0] == '\0') {
         return;
     }
 
-    // Streamed assistant sentences extend the current reply; every other
-    // message (user speech, notifications) replaces it.
-    if (role_str == "assistant" && last_chat_role_ == "assistant" && !chat_message_text_.empty()) {
-        chat_message_text_ += text;
+    const std::string role_str = role != nullptr ? role : "";
+    const std::string text = content;
+
+    // System notices (network, OTA, volume...) are transient: show them in the
+    // top bar and keep the conversation pages free of them.
+    if (role_str == "system") {
+        ShowNotification(text, 3000);
+        return;
+    }
+
+    const bool was_reviewing = !follow_latest_ && page_index_ >= 0;
+    if (role_str == "assistant" && !chat_messages_.empty() &&
+        chat_messages_.back().role == "assistant") {
+        // Streamed assistant sentences extend the current reply.
+        std::string& current = chat_messages_.back().text;
+        current += text;
+        TrimChatText(current, kMaxChatTextBytes);
+        RewrapMessage(chat_messages_.size() - 1);
     } else {
-        chat_message_text_ = text;
-    }
-    last_chat_role_ = role_str;
-
-    // Only the tail of a long message is ever visible: bound the retained text
-    // so wrapping stays cheap and RAM usage stays flat.
-    static constexpr size_t kMaxChatTextBytes = 1500;
-    if (chat_message_text_.size() > kMaxChatTextBytes) {
-        size_t start = chat_message_text_.size() - kMaxChatTextBytes;
-        while (start < chat_message_text_.size() &&
-               (static_cast<unsigned char>(chat_message_text_[start]) & 0xC0) == 0x80) {
-            ++start;  // Do not split a UTF-8 sequence
+        ChatMessage message;
+        message.role = role_str;
+        message.text = std::string(RolePrefix(role_str)) + text;
+        TrimChatText(message.text, kMaxChatTextBytes);
+        chat_messages_.push_back(std::move(message));
+        while (chat_messages_.size() > kMaxChatMessages) {
+            chat_messages_.pop_front();
         }
-        chat_message_text_.erase(0, start);
+        RewrapMessage(chat_messages_.size() - 1);
     }
 
-    lv_label_set_text(chat_message_label_, chat_message_text_.c_str());
-    UpdateChatTextOverflow();
+    RebuildChatPages();
+    follow_latest_ = true;
+    page_index_ = chat_pages_.empty() ? -1 : static_cast<int>(chat_pages_.size()) - 1;
+    RenderCurrentPage();
+    if (was_reviewing) {
+        ShowNotification("新消息", 1200);
+    }
+}
+
+void LcdDisplay::RewrapMessage(size_t index) {
+    if (index >= chat_messages_.size() || chat_area_ == nullptr) {
+        return;
+    }
+    auto lvgl_theme = static_cast<LvglTheme*>(current_theme_);
+    auto text_font = lvgl_theme->text_font();
+    if (text_font == nullptr || text_font->font() == nullptr) {
+        return;
+    }
+    const lv_coord_t width = lv_obj_get_width(chat_area_);
+    if (width <= 0) {
+        return;
+    }
+    WrapChatText(chat_messages_[index].text, text_font->font(), width,
+                 chat_messages_[index].line_starts);
+}
+
+void LcdDisplay::RewrapAllMessages() {
+    for (size_t i = 0; i < chat_messages_.size(); ++i) {
+        RewrapMessage(i);
+    }
+}
+
+void LcdDisplay::RebuildChatPages() {
+    chat_pages_.clear();
+    for (size_t i = 0; i < chat_messages_.size(); ++i) {
+        const int lines = static_cast<int>(chat_messages_[i].line_starts.size());
+        const int pages = std::max(1, (lines + kChatLinesPerPage - 1) / kChatLinesPerPage);
+        for (int page = 0; page < pages; ++page) {
+            chat_pages_.push_back(ChatPage{static_cast<uint16_t>(i),
+                                           static_cast<uint16_t>(page * kChatLinesPerPage)});
+        }
+    }
+    if (chat_pages_.empty()) {
+        page_index_ = -1;
+    } else if (page_index_ >= static_cast<int>(chat_pages_.size())) {
+        page_index_ = static_cast<int>(chat_pages_.size()) - 1;
+    }
+}
+
+std::string LcdDisplay::BuildPageText(const ChatPage& page) const {
+    if (page.message >= chat_messages_.size()) {
+        return "";
+    }
+    const ChatMessage& message = chat_messages_[page.message];
+    if (message.line_starts.empty()) {
+        return message.text;
+    }
+    const int first = page.line;
+    const int last =
+        std::min<int>(first + kChatLinesPerPage, static_cast<int>(message.line_starts.size()));
+    std::string out;
+    for (int line = first; line < last; ++line) {
+        const uint32_t start = message.line_starts[line];
+        const uint32_t end = line + 1 < static_cast<int>(message.line_starts.size())
+                                 ? message.line_starts[line + 1]
+                                 : static_cast<uint32_t>(message.text.size());
+        size_t trimmed_end = end;
+        while (trimmed_end > start &&
+               (message.text[trimmed_end - 1] == '\n' || message.text[trimmed_end - 1] == '\r')) {
+            --trimmed_end;
+        }
+        if (!out.empty()) {
+            out += '\n';
+        }
+        out.append(message.text, start, trimmed_end - start);
+    }
+    return out;
+}
+
+void LcdDisplay::RenderCurrentPage() {
+    if (chat_message_label_ == nullptr) {
+        return;
+    }
+    if (page_index_ < 0 || page_index_ >= static_cast<int>(chat_pages_.size())) {
+        lv_label_set_text(chat_message_label_, "");
+        return;
+    }
+    const std::string text = BuildPageText(chat_pages_[page_index_]);
+    lv_label_set_text(chat_message_label_, text.c_str());
+}
+
+void LcdDisplay::ShowPageIndicator() {
+    if (chat_pages_.empty() || page_index_ < 0) {
+        return;
+    }
+    const std::string indicator =
+        std::to_string(page_index_ + 1) + "/" + std::to_string(chat_pages_.size());
+    ShowNotification(indicator, 1200);
+}
+
+void LcdDisplay::GoToPage(int index, bool show_indicator) {
+    if (chat_pages_.empty()) {
+        return;
+    }
+    const int last = static_cast<int>(chat_pages_.size()) - 1;
+    if (index < 0) {
+        index = 0;
+    }
+    if (index > last) {
+        index = last;
+    }
+    if (index != page_index_) {
+        page_index_ = index;
+        follow_latest_ = (index == last);
+        RenderCurrentPage();
+    }
+    if (show_indicator) {
+        ShowPageIndicator();
+    }
 }
 
 void LcdDisplay::ApplyChatLayout() {
@@ -1104,35 +1366,23 @@ void LcdDisplay::ApplyChatLayout() {
     }
     const lv_font_t* font = text_font->font();
 
-    /* The panel is mounted landscape: LVGL works on a 320x240 canvas (the
-       2.8" panel is rotated by its swap_xy setting). Budget for 240px:
-       top bar (one line) + avatar + five text lines. */
-    constexpr int kChatLines = 5;
-    constexpr lv_coord_t kSidePad = 8;
-    constexpr lv_coord_t kAvatarSize = 52;
-    constexpr lv_coord_t kAvatarGap = 6;
-    constexpr lv_coord_t kTopPad = 6;
-    constexpr lv_coord_t kIconGap = 4;
-
+    /* Portrait 240x320 canvas: top bar (one line), avatar, then five text lines.
+       The avatar sits right under the top bar and the text keeps a readable gap
+       below the avatar. */
     const lv_coord_t line_h = font->line_height;
     const lv_coord_t top_h = line_h;
-    /* Five 20px lines cannot use the 31px assets line box inside 240px, so cap
-       the pitch at 28px (glyphs are ~20px; this is the official look). */
-    const lv_coord_t pitch = LV_MIN(line_h, static_cast<lv_coord_t>(28));
     const lv_coord_t icon_w =
         lvgl_theme->icon_font() != nullptr && lvgl_theme->icon_font()->font() != nullptr
             ? lvgl_theme->icon_font()->font()->line_height
             : 20;
-    const lv_coord_t center_w = LV_HOR_RES - 2 * (kTopPad + 2 * icon_w + kIconGap);
+    const lv_coord_t center_w = LV_HOR_RES - 2 * (kTopBarPad + 2 * icon_w + kTopBarIconGap);
 
-    /* Top bar: WiFi icon (left), clock / conversation state (center), mute and
-       battery (right), matching the upstream layout but without any buttons. */
     lv_obj_set_size(top_bar_, LV_HOR_RES, top_h);
     lv_obj_align(top_bar_, LV_ALIGN_TOP_MID, 0, 0);
 
-    lv_obj_align(network_label_, LV_ALIGN_LEFT_MID, kTopPad, 0);
-    lv_obj_align(mute_label_, LV_ALIGN_RIGHT_MID, -(kTopPad + icon_w + kIconGap), 0);
-    lv_obj_align(battery_label_, LV_ALIGN_RIGHT_MID, -kTopPad, 0);
+    lv_obj_align(network_label_, LV_ALIGN_LEFT_MID, kTopBarPad, 0);
+    lv_obj_align(mute_label_, LV_ALIGN_RIGHT_MID, -(kTopBarPad + icon_w + kTopBarIconGap), 0);
+    lv_obj_align(battery_label_, LV_ALIGN_RIGHT_MID, -kTopBarPad, 0);
 
     lv_obj_set_style_text_font(status_label_, font, 0);
     lv_obj_set_width(status_label_, center_w);
@@ -1144,51 +1394,136 @@ void LcdDisplay::ApplyChatLayout() {
     lv_obj_set_height(notification_label_, top_h);
     lv_obj_align(notification_label_, LV_ALIGN_CENTER, 0, 0);
 
-    /* Avatar + five text lines, centered in the space below the top bar. */
-    const lv_coord_t chat_w = LV_HOR_RES - 2 * kSidePad;
-    /* LVGL heights the text as n*line_height + (n-1)*line_space. */
-    const lv_coord_t chat_h = (kChatLines - 1) * pitch + line_h;
-    const lv_coord_t block_h = kAvatarSize + kAvatarGap + chat_h;
-    const lv_coord_t body_top = top_h + LV_MAX((LV_VER_RES - top_h - block_h) / 2, 0);
-    const lv_coord_t chat_y = body_top + kAvatarSize + kAvatarGap;
+    const lv_coord_t chat_w = LV_HOR_RES - 2 * kChatSidePad;
+    const lv_coord_t chat_h = line_h * kChatLinesPerPage;
+    const lv_coord_t avatar_y = top_h + kAvatarTopGap;
+    const lv_coord_t chat_y = avatar_y + kAvatarSize + kAvatarGap;
 
     lv_obj_set_size(emoji_box_, kAvatarSize, kAvatarSize);
-    lv_obj_align(emoji_box_, LV_ALIGN_TOP_MID, 0, body_top);
+    lv_obj_align(emoji_box_, LV_ALIGN_TOP_MID, 0, avatar_y);
 
-    lv_obj_set_pos(chat_area_, kSidePad, chat_y);
+    if (page_progress_ != nullptr) {
+        lv_obj_set_size(page_progress_, kAvatarSize + 12, kAvatarSize + 12);
+        lv_obj_align_to(page_progress_, emoji_box_, LV_ALIGN_CENTER, 0, 0);
+    }
+
+    lv_obj_set_pos(chat_area_, kChatSidePad, chat_y);
     lv_obj_set_size(chat_area_, chat_w, chat_h);
 
     lv_obj_set_style_text_font(chat_message_label_, font, 0);
-    lv_obj_set_style_text_line_space(chat_message_label_, pitch - line_h, 0);
+    lv_obj_set_style_text_line_space(chat_message_label_, 0, 0);
     lv_obj_set_width(chat_message_label_, chat_w);
 
-    UpdateChatTextOverflow();
+    RewrapAllMessages();
+    RebuildChatPages();
+    if (!chat_messages_.empty()) {
+        if (follow_latest_ || page_index_ < 0) {
+            page_index_ = static_cast<int>(chat_pages_.size()) - 1;
+        } else if (page_index_ >= static_cast<int>(chat_pages_.size())) {
+            page_index_ = static_cast<int>(chat_pages_.size()) - 1;
+        }
+        RenderCurrentPage();
+    } else {
+        page_index_ = -1;
+        lv_label_set_text(chat_message_label_, "");
+    }
 }
 
-void LcdDisplay::UpdateChatTextOverflow() {
-    if (chat_area_ == nullptr || chat_message_label_ == nullptr) {
+void LcdDisplay::StartLongPressRing() {
+    if (page_progress_ == nullptr) {
         return;
     }
-    lv_obj_update_layout(chat_message_label_);
-    const lv_coord_t area_h = lv_obj_get_height(chat_area_);
-    const lv_coord_t text_h = lv_obj_get_height(chat_message_label_);
-    lv_obj_set_y(chat_message_label_, text_h > area_h ? area_h - text_h : 0);
+    lv_obj_remove_flag(page_progress_, LV_OBJ_FLAG_HIDDEN);
+    lv_arc_set_value(page_progress_, 0);
+    lv_anim_t anim;
+    lv_anim_init(&anim);
+    lv_anim_set_var(&anim, page_progress_);
+    lv_anim_set_values(&anim, 0, 100);
+    lv_anim_set_duration(&anim, kAvatarLongPressMs);
+    lv_anim_set_exec_cb(&anim, [](void* var, int32_t value) {
+        lv_arc_set_value(static_cast<lv_obj_t*>(var), value);
+    });
+    lv_anim_start(&anim);
+}
+
+void LcdDisplay::StopLongPressRing() {
+    if (page_progress_ == nullptr) {
+        return;
+    }
+    lv_anim_delete(page_progress_, nullptr);
+    lv_obj_add_flag(page_progress_, LV_OBJ_FLAG_HIDDEN);
+    lv_arc_set_value(page_progress_, 0);
+}
+
+void LcdDisplay::OnChatAreaClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self == nullptr || self->chat_area_ == nullptr || self->chat_pages_.empty()) {
+        return;
+    }
+    lv_indev_t* indev = lv_indev_active();
+    if (indev == nullptr) {
+        return;
+    }
+    lv_point_t point;
+    lv_indev_get_point(indev, &point);
+    lv_area_t area;
+    lv_obj_get_coords(self->chat_area_, &area);
+    const lv_coord_t middle = (area.x1 + area.x2) / 2;
+    if (point.x < middle) {
+        self->GoToPage(self->page_index_ - 1, true);
+    } else {
+        self->GoToPage(self->page_index_ + 1, true);
+    }
+}
+
+void LcdDisplay::OnAvatarPressed(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self != nullptr) {
+        self->StartLongPressRing();
+    }
+}
+
+void LcdDisplay::OnAvatarReleased(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self != nullptr) {
+        self->StopLongPressRing();
+    }
+}
+
+void LcdDisplay::OnAvatarLongPressed(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self == nullptr) {
+        return;
+    }
+    self->StopLongPressRing();
+    // Swallow the CLICKED event that LVGL still sends on release.
+    if (lv_indev_t* indev = lv_indev_active(); indev != nullptr) {
+        lv_indev_wait_release(indev);
+    }
+    Application::GetInstance().Schedule([]() { Application::GetInstance().StartNewSession(); });
+    self->ShowNotification("新会话", 1200);
 }
 
 void LcdDisplay::OnMicButtonClicked(lv_event_t* e) {
-    (void)e;
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self != nullptr && !self->chat_pages_.empty()) {
+        // Continue the conversation from the live page.
+        self->GoToPage(static_cast<int>(self->chat_pages_.size()) - 1, false);
+    }
     Application::GetInstance().ToggleChatState();
 }
 
 void LcdDisplay::ClearChatMessages() {
     DisplayLockGuard lock(this);
-    chat_message_text_.clear();
-    last_chat_role_.clear();
+    StopLongPressRing();
+    chat_messages_.clear();
+    chat_pages_.clear();
+    page_index_ = -1;
+    follow_latest_ = true;
     if (chat_message_label_ != nullptr) {
         lv_label_set_text(chat_message_label_, "");
-        lv_obj_set_y(chat_message_label_, 0);
     }
-    ESP_LOGI(TAG, "Chat messages cleared");
+    ESP_LOGI(TAG, "Chat history cleared (new session)");
 }
 #endif
 
@@ -1238,7 +1573,7 @@ void LcdDisplay::SetEmotion(const char* emotion) {
 #if CONFIG_USE_WECHAT_MESSAGE_STYLE
             lv_img_set_zoom(emoji_image_, (56 * 256) / max_dim);
 #else
-            lv_img_set_zoom(emoji_image_, (52 * 256) / max_dim);
+            lv_img_set_zoom(emoji_image_, (64 * 256) / max_dim);
 #endif
         }
     };
@@ -1424,6 +1759,10 @@ void LcdDisplay::SetTheme(Theme* theme) {
     if (emoji_box_ != nullptr) {
         lv_obj_set_style_bg_color(emoji_box_, lvgl_theme->chat_background_color(), 0);
         lv_obj_set_style_border_color(emoji_box_, lvgl_theme->border_color(), 0);
+    }
+    if (page_progress_ != nullptr) {
+        lv_obj_set_style_arc_color(page_progress_, lvgl_theme->border_color(), LV_PART_MAIN);
+        lv_obj_set_style_arc_color(page_progress_, lvgl_theme->text_color(), LV_PART_INDICATOR);
     }
     if (bottom_bar_ != nullptr) {
         lv_obj_set_style_bg_opa(bottom_bar_, LV_OPA_50, 0);

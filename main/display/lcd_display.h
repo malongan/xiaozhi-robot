@@ -7,8 +7,11 @@
 #include <esp_lcd_panel_io.h>
 #include <esp_lcd_panel_ops.h>
 #include <atomic>
+#include <cstdint>
+#include <deque>
 #include <memory>
 #include <string>
+#include <vector>
 
 #define PREVIEW_IMAGE_DURATION_MS 5000
 
@@ -30,19 +33,44 @@ protected:
     std::unique_ptr<LvglGif> gif_controller_ = nullptr;
     lv_obj_t* emoji_box_ = nullptr;
     lv_obj_t* chat_message_label_ = nullptr;
-    std::string chat_message_text_;
-    std::string last_chat_role_;
     esp_timer_handle_t preview_timer_ = nullptr;
     std::unique_ptr<LvglImage> preview_image_cached_ = nullptr;
     bool hide_subtitle_ = false;  // Control whether to hide chat messages/subtitles
 
-    // Default message style: one fixed-size viewport that shows the tail of the
-    // latest message. No history, no pagination, no user scrolling.
+    // Default message style: paged conversation history. One page shows up to
+    // five wrapped lines; long messages span several pages. Pages live in RAM
+    // only and are dropped when a new session starts.
+    struct ChatMessage {
+        std::string role;
+        std::string text;                   // display text, includes the role prefix
+        std::vector<uint32_t> line_starts;  // byte offsets of wrapped line starts
+    };
+    struct ChatPage {
+        uint16_t message = 0;  // index into chat_messages_
+        uint16_t line = 0;     // first wrapped line shown on the page
+    };
+    std::deque<ChatMessage> chat_messages_;
+    std::vector<ChatPage> chat_pages_;
+    int page_index_ = -1;
+    bool follow_latest_ = true;
     lv_obj_t* chat_area_ = nullptr;
+    lv_obj_t* page_progress_ = nullptr;  // long-press-to-reset ring around the avatar
 
     void ApplyChatLayout();
-    void UpdateChatTextOverflow();
+    void RewrapMessage(size_t index);
+    void RewrapAllMessages();
+    void RebuildChatPages();
+    void RenderCurrentPage();
+    void GoToPage(int index, bool show_indicator);
+    void ShowPageIndicator();
+    void StartLongPressRing();
+    void StopLongPressRing();
+    std::string BuildPageText(const ChatPage& page) const;
 
+    static void OnChatAreaClicked(lv_event_t* e);
+    static void OnAvatarPressed(lv_event_t* e);
+    static void OnAvatarReleased(lv_event_t* e);
+    static void OnAvatarLongPressed(lv_event_t* e);
     static void OnMicButtonClicked(lv_event_t* e);
 
     void InitializeLcdThemes();
