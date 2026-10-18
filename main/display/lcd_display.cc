@@ -873,9 +873,16 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_text_font(screen, text_font, 0);
     lv_obj_set_style_text_color(screen, lvgl_theme->text_color(), 0);
     lv_obj_set_style_bg_color(screen, lvgl_theme->background_color(), 0);
+    /* The screen is scrollable by default; with a fixed page layout an
+       overflowing child would draw a scrollbar, so forbid it outright. */
+    lv_obj_remove_flag(screen, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollbar_mode(screen, LV_SCROLLBAR_MODE_OFF);
+    ESP_LOGI(TAG, "Layout canvas: %dx%d", (int)LV_HOR_RES, (int)LV_VER_RES);
 
     /* Container - used as background */
     container_ = lv_obj_create(screen);
+    lv_obj_remove_flag(container_, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollbar_mode(container_, LV_SCROLLBAR_MODE_OFF);
     lv_obj_set_size(container_, LV_HOR_RES, LV_VER_RES);
     lv_obj_set_style_radius(container_, 0, 0);
     lv_obj_set_style_pad_all(container_, 0, 0);
@@ -929,7 +936,7 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_text_font(emoji_label_, large_icon_font, 0);
     lv_obj_set_style_text_color(emoji_label_, lvgl_theme->text_color(), 0);
     lv_label_set_text(emoji_label_, MATERIAL_SYMBOLS_ROBOT_2);
-    lv_obj_set_style_transform_scale(emoji_label_, 200, 0);
+    lv_obj_set_style_transform_scale(emoji_label_, 170, 0);
     lv_obj_set_style_transform_pivot_x(emoji_label_, lv_pct(50), 0);
     lv_obj_set_style_transform_pivot_y(emoji_label_, lv_pct(50), 0);
     lv_obj_center(emoji_label_);
@@ -944,6 +951,7 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_text_align(status_label_, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_text_color(status_label_, lvgl_theme->text_color(), 0);
     lv_label_set_long_mode(status_label_, LV_LABEL_LONG_SCROLL_CIRCULAR);
+    lv_obj_set_scrollbar_mode(status_label_, LV_SCROLLBAR_MODE_OFF);
     lv_label_set_text(status_label_, Lang::Strings::INITIALIZING);
 
     notification_label_ = lv_label_create(top_bar_);
@@ -951,6 +959,7 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_text_align(notification_label_, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_text_color(notification_label_, lvgl_theme->text_color(), 0);
     lv_label_set_long_mode(notification_label_, LV_LABEL_LONG_SCROLL_CIRCULAR);
+    lv_obj_set_scrollbar_mode(notification_label_, LV_SCROLLBAR_MODE_OFF);
     lv_label_set_text(notification_label_, "");
     lv_obj_add_flag(notification_label_, LV_OBJ_FLAG_HIDDEN);
 
@@ -969,7 +978,7 @@ void LcdDisplay::SetupUI() {
     lv_label_set_long_mode(chat_message_label_, LV_LABEL_LONG_WRAP);
     lv_obj_set_style_text_font(chat_message_label_, text_font, 0);
     lv_obj_set_style_text_color(chat_message_label_, lvgl_theme->text_color(), 0);
-    lv_obj_set_style_text_align(chat_message_label_, LV_TEXT_ALIGN_LEFT, 0);
+    lv_obj_set_style_text_align(chat_message_label_, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_text(chat_message_label_, "");
     lv_obj_set_pos(chat_message_label_, 0, 0);
 
@@ -1095,18 +1104,29 @@ void LcdDisplay::ApplyChatLayout() {
     }
     const lv_font_t* font = text_font->font();
 
-    /* Top bar: WiFi icon (left), clock / conversation state (center), mute and
-       battery (right), matching the upstream layout but without any buttons. */
+    /* The panel is mounted landscape: LVGL works on a 320x240 canvas (the
+       2.8" panel is rotated by its swap_xy setting). Budget for 240px:
+       top bar (one line) + avatar + five text lines. */
+    constexpr int kChatLines = 5;
+    constexpr lv_coord_t kSidePad = 8;
+    constexpr lv_coord_t kAvatarSize = 52;
+    constexpr lv_coord_t kAvatarGap = 6;
     constexpr lv_coord_t kTopPad = 6;
     constexpr lv_coord_t kIconGap = 4;
+
     const lv_coord_t line_h = font->line_height;
     const lv_coord_t top_h = line_h;
+    /* Five 20px lines cannot use the 31px assets line box inside 240px, so cap
+       the pitch at 28px (glyphs are ~20px; this is the official look). */
+    const lv_coord_t pitch = LV_MIN(line_h, static_cast<lv_coord_t>(28));
     const lv_coord_t icon_w =
         lvgl_theme->icon_font() != nullptr && lvgl_theme->icon_font()->font() != nullptr
             ? lvgl_theme->icon_font()->font()->line_height
             : 20;
     const lv_coord_t center_w = LV_HOR_RES - 2 * (kTopPad + 2 * icon_w + kIconGap);
 
+    /* Top bar: WiFi icon (left), clock / conversation state (center), mute and
+       battery (right), matching the upstream layout but without any buttons. */
     lv_obj_set_size(top_bar_, LV_HOR_RES, top_h);
     lv_obj_align(top_bar_, LV_ALIGN_TOP_MID, 0, 0);
 
@@ -1125,13 +1145,9 @@ void LcdDisplay::ApplyChatLayout() {
     lv_obj_align(notification_label_, LV_ALIGN_CENTER, 0, 0);
 
     /* Avatar + five text lines, centered in the space below the top bar. */
-    constexpr int kChatLines = 5;
-    constexpr lv_coord_t kSidePad = 8;
-    constexpr lv_coord_t kAvatarSize = 64;
-    constexpr lv_coord_t kAvatarGap = 8;
-
     const lv_coord_t chat_w = LV_HOR_RES - 2 * kSidePad;
-    const lv_coord_t chat_h = line_h * kChatLines;
+    /* LVGL heights the text as n*line_height + (n-1)*line_space. */
+    const lv_coord_t chat_h = (kChatLines - 1) * pitch + line_h;
     const lv_coord_t block_h = kAvatarSize + kAvatarGap + chat_h;
     const lv_coord_t body_top = top_h + LV_MAX((LV_VER_RES - top_h - block_h) / 2, 0);
     const lv_coord_t chat_y = body_top + kAvatarSize + kAvatarGap;
@@ -1143,6 +1159,7 @@ void LcdDisplay::ApplyChatLayout() {
     lv_obj_set_size(chat_area_, chat_w, chat_h);
 
     lv_obj_set_style_text_font(chat_message_label_, font, 0);
+    lv_obj_set_style_text_line_space(chat_message_label_, pitch - line_h, 0);
     lv_obj_set_width(chat_message_label_, chat_w);
 
     UpdateChatTextOverflow();
@@ -1221,7 +1238,7 @@ void LcdDisplay::SetEmotion(const char* emotion) {
 #if CONFIG_USE_WECHAT_MESSAGE_STYLE
             lv_img_set_zoom(emoji_image_, (56 * 256) / max_dim);
 #else
-            lv_img_set_zoom(emoji_image_, (64 * 256) / max_dim);
+            lv_img_set_zoom(emoji_image_, (52 * 256) / max_dim);
 #endif
         }
     };
