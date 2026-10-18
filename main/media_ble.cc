@@ -1,5 +1,6 @@
 #include "media_ble.h"
 
+#include <cstdio>
 #include <cstring>
 
 #include <esp_log.h>
@@ -37,7 +38,9 @@ const ble_uuid16_t kPnpIdUuid = BLE_UUID16_INIT(0x2A50);
 const ble_uuid16_t kBatteryServiceUuid = BLE_UUID16_INIT(0x180F);
 const ble_uuid16_t kBatteryLevelUuid = BLE_UUID16_INIT(0x2A19);
 
-// Keyboard (report ID 1, boot-style 8 bytes) + consumer control (report ID 2).
+// One combined input report (ID 1): keyboard (8 bytes) + nested consumer keys
+// (1 byte).  A single report characteristic binds reliably on macOS; multiple
+// 0x2A4D report characteristics were ignored by its HID stack.
 const uint8_t kReportMap[] = {
     0x05, 0x01,  // Usage Page (Generic Desktop)
     0x09, 0x06,  // Usage (Keyboard)
@@ -50,10 +53,10 @@ const uint8_t kReportMap[] = {
     0x25, 0x01,  //   Logical Maximum (1)
     0x75, 0x01,  //   Report Size (1)
     0x95, 0x08,  //   Report Count (8)
-    0x81, 0x02,  //   Input (Data,Var,Abs)
+    0x81, 0x02,  //   Input (Data,Var,Abs) -> modifier byte
     0x95, 0x01,  //   Report Count (1)
     0x75, 0x08,  //   Report Size (8)
-    0x81, 0x01,  //   Input (Const)
+    0x81, 0x01,  //   Input (Const) -> reserved byte
     0x95, 0x06,  //   Report Count (6)
     0x75, 0x08,  //   Report Size (8)
     0x15, 0x00,  //   Logical Minimum (0)
@@ -61,43 +64,40 @@ const uint8_t kReportMap[] = {
     0x05, 0x07,  //   Usage Page (Key Codes)
     0x19, 0x00,  //   Usage Minimum (0)
     0x29, 0x65,  //   Usage Maximum (101)
-    0x81, 0x00,  //   Input (Data,Array)
-    0xC0,        // End Collection
+    0x81, 0x00,  //   Input (Data,Array) -> 6 keycodes
 
-    0x05, 0x0C,  // Usage Page (Consumer)
-    0x09, 0x01,  // Usage (Consumer Control)
-    0xA1, 0x01,  // Collection (Application)
-    0x85, 0x02,  //   Report ID (2)
     0x05, 0x0C,  //   Usage Page (Consumer)
-    0x15, 0x00,  //   Logical Minimum (0)
-    0x25, 0x01,  //   Logical Maximum (1)
-    0x75, 0x01,  //   Report Size (1)
-    0x95, 0x06,  //   Report Count (6)
-    0x09, 0xB5,  //   Usage (Scan Next Track)
-    0x09, 0xB6,  //   Usage (Scan Previous Track)
-    0x09, 0xCD,  //   Usage (Play/Pause)
-    0x09, 0xE2,  //   Usage (Mute)
-    0x09, 0xE9,  //   Usage (Volume Increment)
-    0x09, 0xEA,  //   Usage (Volume Decrement)
-    0x81, 0x02,  //   Input (Data,Var,Abs)
-    0x95, 0x02,  //   Report Count (2)
-    0x81, 0x03,  //   Input (Const)
-    0xC0,        // End Collection
+    0x09, 0x01,  //   Usage (Consumer Control)
+    0xA1, 0x01,  //   Collection (Logical)
+    0x15, 0x00,  //     Logical Minimum (0)
+    0x25, 0x01,  //     Logical Maximum (1)
+    0x75, 0x01,  //     Report Size (1)
+    0x95, 0x06,  //     Report Count (6)
+    0x09, 0xB5,  //     Usage (Scan Next Track)
+    0x09, 0xB6,  //     Usage (Scan Previous Track)
+    0x09, 0xCD,  //     Usage (Play/Pause)
+    0x09, 0xE2,  //     Usage (Mute)
+    0x09, 0xE9,  //     Usage (Volume Increment)
+    0x09, 0xEA,  //     Usage (Volume Decrement)
+    0x81, 0x02,  //     Input (Data,Var,Abs) -> consumer byte
+    0x95, 0x02,  //     Report Count (2)
+    0x81, 0x03,  //     Input (Const) -> padding bits
+    0xC0,        //   End Collection (Logical)
+    0xC0,        // End Collection (Application)
 };
 
-const uint8_t kHidInfo[] = {0x11, 0x01, 0x00, 0x02};  // bcdHID 1.11
-const uint8_t kReportRefKeyboard[] = {0x01, 0x01};
-const uint8_t kReportRefConsumer[] = {0x02, 0x01};
+const uint8_t kHidInfo[] = {0x11, 0x01, 0x00, 0x02};  // bcdHID 1.11, flags
+const uint8_t kReportRefInput[] = {0x01, 0x01};       // report id 1, input
 const uint8_t kManufacturerName[] = "Xiaozhi";
-const uint8_t kPnpId[] = {0x02, 0xE5, 0x02, 0x01, 0x00, 0x00, 0x01};  // USB vid 02E5
-uint8_t g_protocol_mode = 1;
-uint8_t g_report_value = 0;
+const uint8_t kPnpId[] = {0x02, 0xE5, 0x02, 0x01, 0x00, 0x00, 0x01};
+uint8_t g_protocol_mode = 1;     // report protocol
+uint8_t g_report_value[9] = {};  // 8 keyboard bytes + 1 consumer byte
 uint8_t g_battery_level = 100;
 
 uint8_t g_own_addr_type = 0;
 
-ble_gatt_chr_def g_hid_chrs[7] = {};
-ble_gatt_dsc_def g_hid_dscs[3] = {};
+ble_gatt_chr_def g_hid_chrs[6] = {};
+ble_gatt_dsc_def g_hid_dscs[2] = {};
 ble_gatt_svc_def g_svcs[4] = {};
 ble_gatt_chr_def g_di_chrs[3] = {};
 ble_gatt_chr_def g_batt_chrs[2] = {};
@@ -108,6 +108,7 @@ int HidInfoAccess(uint16_t, uint16_t, struct ble_gatt_access_ctxt* ctxt, void*) 
 }
 
 int ReportMapAccess(uint16_t, uint16_t, struct ble_gatt_access_ctxt* ctxt, void*) {
+    ESP_LOGI(TAG, "host read report map (%d bytes)", static_cast<int>(sizeof(kReportMap)));
     return os_mbuf_append(ctxt->om, kReportMap, sizeof(kReportMap)) == 0
                ? 0
                : BLE_ATT_ERR_INSUFFICIENT_RES;
@@ -123,26 +124,27 @@ int ProtocolModeAccess(uint16_t, uint16_t, struct ble_gatt_access_ctxt* ctxt, vo
                                                                   : BLE_ATT_ERR_INSUFFICIENT_RES;
     }
     if (ctxt->op == BLE_GATT_ACCESS_OP_WRITE_CHR && OS_MBUF_PKTLEN(ctxt->om) >= 1) {
-        return os_mbuf_copydata(ctxt->om, 0, 1, &g_protocol_mode) == 0 ? 0 : BLE_ATT_ERR_UNLIKELY;
+        if (os_mbuf_copydata(ctxt->om, 0, 1, &g_protocol_mode) == 0) {
+            ESP_LOGI(TAG, "protocol mode <- %d", g_protocol_mode);
+            return 0;
+        }
     }
     return BLE_ATT_ERR_UNLIKELY;
 }
 
-int ReportAccess(uint16_t, uint16_t, struct ble_gatt_access_ctxt* ctxt, void*) {
+int InputReportAccess(uint16_t, uint16_t, struct ble_gatt_access_ctxt* ctxt, void*) {
     if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) {
-        return os_mbuf_append(ctxt->om, &g_report_value, 1) == 0 ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
+        ESP_LOGI(TAG, "host read input report (%d bytes)",
+                 static_cast<int>(sizeof(g_report_value)));
+        return os_mbuf_append(ctxt->om, g_report_value, sizeof(g_report_value)) == 0
+                   ? 0
+                   : BLE_ATT_ERR_INSUFFICIENT_RES;
     }
     return BLE_ATT_ERR_UNLIKELY;
 }
 
-int ReportRefConsumerAccess(uint16_t, uint16_t, struct ble_gatt_access_ctxt* ctxt, void*) {
-    return os_mbuf_append(ctxt->om, kReportRefConsumer, sizeof(kReportRefConsumer)) == 0
-               ? 0
-               : BLE_ATT_ERR_INSUFFICIENT_RES;
-}
-
-int ReportRefKeyboardAccess(uint16_t, uint16_t, struct ble_gatt_access_ctxt* ctxt, void*) {
-    return os_mbuf_append(ctxt->om, kReportRefKeyboard, sizeof(kReportRefKeyboard)) == 0
+int InputReportRefAccess(uint16_t, uint16_t, struct ble_gatt_access_ctxt* ctxt, void*) {
+    return os_mbuf_append(ctxt->om, kReportRefInput, sizeof(kReportRefInput)) == 0
                ? 0
                : BLE_ATT_ERR_INSUFFICIENT_RES;
 }
@@ -180,12 +182,8 @@ void MediaBle::InitGattServices() {
     g_hid_dscs[0] = {};
     g_hid_dscs[0].uuid = &kReportRefUuid.u;
     g_hid_dscs[0].att_flags = BLE_ATT_F_READ;
-    g_hid_dscs[0].access_cb = ReportRefConsumerAccess;
+    g_hid_dscs[0].access_cb = InputReportRefAccess;
     g_hid_dscs[1] = {};
-    g_hid_dscs[1].uuid = &kReportRefUuid.u;
-    g_hid_dscs[1].att_flags = BLE_ATT_F_READ;
-    g_hid_dscs[1].access_cb = ReportRefKeyboardAccess;
-    g_hid_dscs[2] = {};
 
     g_hid_chrs[0] = {};
     g_hid_chrs[0].uuid = &kHidInfoUuid.u;
@@ -198,25 +196,18 @@ void MediaBle::InitGattServices() {
     g_hid_chrs[2] = {};
     g_hid_chrs[2].uuid = &kHidControlUuid.u;
     g_hid_chrs[2].access_cb = ControlPointAccess;
-    g_hid_chrs[2].flags = BLE_GATT_CHR_F_WRITE_NO_RSP | BLE_GATT_CHR_F_WRITE_ENC;
+    g_hid_chrs[2].flags = BLE_GATT_CHR_F_WRITE_NO_RSP;
     g_hid_chrs[3] = {};
     g_hid_chrs[3].uuid = &kProtocolModeUuid.u;
     g_hid_chrs[3].access_cb = ProtocolModeAccess;
-    g_hid_chrs[3].flags =
-        BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE_NO_RSP | BLE_GATT_CHR_F_WRITE_ENC;
+    g_hid_chrs[3].flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE_NO_RSP;
     g_hid_chrs[4] = {};
     g_hid_chrs[4].uuid = &kReportUuid.u;
-    g_hid_chrs[4].access_cb = ReportAccess;
+    g_hid_chrs[4].access_cb = InputReportAccess;
     g_hid_chrs[4].flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_NOTIFY | BLE_GATT_CHR_F_READ_ENC |
                           BLE_GATT_CHR_F_WRITE_ENC;
-    g_hid_chrs[4].descriptors = &g_hid_dscs[0];
+    g_hid_chrs[4].descriptors = g_hid_dscs;
     g_hid_chrs[5] = {};
-    g_hid_chrs[5].uuid = &kReportUuid.u;
-    g_hid_chrs[5].access_cb = ReportAccess;
-    g_hid_chrs[5].flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_NOTIFY | BLE_GATT_CHR_F_READ_ENC |
-                          BLE_GATT_CHR_F_WRITE_ENC;
-    g_hid_chrs[5].descriptors = &g_hid_dscs[1];
-    g_hid_chrs[6] = {};
 
     g_di_chrs[0] = {};
     g_di_chrs[0].uuid = &kManufacturerUuid.u;
@@ -287,7 +278,7 @@ void MediaBle::Start() {
     ble_store_config_init();
 
     nimble_port_freertos_init(&MediaBle::HostTask);
-    ESP_LOGI(TAG, "BLE HID started, advertising as %s", kDeviceName);
+    ESP_LOGI(TAG, "BLE HID started (single-report layout v2), advertising as %s", kDeviceName);
 }
 
 void MediaBle::HostTask(void*) {
@@ -303,7 +294,6 @@ void MediaBle::OnSync() {
         ESP_LOGE(TAG, "failed to infer address type");
     }
     auto& self = GetInstance();
-    // Consumer report is the first 0x2A4D characteristic.
     if (ble_gatts_find_chr(&kHidServiceUuid.u, &kReportUuid.u, nullptr, &self.report_val_handle_) !=
         0) {
         ESP_LOGE(TAG, "report characteristic not found");
@@ -399,7 +389,7 @@ int MediaBle::GapEvent(struct ble_gap_event* event, void*) {
         case BLE_GAP_EVENT_SUBSCRIBE:
             self.subscribed_handle_ = event->subscribe.attr_handle;
             self.subscribed_notify_ = event->subscribe.cur_notify != 0;
-            ESP_LOGI(TAG, "subscribe, cccd_handle=%d notify=%d report_val_handle=%d",
+            ESP_LOGI(TAG, "subscribe, handle=%d notify=%d report_val_handle=%d",
                      event->subscribe.attr_handle, event->subscribe.cur_notify,
                      self.report_val_handle_);
             return 0;
@@ -460,20 +450,22 @@ bool MediaBle::SendKey(MediaBleKey key) {
     }
     const uint8_t bit = static_cast<uint8_t>(1u << static_cast<uint8_t>(key));
     int rc = 0;
-    auto notify = [this, &rc](uint8_t value) {
-        g_report_value = value;
-        struct os_mbuf* om = ble_hs_mbuf_from_flat(&value, 1);
+    auto notify = [this, &rc](const uint8_t* data) {
+        memcpy(g_report_value, data, sizeof(g_report_value));
+        struct os_mbuf* om = ble_hs_mbuf_from_flat(data, sizeof(g_report_value));
         if (om == nullptr) {
             rc = BLE_HS_ENOMEM;
             return;
         }
         rc = ble_gatts_notify_custom(conn_handle_, report_val_handle_, om);
     };
-    notify(bit);
+    uint8_t pressed[sizeof(g_report_value)] = {};
+    pressed[8] = bit;  // consumer byte follows the 8 keyboard bytes
+    uint8_t released[sizeof(g_report_value)] = {};
+    notify(pressed);
     vTaskDelay(pdMS_TO_TICKS(20));
-    notify(0);
-    ESP_LOGI(TAG, "send key %d bit=0x%02X val_handle=%d cccd=%d notify_on=%d rc=%d",
-             static_cast<int>(key), bit, report_val_handle_, subscribed_handle_, subscribed_notify_,
-             rc);
+    notify(released);
+    ESP_LOGI(TAG, "send key %d bit=0x%02X val_handle=%d rc=%d", static_cast<int>(key), bit,
+             report_val_handle_, rc);
     return true;
 }
