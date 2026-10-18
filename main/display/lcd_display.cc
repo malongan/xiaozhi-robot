@@ -1768,28 +1768,24 @@ void LcdDisplay::ApplyChatLayout() {
     const lv_coord_t chat_y = text_top + LV_MAX((text_space - chat_h) / 2, 0);
 
     const bool big_idle = avatar_mood_ == kAvatarMoodIdle;
-    lv_obj_set_size(emoji_box_, kAvatarSize, kAvatarSize);
+    const lv_coord_t face_size = big_idle ? 150 : kAvatarSize;
+    avatar_face_scale_ = static_cast<float>(face_size) / static_cast<float>(kAvatarSize);
+    lv_obj_set_size(emoji_box_, face_size, face_size);
     if (big_idle) {
-        // Idle: one large face in the middle of the screen, chat text hidden.
-        avatar_layout_scale_ = 480;
+        // Idle: one large face drawn at native resolution in the middle.
         lv_obj_align(emoji_box_, LV_ALIGN_CENTER, 0, 8);
         lv_obj_add_flag(chat_area_, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_set_ext_click_area(emoji_box_, 40);
+        lv_obj_set_ext_click_area(emoji_box_, 30);
     } else {
-        avatar_layout_scale_ = 256;
         lv_obj_align(emoji_box_, LV_ALIGN_TOP_MID, 0, avatar_y);
         lv_obj_remove_flag(chat_area_, LV_OBJ_FLAG_HIDDEN);
         lv_obj_set_ext_click_area(emoji_box_, 8);
     }
 
     if (page_progress_ != nullptr) {
-        lv_obj_set_size(page_progress_, kAvatarSize + 14, kAvatarSize + 14);
+        lv_obj_set_size(page_progress_, face_size + 14, face_size + 14);
         lv_obj_align_to(page_progress_, emoji_box_, LV_ALIGN_CENTER, 0, 0);
-        if (big_idle) {
-            lv_obj_add_flag(page_progress_, LV_OBJ_FLAG_HIDDEN);
-        } else {
-            lv_obj_remove_flag(page_progress_, LV_OBJ_FLAG_HIDDEN);
-        }
+        lv_obj_add_flag(page_progress_, LV_OBJ_FLAG_HIDDEN);
     }
     if (avatar_think_dots_ != nullptr) {
         lv_obj_align_to(avatar_think_dots_, emoji_box_, LV_ALIGN_TOP_RIGHT, 6, -4);
@@ -2159,6 +2155,20 @@ void LcdDisplay::AvatarAnimTimerCb(lv_timer_t* timer) {
         face_rot = static_cast<int32_t>(self->gaze_tilt_ * 20.0f);  // 2 deg max
     }
 
+    const float fs = self->avatar_face_scale_;
+    if (fs != 1.0f) {
+        eye_left_x = static_cast<lv_coord_t>(eye_left_x * fs);
+        eye_left_y = static_cast<lv_coord_t>(eye_left_y * fs);
+        eye_left_w = static_cast<lv_coord_t>(eye_left_w * fs);
+        eye_left_h = static_cast<lv_coord_t>(eye_left_h * fs);
+        eye_right_x = static_cast<lv_coord_t>(eye_right_x * fs);
+        eye_right_y = static_cast<lv_coord_t>(eye_right_y * fs);
+        eye_right_w = static_cast<lv_coord_t>(eye_right_w * fs);
+        eye_right_h = static_cast<lv_coord_t>(eye_right_h * fs);
+        bob = static_cast<lv_coord_t>(bob * fs);
+        face_tx = static_cast<lv_coord_t>(face_tx * fs);
+    }
+
     if (!happy) {
         lv_coord_t left_h_draw = eye_left_h;
         lv_coord_t right_h_draw = eye_right_h;
@@ -2184,11 +2194,11 @@ void LcdDisplay::AvatarAnimTimerCb(lv_timer_t* timer) {
                 const bool blink_right =
                     !self->avatar_blink_single_eye_ || self->avatar_blink_eye_ == 1;
                 if (blink_left) {
-                    left_h_draw = LV_MAX(static_cast<lv_coord_t>(3),
+                    left_h_draw = LV_MAX(static_cast<lv_coord_t>(3 * fs),
                                          static_cast<lv_coord_t>(eye_left_h * factor));
                 }
                 if (blink_right) {
-                    right_h_draw = LV_MAX(static_cast<lv_coord_t>(3),
+                    right_h_draw = LV_MAX(static_cast<lv_coord_t>(3 * fs),
                                           static_cast<lv_coord_t>(eye_right_h * factor));
                 }
             }
@@ -2213,13 +2223,22 @@ void LcdDisplay::AvatarAnimTimerCb(lv_timer_t* timer) {
                          LV_MAX(1, right_h_draw / 10));
         }
     } else {
-        lv_obj_align(self->avatar_eye_happy_left_, LV_ALIGN_CENTER, -eye_gap, 0);
-        lv_obj_align(self->avatar_eye_happy_right_, LV_ALIGN_CENTER, eye_gap, 0);
+        const lv_coord_t arc_size = static_cast<lv_coord_t>(20 * fs);
+        lv_obj_set_size(self->avatar_eye_happy_left_, arc_size, arc_size);
+        lv_obj_set_size(self->avatar_eye_happy_right_, arc_size, arc_size);
+        lv_obj_set_style_arc_width(self->avatar_eye_happy_left_,
+                                   LV_MAX(static_cast<lv_coord_t>(2), static_cast<lv_coord_t>(4 * fs)),
+                                   LV_PART_MAIN);
+        lv_obj_set_style_arc_width(self->avatar_eye_happy_right_,
+                                   LV_MAX(static_cast<lv_coord_t>(2), static_cast<lv_coord_t>(4 * fs)),
+                                   LV_PART_MAIN);
+        const lv_coord_t happy_gap = static_cast<lv_coord_t>(eye_gap * fs);
+        lv_obj_align(self->avatar_eye_happy_left_, LV_ALIGN_CENTER, -happy_gap, 0);
+        lv_obj_align(self->avatar_eye_happy_right_, LV_ALIGN_CENTER, happy_gap, 0);
     }
 
-    const int base_scale = self->avatar_layout_scale_;
-    lv_obj_set_style_transform_scale_x(self->emoji_box_, base_scale + breath, 0);
-    lv_obj_set_style_transform_scale_y(self->emoji_box_, base_scale + breath, 0);
+    lv_obj_set_style_transform_scale_x(self->emoji_box_, 256 + breath, 0);
+    lv_obj_set_style_transform_scale_y(self->emoji_box_, 256 + breath, 0);
     lv_obj_set_style_translate_x(self->emoji_box_, face_tx, 0);
     lv_obj_set_style_translate_y(self->emoji_box_, bob, 0);
     lv_obj_set_style_transform_rotation(self->emoji_box_, face_rot, 0);

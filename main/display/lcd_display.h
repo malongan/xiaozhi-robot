@@ -73,7 +73,7 @@ protected:
     bool media_repeat_active_ = false;
     uint32_t media_repeat_next_ = 0;
     bool media_playing_ = false;
-    int avatar_layout_scale_ = 256;  // 256 = 80px, 480 = ~150px for the idle screen
+    float avatar_face_scale_ = 1.0f;  // 1.0 = 80px, 1.875 = 150px idle face
     lv_obj_t* media_hint_ = nullptr;
     lv_obj_t* media_bt_icon_ = nullptr;
     lv_obj_t* media_title_ = nullptr;
