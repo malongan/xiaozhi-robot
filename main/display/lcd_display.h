@@ -63,7 +63,10 @@ protected:
     lv_obj_t* bluetooth_screen_ = nullptr;  // paired-device list
     bool media_screen_visible_ = false;
     bool bluetooth_screen_visible_ = false;
-    lv_obj_t* media_keys_[9] = {};
+    lv_obj_t* media_keys_[16] = {};
+    lv_obj_t* shortcut_labels_[10] = {};
+    int shortcut_label_count_ = 0;
+    lv_timer_t* media_feedback_timer_ = nullptr;
     lv_obj_t* media_key_icons_[9] = {};
     lv_timer_t* media_repeat_timer_ = nullptr;
     int media_repeat_key_ = -1;
@@ -144,6 +147,8 @@ protected:
     static void OnMediaBarClicked(lv_event_t* e);
     static void OnMediaBackClicked(lv_event_t* e);
     static void OnMediaKeyClicked(lv_event_t* e);
+    static void MediaFeedbackTimerCb(lv_timer_t* timer);
+    void ShowMediaFeedback(const char* text);
     static void MediaRepeatTimerCb(lv_timer_t* timer);
     void HandleMediaKeyDown(int index);
     void HandleMediaKeyUp();

@@ -1323,18 +1323,18 @@ void LcdDisplay::SetupUI() {
     lv_label_set_text(bt_icon, MATERIAL_SYMBOLS_BLUETOOTH);
     lv_obj_center(bt_icon);
 
-    const char* media_icons[9] = {
-        MATERIAL_SYMBOLS_SKIP_PREVIOUS, MATERIAL_SYMBOLS_PLAY_ARROW, MATERIAL_SYMBOLS_SKIP_NEXT,
-        MATERIAL_SYMBOLS_VOLUME_DOWN,   MATERIAL_SYMBOLS_VOLUME_OFF, MATERIAL_SYMBOLS_VOLUME_UP,
-        MATERIAL_SYMBOLS_HOME,          MATERIAL_SYMBOLS_ARROW_BACK,
-        MATERIAL_SYMBOLS_KEY,  // menu: hidden and replaced by three bars
+    const char* media_icons[6] = {
+        MATERIAL_SYMBOLS_SKIP_PREVIOUS, MATERIAL_SYMBOLS_PLAY_ARROW,  MATERIAL_SYMBOLS_SKIP_NEXT,
+        MATERIAL_SYMBOLS_VOLUME_OFF,    MATERIAL_SYMBOLS_VOLUME_DOWN, MATERIAL_SYMBOLS_VOLUME_UP,
     };
-    for (int i = 0; i < 9; ++i) {
+    static const char* const kShortcutLabels[10] = {"调度", "切换", "锁屏", "截图", "聚焦",
+                                                    "全屏", "关闭", "桌面", "复制", "粘贴"};
+    for (int i = 0; i < 16; ++i) {
         lv_obj_t* key = lv_button_create(media_screen_);
         media_keys_[i] = key;
-        lv_obj_set_size(key, 64, 64);
-        lv_obj_set_pos(key, 8 + (i % 3) * 80, 58 + (i / 3) * 74);
-        lv_obj_set_style_radius(key, 14, 0);
+        lv_obj_set_size(key, 52, 52);
+        lv_obj_set_pos(key, 4 + (i % 4) * 60, 46 + (i / 4) * 66);
+        lv_obj_set_style_radius(key, 12, 0);
         lv_obj_set_style_bg_opa(key, LV_OPA_TRANSP, 0);
         lv_obj_set_style_border_width(key, 2, 0);
         lv_obj_set_style_border_color(key, lvgl_theme->text_color(), 0);
@@ -1345,30 +1345,24 @@ void LcdDisplay::SetupUI() {
         lv_obj_add_event_cb(key, &LcdDisplay::OnMediaKeyClicked, LV_EVENT_PRESSED, this);
         lv_obj_add_event_cb(key, &LcdDisplay::OnMediaKeyClicked, LV_EVENT_RELEASED, this);
         lv_obj_add_event_cb(key, &LcdDisplay::OnMediaKeyClicked, LV_EVENT_PRESS_LOST, this);
-        lv_obj_t* key_icon = lv_label_create(key);
-        media_key_icons_[i] = key_icon;
-        lv_obj_set_style_text_font(key_icon, large_icon_font, 0);
-        lv_obj_set_style_text_color(key_icon, lvgl_theme->text_color(), 0);
-        lv_label_set_text(key_icon, media_icons[i]);
-        lv_obj_center(key_icon);
-        if (i == 8) {  // menu: three horizontal bars
-            lv_obj_add_flag(key_icon, LV_OBJ_FLAG_HIDDEN);
-            for (int bar_index = 0; bar_index < 3; ++bar_index) {
-                lv_obj_t* bar = lv_obj_create(key);
-                lv_obj_set_size(bar, 22, 3);
-                lv_obj_align(bar, LV_ALIGN_CENTER, 0, -6 + bar_index * 6);
-                lv_obj_set_style_radius(bar, 2, 0);
-                lv_obj_set_style_bg_color(bar, lvgl_theme->text_color(), 0);
-                lv_obj_set_style_bg_opa(bar, LV_OPA_COVER, 0);
-                lv_obj_set_style_border_width(bar, 0, 0);
-                lv_obj_set_style_pad_all(bar, 0, 0);
-                lv_obj_remove_flag(bar, LV_OBJ_FLAG_SCROLLABLE);
-                lv_obj_remove_flag(bar, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_t* label = lv_label_create(key);
+        if (i < 6) {
+            media_key_icons_[i] = label;
+            lv_obj_set_style_text_font(label, large_icon_font, 0);
+            lv_obj_set_style_text_color(label, lvgl_theme->text_color(), 0);
+            lv_label_set_text(label, media_icons[i]);
+        } else {
+            if (shortcut_label_count_ < 10) {
+                shortcut_labels_[shortcut_label_count_++] = label;
             }
+            lv_label_set_text(label, kShortcutLabels[i - 6]);
         }
+        lv_obj_center(label);
     }
     media_repeat_timer_ = lv_timer_create(&LcdDisplay::MediaRepeatTimerCb, 60, this);
     lv_timer_pause(media_repeat_timer_);
+    media_feedback_timer_ = lv_timer_create(&LcdDisplay::MediaFeedbackTimerCb, 900, this);
+    lv_timer_pause(media_feedback_timer_);
 
     media_hint_ = lv_label_create(media_screen_);
     lv_obj_set_width(media_hint_, 224);
@@ -2326,36 +2320,77 @@ void LcdDisplay::OnMediaBackClicked(lv_event_t* e) {
     }
 }
 
-static const MediaBleKey kMediaKeys[9] = {
-    MediaBleKey::kPrevious,   MediaBleKey::kPlayPause, MediaBleKey::kNext,
-    MediaBleKey::kVolumeDown, MediaBleKey::kMute,      MediaBleKey::kVolumeUp,
-    MediaBleKey::kHome,       MediaBleKey::kBack,      MediaBleKey::kMenu,
+static const MediaBleKey kMediaKeys[6] = {MediaBleKey::kPrevious, MediaBleKey::kPlayPause,
+                                          MediaBleKey::kNext,     MediaBleKey::kVolumeDown,
+                                          MediaBleKey::kMute,     MediaBleKey::kVolumeUp};
+static const bool kMediaRepeat[6] = {false, false, false, true, false, true};
+static const char* kMediaHints[6] = {"上一首", "播放/暂停", "下一首", "音量-", "静音", "音量+"};
+
+struct MediaShortcut {
+    const char* label;
+    uint8_t modifiers;
+    uint8_t keycode;
 };
-// Volume repeats while held; navigation keys are single-shot.
-static const bool kMediaRepeat[9] = {false, false, false, true, false, true, false, false, false};
-static const char* kMediaHints[9] = {"上一首", "播放/暂停", "下一首", "音量-", "静音",
-                                     "音量+",  "首页",      "返回",   "菜单"};
+static const MediaShortcut kShortcuts[10] = {
+    {"调度", 0x01, 0x52},  // Ctrl+Up: Mission Control
+    {"切换", 0x08, 0x2B},  // Cmd+Tab: app switcher
+    {"锁屏", 0x09, 0x14},  // Ctrl+Cmd+Q
+    {"截图", 0x0A, 0x20},  // Cmd+Shift+3
+    {"聚焦", 0x08, 0x2C},  // Cmd+Space: Spotlight
+    {"全屏", 0x09, 0x09},  // Ctrl+Cmd+F
+    {"关闭", 0x08, 0x1A},  // Cmd+W
+    {"桌面", 0x00, 0x44},  // F11: show desktop
+    {"复制", 0x08, 0x06},  // Cmd+C
+    {"粘贴", 0x08, 0x19},  // Cmd+V
+};
+
+void LcdDisplay::ShowMediaFeedback(const char* text) {
+    if (media_title_ == nullptr) {
+        return;
+    }
+    lv_label_set_text(media_title_, text != nullptr ? text : "媒 体");
+    if (media_feedback_timer_ != nullptr) {
+        lv_timer_reset(media_feedback_timer_);
+        lv_timer_resume(media_feedback_timer_);
+    }
+}
+
+void LcdDisplay::MediaFeedbackTimerCb(lv_timer_t* timer) {
+    auto* self = static_cast<LcdDisplay*>(lv_timer_get_user_data(timer));
+    if (self != nullptr && self->media_title_ != nullptr) {
+        lv_label_set_text(self->media_title_, "媒 体");
+    }
+    lv_timer_pause(timer);
+}
 
 void LcdDisplay::HandleMediaKeyDown(int index) {
-    const bool sent = MediaBle::GetInstance().SendKey(kMediaKeys[index]);
-    if (media_hint_ != nullptr) {
-        lv_label_set_text(media_hint_, sent ? kMediaHints[index] : "蓝牙未连接");
+    if (index < 0 || index >= 16) {
+        return;
     }
-    if (index == 1) {  // play/pause: toggle the icon
-        media_playing_ = !media_playing_;
-        if (media_key_icons_[1] != nullptr) {
-            lv_label_set_text(media_key_icons_[1], media_playing_ ? MATERIAL_SYMBOLS_PAUSE
-                                                                  : MATERIAL_SYMBOLS_PLAY_ARROW);
+    if (index < 6) {
+        const bool sent = MediaBle::GetInstance().SendKey(kMediaKeys[index]);
+        ShowMediaFeedback(sent ? kMediaHints[index] : "蓝牙未连接");
+        if (index == 1) {  // play/pause icon toggle
+            media_playing_ = !media_playing_;
+            if (media_key_icons_[1] != nullptr) {
+                lv_label_set_text(media_key_icons_[1], media_playing_
+                                                           ? MATERIAL_SYMBOLS_PAUSE
+                                                           : MATERIAL_SYMBOLS_PLAY_ARROW);
+            }
         }
-    }
-    if (kMediaRepeat[index]) {
-        media_repeat_key_ = index;
-        media_repeat_active_ = true;
-        media_repeat_next_ = lv_tick_get() + 400;
-        if (media_repeat_timer_ != nullptr) {
-            lv_timer_resume(media_repeat_timer_);
+        if (kMediaRepeat[index]) {
+            media_repeat_key_ = index;
+            media_repeat_active_ = true;
+            media_repeat_next_ = lv_tick_get() + 400;
+            if (media_repeat_timer_ != nullptr) {
+                lv_timer_resume(media_repeat_timer_);
+            }
         }
+        return;
     }
+    const MediaShortcut& shortcut = kShortcuts[index - 6];
+    const bool sent = MediaBle::GetInstance().SendShortcut(shortcut.modifiers, shortcut.keycode);
+    ShowMediaFeedback(sent ? shortcut.label : "蓝牙未连接");
 }
 
 void LcdDisplay::HandleMediaKeyUp() {
@@ -2380,7 +2415,7 @@ void LcdDisplay::OnMediaKeyClicked(lv_event_t* e) {
         return;
     }
     lv_obj_t* target = lv_event_get_target_obj(e);
-    for (int i = 0; i < 9; ++i) {
+    for (int i = 0; i < 16; ++i) {
         if (target == self->media_keys_[i]) {
             self->HandleMediaKeyDown(i);
             return;
