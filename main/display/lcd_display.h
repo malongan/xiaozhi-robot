@@ -150,8 +150,6 @@ protected:
     static void OnMediaBackClicked(lv_event_t* e);
     static void OnMediaKeyClicked(lv_event_t* e);
     static void MediaRepeatTimerCb(lv_timer_t* timer);
-    static void OnMediaPanelPrev(lv_event_t* e);
-    static void OnMediaPanelNext(lv_event_t* e);
     static void OnMediaPanelCycle(lv_event_t* e);
     static void OnKeyboardKeyClicked(lv_event_t* e);
     void SetMediaPanel(int panel);

@@ -1390,63 +1390,53 @@ void LcdDisplay::SetupUI() {
         bool icon;
     };
     static const KeyDef kFullKeys[] = {
-        {"1", 0x1E, 2, 44, 22, 24, false},
-        {"2", 0x1F, 26, 44, 22, 24, false},
-        {"3", 0x20, 50, 44, 22, 24, false},
-        {"4", 0x21, 74, 44, 22, 24, false},
-        {"5", 0x22, 98, 44, 22, 24, false},
-        {"6", 0x23, 122, 44, 22, 24, false},
-        {"7", 0x24, 146, 44, 22, 24, false},
-        {"8", 0x25, 170, 44, 22, 24, false},
-        {"9", 0x26, 194, 44, 22, 24, false},
-        {"0", 0x27, 218, 44, 22, 24, false},
-        {"Q", 0x14, 2, 74, 22, 24, false},
-        {"W", 0x1A, 26, 74, 22, 24, false},
-        {"E", 0x08, 50, 74, 22, 24, false},
-        {"R", 0x15, 74, 74, 22, 24, false},
-        {"T", 0x17, 98, 74, 22, 24, false},
-        {"Y", 0x1C, 122, 74, 22, 24, false},
-        {"U", 0x18, 146, 74, 22, 24, false},
-        {"I", 0x0C, 170, 74, 22, 24, false},
-        {"O", 0x12, 194, 74, 22, 24, false},
-        {"P", 0x13, 218, 74, 22, 24, false},
-        {"A", 0x04, 14, 104, 22, 24, false},
-        {"S", 0x16, 38, 104, 22, 24, false},
-        {"D", 0x07, 62, 104, 22, 24, false},
-        {"F", 0x09, 86, 104, 22, 24, false},
-        {"G", 0x0A, 110, 104, 22, 24, false},
-        {"H", 0x0B, 134, 104, 22, 24, false},
-        {"J", 0x0D, 158, 104, 22, 24, false},
-        {"K", 0x0E, 182, 104, 22, 24, false},
-        {"L", 0x0F, 206, 104, 22, 24, false},
-        {"Z", 0x1D, 38, 134, 22, 24, false},
-        {"X", 0x1B, 62, 134, 22, 24, false},
-        {"C", 0x06, 86, 134, 22, 24, false},
-        {"V", 0x19, 110, 134, 22, 24, false},
-        {"B", 0x05, 134, 134, 22, 24, false},
-        {"N", 0x11, 158, 134, 22, 24, false},
-        {"M", 0x10, 182, 134, 22, 24, false},
-        {"退格", 0x2A, 2, 164, 44, 24, false},
-        {"空格", 0x2C, 50, 164, 110, 24, false},
-        {"回车", 0x28, 164, 164, 44, 24, false},
-        {",", 0x36, 6, 228, 32, 24, false},
-        {".", 0x37, 45, 228, 32, 24, false},
-        {"/", 0x38, 84, 228, 32, 24, false},
-        {";", 0x33, 123, 228, 32, 24, false},
-        {"'", 0x34, 162, 228, 32, 24, false},
-        {"-", 0x2D, 201, 228, 32, 24, false},
-        {MATERIAL_SYMBOLS_ARROW_BACK, 0x50, 40, 196, 34, 28, true},
-        {MATERIAL_SYMBOLS_ARROW_UPWARD, 0x52, 82, 196, 34, 28, true},
-        {MATERIAL_SYMBOLS_ARROW_DOWNWARD, 0x51, 124, 196, 34, 28, true},
-        {MATERIAL_SYMBOLS_ARROW_FORWARD, 0x4F, 166, 196, 34, 28, true},
+        {"Q", 0x14, 1, 52, 23, 32, false},
+        {"W", 0x1A, 25, 52, 23, 32, false},
+        {"E", 0x08, 49, 52, 23, 32, false},
+        {"R", 0x15, 73, 52, 23, 32, false},
+        {"T", 0x17, 97, 52, 23, 32, false},
+        {"Y", 0x1C, 121, 52, 23, 32, false},
+        {"U", 0x18, 145, 52, 23, 32, false},
+        {"I", 0x0C, 169, 52, 23, 32, false},
+        {"O", 0x12, 193, 52, 23, 32, false},
+        {"P", 0x13, 217, 52, 23, 32, false},
+        {"A", 0x04, 13, 90, 23, 32, false},
+        {"S", 0x16, 37, 90, 23, 32, false},
+        {"D", 0x07, 61, 90, 23, 32, false},
+        {"F", 0x09, 85, 90, 23, 32, false},
+        {"G", 0x0A, 109, 90, 23, 32, false},
+        {"H", 0x0B, 133, 90, 23, 32, false},
+        {"J", 0x0D, 157, 90, 23, 32, false},
+        {"K", 0x0E, 181, 90, 23, 32, false},
+        {"L", 0x0F, 205, 90, 23, 32, false},
+        {"Z", 0x1D, 37, 128, 23, 32, false},
+        {"X", 0x1B, 61, 128, 23, 32, false},
+        {"C", 0x06, 85, 128, 23, 32, false},
+        {"V", 0x19, 109, 128, 23, 32, false},
+        {"B", 0x05, 133, 128, 23, 32, false},
+        {"N", 0x11, 157, 128, 23, 32, false},
+        {"M", 0x10, 181, 128, 23, 32, false},
+        {"退格", 0x2A, 1, 166, 46, 32, false},
+        {"空格", 0x2C, 49, 166, 116, 32, false},
+        {"回车", 0x28, 167, 166, 46, 32, false},
+        {MATERIAL_SYMBOLS_ARROW_BACK, 0x50, 5, 204, 50, 34, true},
+        {MATERIAL_SYMBOLS_ARROW_UPWARD, 0x52, 65, 204, 50, 34, true},
+        {MATERIAL_SYMBOLS_ARROW_DOWNWARD, 0x51, 125, 204, 50, 34, true},
+        {MATERIAL_SYMBOLS_ARROW_FORWARD, 0x4F, 185, 204, 50, 34, true},
+        {",", 0x36, 3, 244, 34, 30, false},
+        {".", 0x37, 43, 244, 34, 30, false},
+        {"/", 0x38, 83, 244, 34, 30, false},
+        {";", 0x33, 123, 244, 34, 30, false},
+        {"'", 0x34, 163, 244, 34, 30, false},
+        {"-", 0x2D, 203, 244, 34, 30, false},
     };
     static const KeyDef kNumpadKeys[] = {
-        {"1", 0x1E, 50, 66, 40, 40, false},   {"2", 0x1F, 100, 66, 40, 40, false},
-        {"3", 0x20, 150, 66, 40, 40, false},  {"4", 0x21, 50, 116, 40, 40, false},
-        {"5", 0x22, 100, 116, 40, 40, false}, {"6", 0x23, 150, 116, 40, 40, false},
-        {"7", 0x24, 50, 166, 40, 40, false},  {"8", 0x25, 100, 166, 40, 40, false},
-        {"9", 0x26, 150, 166, 40, 40, false}, {"退格", 0x2A, 50, 216, 40, 40, false},
-        {"0", 0x27, 100, 216, 40, 40, false}, {"回车", 0x28, 150, 216, 40, 40, false},
+        {"1", 0x1E, 30, 46, 52, 52, false},   {"2", 0x1F, 94, 46, 52, 52, false},
+        {"3", 0x20, 158, 46, 52, 52, false},  {"4", 0x21, 30, 108, 52, 52, false},
+        {"5", 0x22, 94, 108, 52, 52, false},  {"6", 0x23, 158, 108, 52, 52, false},
+        {"7", 0x24, 30, 170, 52, 52, false},  {"8", 0x25, 94, 170, 52, 52, false},
+        {"9", 0x26, 158, 170, 52, 52, false}, {"退格", 0x2A, 30, 232, 52, 52, false},
+        {"0", 0x27, 94, 232, 52, 52, false},  {"回车", 0x28, 158, 232, 52, 52, false},
     };
 
     auto build_keyboard = [&](lv_obj_t* panel, const KeyDef* keys, int count) {
@@ -1480,8 +1470,8 @@ void LcdDisplay::SetupUI() {
     };
 
     keyboard_panel_ = lv_obj_create(media_screen_);
-    lv_obj_set_size(keyboard_panel_, 240, 230);
-    lv_obj_set_pos(keyboard_panel_, 0, 44);
+    lv_obj_set_size(keyboard_panel_, 240, 320);
+    lv_obj_set_pos(keyboard_panel_, 0, 0);
     lv_obj_set_style_bg_opa(keyboard_panel_, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(keyboard_panel_, 0, 0);
     lv_obj_set_style_pad_all(keyboard_panel_, 0, 0);
@@ -1490,8 +1480,8 @@ void LcdDisplay::SetupUI() {
     build_keyboard(keyboard_panel_, kFullKeys, sizeof(kFullKeys) / sizeof(kFullKeys[0]));
 
     numpad_panel_ = lv_obj_create(media_screen_);
-    lv_obj_set_size(numpad_panel_, 240, 280);
-    lv_obj_set_pos(numpad_panel_, 0, 40);
+    lv_obj_set_size(numpad_panel_, 240, 320);
+    lv_obj_set_pos(numpad_panel_, 0, 0);
     lv_obj_set_style_bg_opa(numpad_panel_, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(numpad_panel_, 0, 0);
     lv_obj_set_style_pad_all(numpad_panel_, 0, 0);
@@ -1500,36 +1490,10 @@ void LcdDisplay::SetupUI() {
     build_keyboard(numpad_panel_, kNumpadKeys, sizeof(kNumpadKeys) / sizeof(kNumpadKeys[0]));
 
     /* Bottom panel switcher: left/right arrows + tap the title to cycle. */
-    lv_obj_t* panel_prev = lv_button_create(media_screen_);
-    lv_obj_set_size(panel_prev, 40, 36);
-    lv_obj_align(panel_prev, LV_ALIGN_BOTTOM_LEFT, 4, -4);
-    lv_obj_set_style_bg_opa(panel_prev, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(panel_prev, 0, 0);
-    lv_obj_set_style_shadow_width(panel_prev, 0, 0);
-    lv_obj_set_style_pad_all(panel_prev, 0, 0);
-    lv_obj_add_event_cb(panel_prev, &LcdDisplay::OnMediaPanelPrev, LV_EVENT_CLICKED, this);
-    lv_obj_t* prev_icon = lv_label_create(panel_prev);
-    lv_obj_set_style_text_font(prev_icon, icon_font, 0);
-    lv_obj_set_style_text_color(prev_icon, lvgl_theme->text_color(), 0);
-    lv_label_set_text(prev_icon, MATERIAL_SYMBOLS_ARROW_BACK);
-    lv_obj_center(prev_icon);
-
-    lv_obj_t* panel_next = lv_button_create(media_screen_);
-    lv_obj_set_size(panel_next, 40, 36);
-    lv_obj_align(panel_next, LV_ALIGN_BOTTOM_RIGHT, -4, -4);
-    lv_obj_set_style_bg_opa(panel_next, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(panel_next, 0, 0);
-    lv_obj_set_style_shadow_width(panel_next, 0, 0);
-    lv_obj_set_style_pad_all(panel_next, 0, 0);
-    lv_obj_add_event_cb(panel_next, &LcdDisplay::OnMediaPanelNext, LV_EVENT_CLICKED, this);
-    lv_obj_t* next_icon = lv_label_create(panel_next);
-    lv_obj_set_style_text_font(next_icon, icon_font, 0);
-    lv_obj_set_style_text_color(next_icon, lvgl_theme->text_color(), 0);
-    lv_label_set_text(next_icon, MATERIAL_SYMBOLS_ARROW_FORWARD);
-    lv_obj_center(next_icon);
-
     lv_obj_add_flag(media_title_, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(media_title_, &LcdDisplay::OnMediaPanelCycle, LV_EVENT_CLICKED, this);
+    lv_obj_move_to_index(keyboard_panel_, 0);
+    lv_obj_move_to_index(numpad_panel_, 0);
 
     /* Paired-device screen (populated once BLE HID lands). */
     bluetooth_screen_ = lv_obj_create(screen);
@@ -2500,20 +2464,6 @@ void LcdDisplay::SetMediaPanel(int panel) {
         lv_label_set_text(media_hint_, media_panel_ == 0   ? "媒体"
                                        : media_panel_ == 1 ? "点按输入"
                                                            : "数字输入");
-    }
-}
-
-void LcdDisplay::OnMediaPanelPrev(lv_event_t* e) {
-    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
-    if (self != nullptr) {
-        self->SetMediaPanel(self->media_panel_ - 1);
-    }
-}
-
-void LcdDisplay::OnMediaPanelNext(lv_event_t* e) {
-    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
-    if (self != nullptr) {
-        self->SetMediaPanel(self->media_panel_ + 1);
     }
 }
 
