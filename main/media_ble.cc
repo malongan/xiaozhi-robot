@@ -95,9 +95,9 @@ const uint8_t kReportRefKeyboard[] = {0x01, 0x01};    // report id 1, input
 const uint8_t kReportRefConsumer[] = {0x02, 0x01};    // report id 2, input
 const uint8_t kManufacturerName[] = "Xiaozhi";
 const uint8_t kPnpId[] = {0x02, 0xE5, 0x02, 0x01, 0x00, 0x00, 0x01};
-uint8_t g_protocol_mode = 1;  // report protocol
-uint8_t g_keyboard_value[8] = {};
-uint8_t g_consumer_value[2] = {};
+uint8_t g_protocol_mode = 1;       // report protocol
+uint8_t g_mixed_value[10] = {};    // 8 keyboard + 2 consumer bytes (report ID 1)
+uint8_t g_consumer_value[2] = {};  // report ID 2
 uint8_t g_battery_level = 100;
 
 uint8_t g_own_addr_type = 0;
@@ -140,7 +140,7 @@ int ProtocolModeAccess(uint16_t, uint16_t, struct ble_gatt_access_ctxt* ctxt, vo
 
 int KeyboardReportAccess(uint16_t, uint16_t, struct ble_gatt_access_ctxt* ctxt, void*) {
     if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) {
-        return os_mbuf_append(ctxt->om, g_keyboard_value, sizeof(g_keyboard_value)) == 0
+        return os_mbuf_append(ctxt->om, g_mixed_value, sizeof(g_mixed_value)) == 0
                    ? 0
                    : BLE_ATT_ERR_INSUFFICIENT_RES;
     }
@@ -327,9 +327,10 @@ void MediaBle::OnSync() {
         0) {
         ESP_LOGE(TAG, "keyboard report characteristic not found");
     }
-    // Each report characteristic uses decl+value+report-ref+CCCD handles, so
-    // the consumer value handle is four handles after the keyboard one.
-    self.consumer_val_handle_ = static_cast<uint16_t>(self.report_val_handle_ + 4);
+    // NimBLE lays out decl+value+report-ref+CCCD per characteristic; in
+    // practice the second report value ends up five handles after the first.
+    // The SUBSCRIBE event corrects this to the real handle at runtime.
+    self.consumer_val_handle_ = static_cast<uint16_t>(self.report_val_handle_ + 5);
     self.StartAdvertising();
     ESP_LOGI(TAG, "host synced, advertise, keyboard handle=%d consumer handle=%d",
              self.report_val_handle_, self.consumer_val_handle_);
@@ -422,6 +423,11 @@ int MediaBle::GapEvent(struct ble_gap_event* event, void*) {
         case BLE_GAP_EVENT_SUBSCRIBE:
             self.subscribed_handle_ = event->subscribe.attr_handle;
             self.subscribed_notify_ = event->subscribe.cur_notify != 0;
+            if (self.subscribed_notify_ &&
+                event->subscribe.attr_handle != self.report_val_handle_ &&
+                event->subscribe.attr_handle <= self.report_val_handle_ + 8) {
+                self.consumer_val_handle_ = event->subscribe.attr_handle;
+            }
             ESP_LOGI(TAG, "subscribe, handle=%d notify=%d report_val_handle=%d",
                      event->subscribe.attr_handle, event->subscribe.cur_notify,
                      self.report_val_handle_);
@@ -502,13 +508,13 @@ bool MediaBle::SendShortcut(uint8_t modifiers, uint8_t keycode) {
     if (!connected_ || conn_handle_ == 0xFFFF || report_val_handle_ == 0) {
         return false;
     }
-    uint8_t pressed[sizeof(g_keyboard_value)] = {};
+    uint8_t pressed[sizeof(g_mixed_value)] = {};
     pressed[0] = modifiers;
     pressed[2] = keycode;
-    uint8_t released[sizeof(g_keyboard_value)] = {};
-    memcpy(g_keyboard_value, pressed, sizeof(g_keyboard_value));
+    uint8_t released[sizeof(g_mixed_value)] = {};
+    memcpy(g_mixed_value, pressed, sizeof(g_mixed_value));
     auto send = [this](const uint8_t* data) {
-        struct os_mbuf* om = ble_hs_mbuf_from_flat(data, sizeof(g_keyboard_value));
+        struct os_mbuf* om = ble_hs_mbuf_from_flat(data, sizeof(g_mixed_value));
         if (om != nullptr) {
             return ble_gatts_notify_custom(conn_handle_, report_val_handle_, om);
         }
@@ -526,7 +532,7 @@ bool MediaBle::SendKeycode(uint8_t keycode, uint8_t modifiers) {
 }
 
 bool MediaBle::SendKey(MediaBleKey key) {
-    if (!connected_ || conn_handle_ == 0xFFFF || consumer_val_handle_ == 0) {
+    if (!connected_ || conn_handle_ == 0xFFFF || report_val_handle_ == 0) {
         return false;
     }
     if (key == MediaBleKey::kMenu) {
@@ -534,21 +540,34 @@ bool MediaBle::SendKey(MediaBleKey key) {
         return SendShortcut(0x00, 0x65);
     }
     const uint8_t index = static_cast<uint8_t>(key);
-    uint8_t pressed[sizeof(g_consumer_value)] = {};
-    pressed[index / 8] = static_cast<uint8_t>(1u << (index % 8));
-    uint8_t released[sizeof(g_consumer_value)] = {};
-    memcpy(g_consumer_value, pressed, sizeof(g_consumer_value));
-    int rc = 0;
-    struct os_mbuf* om = ble_hs_mbuf_from_flat(pressed, sizeof(pressed));
+    uint8_t mixed[sizeof(g_mixed_value)] = {};
+    mixed[8 + index / 8] = static_cast<uint8_t>(1u << (index % 8));
+    uint8_t consumer[sizeof(g_consumer_value)] = {};
+    consumer[index / 8] = static_cast<uint8_t>(1u << (index % 8));
+    uint8_t zeros[sizeof(g_mixed_value)] = {};
+
+    memcpy(g_mixed_value, mixed, sizeof(mixed));
+    memcpy(g_consumer_value, consumer, sizeof(consumer));
+    int rc_mixed = 0;
+    int rc_consumer = 0;
+    struct os_mbuf* om = ble_hs_mbuf_from_flat(mixed, sizeof(mixed));
     if (om != nullptr) {
-        rc = ble_gatts_notify_custom(conn_handle_, consumer_val_handle_, om);
+        rc_mixed = ble_gatts_notify_custom(conn_handle_, report_val_handle_, om);
+    }
+    om = ble_hs_mbuf_from_flat(consumer, sizeof(consumer));
+    if (om != nullptr) {
+        rc_consumer = ble_gatts_notify_custom(conn_handle_, consumer_val_handle_, om);
     }
     vTaskDelay(pdMS_TO_TICKS(20));
-    om = ble_hs_mbuf_from_flat(released, sizeof(released));
+    om = ble_hs_mbuf_from_flat(zeros, sizeof(zeros));
+    if (om != nullptr) {
+        ble_gatts_notify_custom(conn_handle_, report_val_handle_, om);
+    }
+    om = ble_hs_mbuf_from_flat(zeros, sizeof(consumer));
     if (om != nullptr) {
         ble_gatts_notify_custom(conn_handle_, consumer_val_handle_, om);
     }
-    ESP_LOGI(TAG, "send key %d value=0x%02X handle=%d rc=%d", index, pressed[index / 8],
-             consumer_val_handle_, rc);
+    ESP_LOGI(TAG, "send key %d mixed=%d consumer=%d handles=%d/%d", index, rc_mixed, rc_consumer,
+             report_val_handle_, consumer_val_handle_);
     return true;
 }
