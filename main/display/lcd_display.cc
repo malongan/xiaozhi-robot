@@ -1369,6 +1369,8 @@ void LcdDisplay::SetupUI() {
     }
     media_repeat_timer_ = lv_timer_create(&LcdDisplay::MediaRepeatTimerCb, 60, this);
     lv_timer_pause(media_repeat_timer_);
+    media_title_timer_ = lv_timer_create(&LcdDisplay::MediaTitleTimerCb, 900, this);
+    lv_timer_pause(media_title_timer_);
 
     media_hint_ = lv_label_create(media_screen_);
     lv_obj_set_width(media_hint_, 224);
@@ -1378,6 +1380,7 @@ void LcdDisplay::SetupUI() {
     lv_label_set_text(media_hint_, "等待配对（蓝牙广播中）");
     lv_obj_align(media_hint_, LV_ALIGN_BOTTOM_MID, 0, -14);
     lv_obj_set_width(media_hint_, 140);
+    lv_obj_add_flag(media_hint_, LV_OBJ_FLAG_HIDDEN);
 
     /* Keyboard panels: full QWERTY with arrows, and a numeric keypad. */
     struct KeyDef {
@@ -1390,53 +1393,31 @@ void LcdDisplay::SetupUI() {
         bool icon;
     };
     static const KeyDef kFullKeys[] = {
-        {"Q", 0x14, 1, 52, 23, 32, false},
-        {"W", 0x1A, 25, 52, 23, 32, false},
-        {"E", 0x08, 49, 52, 23, 32, false},
-        {"R", 0x15, 73, 52, 23, 32, false},
-        {"T", 0x17, 97, 52, 23, 32, false},
-        {"Y", 0x1C, 121, 52, 23, 32, false},
-        {"U", 0x18, 145, 52, 23, 32, false},
-        {"I", 0x0C, 169, 52, 23, 32, false},
-        {"O", 0x12, 193, 52, 23, 32, false},
-        {"P", 0x13, 217, 52, 23, 32, false},
-        {"A", 0x04, 13, 90, 23, 32, false},
-        {"S", 0x16, 37, 90, 23, 32, false},
-        {"D", 0x07, 61, 90, 23, 32, false},
-        {"F", 0x09, 85, 90, 23, 32, false},
-        {"G", 0x0A, 109, 90, 23, 32, false},
-        {"H", 0x0B, 133, 90, 23, 32, false},
-        {"J", 0x0D, 157, 90, 23, 32, false},
-        {"K", 0x0E, 181, 90, 23, 32, false},
-        {"L", 0x0F, 205, 90, 23, 32, false},
-        {"Z", 0x1D, 37, 128, 23, 32, false},
-        {"X", 0x1B, 61, 128, 23, 32, false},
-        {"C", 0x06, 85, 128, 23, 32, false},
-        {"V", 0x19, 109, 128, 23, 32, false},
-        {"B", 0x05, 133, 128, 23, 32, false},
-        {"N", 0x11, 157, 128, 23, 32, false},
-        {"M", 0x10, 181, 128, 23, 32, false},
-        {"退格", 0x2A, 1, 166, 46, 32, false},
-        {"空格", 0x2C, 49, 166, 116, 32, false},
-        {"回车", 0x28, 167, 166, 46, 32, false},
-        {MATERIAL_SYMBOLS_ARROW_BACK, 0x50, 5, 204, 50, 34, true},
-        {MATERIAL_SYMBOLS_ARROW_UPWARD, 0x52, 65, 204, 50, 34, true},
-        {MATERIAL_SYMBOLS_ARROW_DOWNWARD, 0x51, 125, 204, 50, 34, true},
-        {MATERIAL_SYMBOLS_ARROW_FORWARD, 0x4F, 185, 204, 50, 34, true},
-        {",", 0x36, 3, 244, 34, 30, false},
-        {".", 0x37, 43, 244, 34, 30, false},
-        {"/", 0x38, 83, 244, 34, 30, false},
-        {";", 0x33, 123, 244, 34, 30, false},
-        {"'", 0x34, 163, 244, 34, 30, false},
-        {"-", 0x2D, 203, 244, 34, 30, false},
+        {"A", 0x04, 2, 48, 36, 46, false},      {"B", 0x05, 42, 48, 36, 46, false},
+        {"C", 0x06, 82, 48, 36, 46, false},     {"D", 0x07, 122, 48, 36, 46, false},
+        {"E", 0x08, 162, 48, 36, 46, false},    {"F", 0x09, 202, 48, 36, 46, false},
+        {"G", 0x0A, 2, 98, 36, 46, false},      {"H", 0x0B, 42, 98, 36, 46, false},
+        {"I", 0x0C, 82, 98, 36, 46, false},     {"J", 0x0D, 122, 98, 36, 46, false},
+        {"K", 0x0E, 162, 98, 36, 46, false},    {"L", 0x0F, 202, 98, 36, 46, false},
+        {"M", 0x10, 2, 148, 36, 46, false},     {"N", 0x11, 42, 148, 36, 46, false},
+        {"O", 0x12, 82, 148, 36, 46, false},    {"P", 0x13, 122, 148, 36, 46, false},
+        {"Q", 0x14, 162, 148, 36, 46, false},   {"R", 0x15, 202, 148, 36, 46, false},
+        {"S", 0x16, 2, 198, 36, 46, false},     {"T", 0x17, 42, 198, 36, 46, false},
+        {"U", 0x18, 82, 198, 36, 46, false},    {"V", 0x19, 122, 198, 36, 46, false},
+        {"W", 0x1A, 162, 198, 36, 46, false},   {"X", 0x1B, 202, 198, 36, 46, false},
+        {"Y", 0x1C, 2, 248, 36, 46, false},     {"Z", 0x1D, 42, 248, 36, 46, false},
+        {"SH", 0xFF, 82, 248, 36, 46, false},    // caps/shift toggle
+        {"SPC", 0x2C, 122, 248, 36, 46, false},  // space
+        {"BSP", 0x2A, 162, 248, 36, 46, false},  // backspace
+        {"ENT", 0x28, 202, 248, 36, 46, false},  // enter
     };
     static const KeyDef kNumpadKeys[] = {
-        {"1", 0x1E, 30, 46, 52, 52, false},   {"2", 0x1F, 94, 46, 52, 52, false},
-        {"3", 0x20, 158, 46, 52, 52, false},  {"4", 0x21, 30, 108, 52, 52, false},
-        {"5", 0x22, 94, 108, 52, 52, false},  {"6", 0x23, 158, 108, 52, 52, false},
-        {"7", 0x24, 30, 170, 52, 52, false},  {"8", 0x25, 94, 170, 52, 52, false},
-        {"9", 0x26, 158, 170, 52, 52, false}, {"退格", 0x2A, 30, 232, 52, 52, false},
-        {"0", 0x27, 94, 232, 52, 52, false},  {"回车", 0x28, 158, 232, 52, 52, false},
+        {"1", 0x1E, 26, 44, 56, 56, false},   {"2", 0x1F, 92, 44, 56, 56, false},
+        {"3", 0x20, 158, 44, 56, 56, false},  {"4", 0x21, 26, 110, 56, 56, false},
+        {"5", 0x22, 92, 110, 56, 56, false},  {"6", 0x23, 158, 110, 56, 56, false},
+        {"7", 0x24, 26, 176, 56, 56, false},  {"8", 0x25, 92, 176, 56, 56, false},
+        {"9", 0x26, 158, 176, 56, 56, false}, {"BSP", 0x2A, 26, 242, 56, 56, false},
+        {"0", 0x27, 92, 242, 56, 56, false},  {"ENT", 0x28, 158, 242, 56, 56, false},
     };
 
     auto build_keyboard = [&](lv_obj_t* panel, const KeyDef* keys, int count) {
@@ -1454,6 +1435,9 @@ void LcdDisplay::SetupUI() {
             lv_obj_set_style_bg_opa(key, LV_OPA_20, LV_STATE_PRESSED);
             lv_obj_set_style_bg_color(key, lvgl_theme->text_color(), LV_STATE_PRESSED);
             lv_obj_set_user_data(key, reinterpret_cast<void*>(static_cast<uintptr_t>(def.code)));
+            if (def.code == 0xFF) {
+                kb_shift_btn_ = key;
+            }
             lv_obj_add_event_cb(key, &LcdDisplay::OnKeyboardKeyClicked, LV_EVENT_PRESSED, this);
             lv_obj_t* label = lv_label_create(key);
             if (def.icon) {
@@ -2429,6 +2413,34 @@ void LcdDisplay::ShowBluetoothScreen(bool show) {
     UpdateMediaBarVisibility();
 }
 
+void LcdDisplay::UpdatePanelTitle() {
+    if (media_title_ == nullptr) {
+        return;
+    }
+    lv_label_set_text(media_title_, media_panel_ == 0   ? "媒 体"
+                                    : media_panel_ == 1 ? "全键盘"
+                                                        : "数字键");
+}
+
+void LcdDisplay::ShowTitleFeedback(const char* text) {
+    if (media_title_ == nullptr) {
+        return;
+    }
+    lv_label_set_text(media_title_, text != nullptr ? text : "");
+    if (media_title_timer_ != nullptr) {
+        lv_timer_reset(media_title_timer_);
+        lv_timer_resume(media_title_timer_);
+    }
+}
+
+void LcdDisplay::MediaTitleTimerCb(lv_timer_t* timer) {
+    auto* self = static_cast<LcdDisplay*>(lv_timer_get_user_data(timer));
+    if (self != nullptr) {
+        self->UpdatePanelTitle();
+    }
+    lv_timer_pause(timer);
+}
+
 void LcdDisplay::SetMediaPanel(int panel) {
     media_panel_ = ((panel % 3) + 3) % 3;
     for (int i = 0; i < 9; ++i) {
@@ -2455,16 +2467,7 @@ void LcdDisplay::SetMediaPanel(int panel) {
             lv_obj_add_flag(numpad_panel_, LV_OBJ_FLAG_HIDDEN);
         }
     }
-    if (media_title_ != nullptr) {
-        lv_label_set_text(media_title_, media_panel_ == 0   ? "媒 体"
-                                        : media_panel_ == 1 ? "全键盘"
-                                                            : "数字键");
-    }
-    if (media_hint_ != nullptr) {
-        lv_label_set_text(media_hint_, media_panel_ == 0   ? "媒体"
-                                       : media_panel_ == 1 ? "点按输入"
-                                                           : "数字输入");
-    }
+    UpdatePanelTitle();
 }
 
 void LcdDisplay::OnMediaPanelCycle(lv_event_t* e) {
@@ -2485,13 +2488,23 @@ void LcdDisplay::OnKeyboardKeyClicked(lv_event_t* e) {
     }
     const uint8_t code =
         static_cast<uint8_t>(reinterpret_cast<uintptr_t>(lv_obj_get_user_data(target)));
-    const bool sent = MediaBle::GetInstance().SendKeycode(code);
-    lv_obj_t* label = lv_obj_get_child(target, 0);
-    if (self->media_hint_ != nullptr) {
-        lv_label_set_text(
-            self->media_hint_,
-            sent ? (label != nullptr ? lv_label_get_text(label) : "已发送") : "蓝牙未连接");
+    if (code == 0xFF) {  // shift / caps toggle
+        self->shift_active_ = !self->shift_active_;
+        if (self->kb_shift_btn_ != nullptr) {
+            lv_obj_set_style_bg_opa(self->kb_shift_btn_,
+                                    self->shift_active_ ? LV_OPA_30 : LV_OPA_TRANSP, 0);
+            lv_obj_set_style_bg_color(self->kb_shift_btn_,
+                                      static_cast<LvglTheme*>(self->GetTheme())->text_color(), 0);
+        }
+        self->ShowTitleFeedback(self->shift_active_ ? "大写" : "小写");
+        return;
     }
+    const bool letter = code >= 0x04 && code <= 0x1D;
+    const uint8_t modifiers = (self->shift_active_ && letter) ? 0x02 : 0;
+    const bool sent = MediaBle::GetInstance().SendKeycode(code, modifiers);
+    lv_obj_t* label = lv_obj_get_child(target, 0);
+    self->ShowTitleFeedback(sent ? (label != nullptr ? lv_label_get_text(label) : "已发送")
+                                 : "蓝牙未连接");
 }
 
 void LcdDisplay::OnMediaBarClicked(lv_event_t* e) {
@@ -2520,9 +2533,7 @@ static const char* kMediaHints[9] = {"上一首", "播放/暂停", "下一首", 
 
 void LcdDisplay::HandleMediaKeyDown(int index) {
     const bool sent = MediaBle::GetInstance().SendKey(kMediaKeys[index]);
-    if (media_hint_ != nullptr) {
-        lv_label_set_text(media_hint_, sent ? kMediaHints[index] : "蓝牙未连接");
-    }
+    ShowTitleFeedback(sent ? kMediaHints[index] : "蓝牙未连接");
     if (index == 1) {  // play/pause: toggle the icon
         media_playing_ = !media_playing_;
         if (media_key_icons_[1] != nullptr) {

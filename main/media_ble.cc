@@ -79,8 +79,8 @@ const uint8_t kReportMap[] = {
     0x09, 0xE2,                                      //     Usage (Mute)
     0x09, 0xE9,                                      //     Usage (Volume Increment)
     0x09, 0xEA,                                      //     Usage (Volume Decrement)
-    0x09, 0x70,                                      //     Usage (Brightness Decrement)
-    0x09, 0x6F,                                      //     Usage (Brightness Increment)
+    0x0B, 0x23, 0x02,                                //     Usage (AC Home)
+    0x0B, 0x24, 0x02,                                //     Usage (AC Back)
     0x09, 0x00, 0x09, 0x00, 0x09, 0x00, 0x09, 0x00,  // padding bits
     0x09, 0x00, 0x09, 0x00, 0x09, 0x00, 0x09, 0x00,
     0x81, 0x02,  //     Input (Data,Var,Abs) -> 2 consumer bytes

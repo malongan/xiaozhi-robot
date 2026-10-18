@@ -75,6 +75,9 @@ protected:
     int media_panel_ = 0;  // 0 media, 1 keyboard, 2 numpad
     lv_obj_t* keyboard_labels_[64] = {};
     int keyboard_label_count_ = 0;
+    bool shift_active_ = false;
+    lv_obj_t* kb_shift_btn_ = nullptr;
+    lv_timer_t* media_title_timer_ = nullptr;
     lv_obj_t* media_hint_ = nullptr;
     lv_obj_t* media_title_ = nullptr;
     lv_obj_t* bt_title_ = nullptr;
@@ -152,6 +155,9 @@ protected:
     static void MediaRepeatTimerCb(lv_timer_t* timer);
     static void OnMediaPanelCycle(lv_event_t* e);
     static void OnKeyboardKeyClicked(lv_event_t* e);
+    static void MediaTitleTimerCb(lv_timer_t* timer);
+    void ShowTitleFeedback(const char* text);
+    void UpdatePanelTitle();
     void SetMediaPanel(int panel);
     void HandleMediaKeyDown(int index);
     void HandleMediaKeyUp();
