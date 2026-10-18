@@ -1386,6 +1386,7 @@ void LcdDisplay::SetupUI() {
     struct KeyDef {
         const char* label;
         uint8_t code;
+        uint8_t mods;
         int16_t x;
         int16_t y;
         int16_t w;
@@ -1393,31 +1394,46 @@ void LcdDisplay::SetupUI() {
         bool icon;
     };
     static const KeyDef kFullKeys[] = {
-        {"A", 0x04, 2, 48, 36, 46, false},      {"B", 0x05, 42, 48, 36, 46, false},
-        {"C", 0x06, 82, 48, 36, 46, false},     {"D", 0x07, 122, 48, 36, 46, false},
-        {"E", 0x08, 162, 48, 36, 46, false},    {"F", 0x09, 202, 48, 36, 46, false},
-        {"G", 0x0A, 2, 98, 36, 46, false},      {"H", 0x0B, 42, 98, 36, 46, false},
-        {"I", 0x0C, 82, 98, 36, 46, false},     {"J", 0x0D, 122, 98, 36, 46, false},
-        {"K", 0x0E, 162, 98, 36, 46, false},    {"L", 0x0F, 202, 98, 36, 46, false},
-        {"M", 0x10, 2, 148, 36, 46, false},     {"N", 0x11, 42, 148, 36, 46, false},
-        {"O", 0x12, 82, 148, 36, 46, false},    {"P", 0x13, 122, 148, 36, 46, false},
-        {"Q", 0x14, 162, 148, 36, 46, false},   {"R", 0x15, 202, 148, 36, 46, false},
-        {"S", 0x16, 2, 198, 36, 46, false},     {"T", 0x17, 42, 198, 36, 46, false},
-        {"U", 0x18, 82, 198, 36, 46, false},    {"V", 0x19, 122, 198, 36, 46, false},
-        {"W", 0x1A, 162, 198, 36, 46, false},   {"X", 0x1B, 202, 198, 36, 46, false},
-        {"Y", 0x1C, 2, 248, 36, 46, false},     {"Z", 0x1D, 42, 248, 36, 46, false},
-        {"SH", 0xFF, 82, 248, 36, 46, false},    // caps/shift toggle
-        {"SPC", 0x2C, 122, 248, 36, 46, false},  // space
-        {"BSP", 0x2A, 162, 248, 36, 46, false},  // backspace
-        {"ENT", 0x28, 202, 248, 36, 46, false},  // enter
+        {"A", 0x04, 0, 2, 44, 36, 34, false},      {"B", 0x05, 0, 42, 44, 36, 34, false},
+        {"C", 0x06, 0, 82, 44, 36, 34, false},     {"D", 0x07, 0, 122, 44, 36, 34, false},
+        {"E", 0x08, 0, 162, 44, 36, 34, false},    {"F", 0x09, 0, 202, 44, 36, 34, false},
+        {"G", 0x0A, 0, 2, 81, 36, 34, false},      {"H", 0x0B, 0, 42, 81, 36, 34, false},
+        {"I", 0x0C, 0, 82, 81, 36, 34, false},     {"J", 0x0D, 0, 122, 81, 36, 34, false},
+        {"K", 0x0E, 0, 162, 81, 36, 34, false},    {"L", 0x0F, 0, 202, 81, 36, 34, false},
+        {"M", 0x10, 0, 2, 118, 36, 34, false},     {"N", 0x11, 0, 42, 118, 36, 34, false},
+        {"O", 0x12, 0, 82, 118, 36, 34, false},    {"P", 0x13, 0, 122, 118, 36, 34, false},
+        {"Q", 0x14, 0, 162, 118, 36, 34, false},   {"R", 0x15, 0, 202, 118, 36, 34, false},
+        {"S", 0x16, 0, 2, 155, 36, 34, false},     {"T", 0x17, 0, 42, 155, 36, 34, false},
+        {"U", 0x18, 0, 82, 155, 36, 34, false},    {"V", 0x19, 0, 122, 155, 36, 34, false},
+        {"W", 0x1A, 0, 162, 155, 36, 34, false},   {"X", 0x1B, 0, 202, 155, 36, 34, false},
+        {"Y", 0x1C, 0, 2, 192, 36, 34, false},     {"Z", 0x1D, 0, 42, 192, 36, 34, false},
+        {"SH", 0xFF, 0, 82, 192, 36, 34, false},   // caps/shift toggle
+        {"中", 0xFE, 0, 122, 192, 36, 34, false},  // Ctrl+Space language switch
+        {"SPC", 0x2C, 0, 162, 192, 36, 34, false}, {"BSP", 0x2A, 0, 202, 192, 36, 34, false},
+        {",", 0x36, 0, 2, 229, 36, 34, false},     {".", 0x37, 0, 42, 229, 36, 34, false},
+        {"?", 0x38, 0x02, 82, 229, 36, 34, false}, {"!", 0x1E, 0x02, 122, 229, 36, 34, false},
+        {"'", 0x34, 0, 162, 229, 36, 34, false},   {"-", 0x2D, 0, 202, 229, 36, 34, false},
+        {"ENT", 0x28, 0, 2, 266, 36, 34, false},   {"@", 0x1F, 0x02, 42, 266, 36, 34, false},
+        {"/", 0x38, 0, 82, 266, 36, 34, false},    {":", 0x33, 0x02, 122, 266, 36, 34, false},
+        {";", 0x33, 0, 162, 266, 36, 34, false},   {"\"", 0x34, 0x02, 202, 266, 36, 34, false},
     };
     static const KeyDef kNumpadKeys[] = {
-        {"1", 0x1E, 26, 44, 56, 56, false},   {"2", 0x1F, 92, 44, 56, 56, false},
-        {"3", 0x20, 158, 44, 56, 56, false},  {"4", 0x21, 26, 110, 56, 56, false},
-        {"5", 0x22, 92, 110, 56, 56, false},  {"6", 0x23, 158, 110, 56, 56, false},
-        {"7", 0x24, 26, 176, 56, 56, false},  {"8", 0x25, 92, 176, 56, 56, false},
-        {"9", 0x26, 158, 176, 56, 56, false}, {"BSP", 0x2A, 26, 242, 56, 56, false},
-        {"0", 0x27, 92, 242, 56, 56, false},  {"ENT", 0x28, 158, 242, 56, 56, false},
+        {"1", 0x1E, 0, 1, 44, 52, 52, false},
+        {"2", 0x1F, 0, 63, 44, 52, 52, false},
+        {"3", 0x20, 0, 125, 44, 52, 52, false},
+        {"BSP", 0x2A, 0, 187, 44, 52, 52, false},
+        {"4", 0x21, 0, 1, 106, 52, 52, false},
+        {"5", 0x22, 0, 63, 106, 52, 52, false},
+        {"6", 0x23, 0, 125, 106, 52, 52, false},
+        {"ENT", 0x28, 0, 187, 106, 52, 52, false},
+        {"7", 0x24, 0, 1, 168, 52, 52, false},
+        {"8", 0x25, 0, 63, 168, 52, 52, false},
+        {"9", 0x26, 0, 125, 168, 52, 52, false},
+        {MATERIAL_SYMBOLS_ARROW_UPWARD, 0x52, 0, 187, 168, 52, 52, true},
+        {MATERIAL_SYMBOLS_ARROW_BACK, 0x50, 0, 1, 230, 52, 52, true},
+        {MATERIAL_SYMBOLS_ARROW_DOWNWARD, 0x51, 0, 63, 230, 52, 52, true},
+        {MATERIAL_SYMBOLS_ARROW_FORWARD, 0x4F, 0, 125, 230, 52, 52, true},
+        {"0", 0x27, 0, 187, 230, 52, 52, false},
     };
 
     auto build_keyboard = [&](lv_obj_t* panel, const KeyDef* keys, int count) {
@@ -1434,7 +1450,8 @@ void LcdDisplay::SetupUI() {
             lv_obj_set_style_pad_all(key, 0, 0);
             lv_obj_set_style_bg_opa(key, LV_OPA_20, LV_STATE_PRESSED);
             lv_obj_set_style_bg_color(key, lvgl_theme->text_color(), LV_STATE_PRESSED);
-            lv_obj_set_user_data(key, reinterpret_cast<void*>(static_cast<uintptr_t>(def.code)));
+            lv_obj_set_user_data(
+                key, reinterpret_cast<void*>(static_cast<uintptr_t>(def.mods) << 8 | def.code));
             if (def.code == 0xFF) {
                 kb_shift_btn_ = key;
             }
@@ -2486,8 +2503,14 @@ void LcdDisplay::OnKeyboardKeyClicked(lv_event_t* e) {
     if (target == nullptr) {
         return;
     }
-    const uint8_t code =
-        static_cast<uint8_t>(reinterpret_cast<uintptr_t>(lv_obj_get_user_data(target)));
+    const uintptr_t encoded = reinterpret_cast<uintptr_t>(lv_obj_get_user_data(target));
+    const uint8_t code = static_cast<uint8_t>(encoded & 0xFF);
+    const uint8_t base_mods = static_cast<uint8_t>((encoded >> 8) & 0xFF);
+    if (code == 0xFE) {  // Ctrl+Space: switch input language
+        const bool ok = MediaBle::GetInstance().SendShortcut(0x01, 0x2C);
+        self->ShowTitleFeedback(ok ? "中英切换" : "蓝牙未连接");
+        return;
+    }
     if (code == 0xFF) {  // shift / caps toggle
         self->shift_active_ = !self->shift_active_;
         if (self->kb_shift_btn_ != nullptr) {
@@ -2500,7 +2523,8 @@ void LcdDisplay::OnKeyboardKeyClicked(lv_event_t* e) {
         return;
     }
     const bool letter = code >= 0x04 && code <= 0x1D;
-    const uint8_t modifiers = (self->shift_active_ && letter) ? 0x02 : 0;
+    const uint8_t modifiers =
+        static_cast<uint8_t>(base_mods | ((self->shift_active_ && letter) ? 0x02 : 0));
     const bool sent = MediaBle::GetInstance().SendKeycode(code, modifiers);
     lv_obj_t* label = lv_obj_get_child(target, 0);
     self->ShowTitleFeedback(sent ? (label != nullptr ? lv_label_get_text(label) : "已发送")
