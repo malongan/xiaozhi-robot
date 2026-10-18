@@ -55,7 +55,19 @@ protected:
     std::vector<ChatPage> chat_pages_;
     int page_index_ = -1;
     bool follow_latest_ = true;
+    int chat_lines_per_page_ = 6;  // 5 lines + media entry when idle, 6 while talking
     lv_obj_t* chat_area_ = nullptr;
+    lv_obj_t* media_bar_ = nullptr;         // bottom keyboard icon, idle only
+    lv_obj_t* media_screen_ = nullptr;      // full-screen media keys page
+    lv_obj_t* bluetooth_screen_ = nullptr;  // paired-device list
+    bool media_screen_visible_ = false;
+    bool bluetooth_screen_visible_ = false;
+    lv_point_precise_t media_cable_pts_[4] = {};
+    lv_obj_t* media_keys_[6] = {};
+    lv_obj_t* media_hint_ = nullptr;
+    lv_obj_t* media_title_ = nullptr;
+    lv_obj_t* bt_title_ = nullptr;
+    lv_obj_t* bt_empty_ = nullptr;
     lv_obj_t* page_progress_ = nullptr;  // faint press ring around the avatar
     LvglCBinFont* chat_font_ = nullptr;  // 18px Common font loaded from the assets partition
 
@@ -116,6 +128,15 @@ protected:
     std::string BuildPageText(const ChatPage& page) const;
 
     static void OnChatAreaClicked(lv_event_t* e);
+    static void OnMediaBarClicked(lv_event_t* e);
+    static void OnMediaBackClicked(lv_event_t* e);
+    static void OnMediaKeyClicked(lv_event_t* e);
+    static void OnBluetoothEntryClicked(lv_event_t* e);
+    static void OnBluetoothBackClicked(lv_event_t* e);
+    void ShowMediaScreen(bool show);
+    void ShowBluetoothScreen(bool show);
+    void UpdateMediaBarVisibility();
+    void UpdateChatViewport();
     static void OnAvatarPressed(lv_event_t* e);
     static void OnAvatarReleased(lv_event_t* e);
     static void OnAvatarLongPressed(lv_event_t* e);

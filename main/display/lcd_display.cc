@@ -863,7 +863,6 @@ void LcdDisplay::ClearChatMessages() {
 #else
 namespace {
 
-constexpr int kChatLinesPerPage = 6;
 constexpr size_t kMaxChatMessages = 40;
 constexpr size_t kMaxChatTextBytes = 1000;
 constexpr lv_coord_t kChatSidePad = 8;
@@ -1228,6 +1227,185 @@ void LcdDisplay::SetupUI() {
     lv_obj_center(low_battery_label_);
     lv_obj_add_flag(low_battery_popup_, LV_OBJ_FLAG_HIDDEN);
 
+    /* Bottom media entry: line-art keyboard icon, shown only while idle. */
+    media_bar_ = lv_obj_create(screen);
+    lv_obj_set_size(media_bar_, 84, 42);
+    lv_obj_set_style_bg_opa(media_bar_, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(media_bar_, 0, 0);
+    lv_obj_set_style_pad_all(media_bar_, 0, 0);
+    lv_obj_remove_flag(media_bar_, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollbar_mode(media_bar_, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_add_flag(media_bar_, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_ext_click_area(media_bar_, 4);
+    lv_obj_add_event_cb(media_bar_, &LcdDisplay::OnMediaBarClicked, LV_EVENT_CLICKED, this);
+
+    lv_obj_t* keyboard = lv_obj_create(media_bar_);
+    lv_obj_set_size(keyboard, 38, 24);
+    lv_obj_align(keyboard, LV_ALIGN_BOTTOM_MID, 0, 0);
+    lv_obj_set_style_radius(keyboard, 5, 0);
+    lv_obj_set_style_bg_opa(keyboard, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(keyboard, 2, 0);
+    lv_obj_set_style_border_color(keyboard, lvgl_theme->text_color(), 0);
+    lv_obj_set_style_pad_all(keyboard, 0, 0);
+    lv_obj_remove_flag(keyboard, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_remove_flag(keyboard, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_scrollbar_mode(keyboard, LV_SCROLLBAR_MODE_OFF);
+    for (int row = 0; row < 2; ++row) {
+        for (int col = 0; col < 4; ++col) {
+            lv_obj_t* key = lv_obj_create(keyboard);
+            lv_obj_set_size(key, 4, 2);
+            lv_obj_set_pos(key, 5 + col * 8, 5 + row * 5);
+            lv_obj_set_style_radius(key, 1, 0);
+            lv_obj_set_style_bg_color(key, lvgl_theme->text_color(), 0);
+            lv_obj_set_style_bg_opa(key, LV_OPA_COVER, 0);
+            lv_obj_set_style_border_width(key, 0, 0);
+            lv_obj_set_style_pad_all(key, 0, 0);
+            lv_obj_remove_flag(key, LV_OBJ_FLAG_SCROLLABLE);
+            lv_obj_remove_flag(key, LV_OBJ_FLAG_CLICKABLE);
+        }
+    }
+    lv_obj_t* spacebar = lv_obj_create(keyboard);
+    lv_obj_set_size(spacebar, 12, 2);
+    lv_obj_set_pos(spacebar, 13, 16);
+    lv_obj_set_style_radius(spacebar, 1, 0);
+    lv_obj_set_style_bg_color(spacebar, lvgl_theme->text_color(), 0);
+    lv_obj_set_style_bg_opa(spacebar, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(spacebar, 0, 0);
+    lv_obj_remove_flag(spacebar, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_remove_flag(spacebar, LV_OBJ_FLAG_CLICKABLE);
+
+    media_cable_pts_[0] = {0, 12};
+    media_cable_pts_[1] = {3, 5};
+    media_cable_pts_[2] = {9, 1};
+    media_cable_pts_[3] = {13, 0};
+    lv_obj_t* cable = lv_line_create(media_bar_);
+    lv_line_set_points(cable, media_cable_pts_, 4);
+    lv_obj_set_style_line_width(cable, 2, 0);
+    lv_obj_set_style_line_color(cable, lvgl_theme->text_color(), 0);
+    lv_obj_set_style_line_rounded(cable, true, 0);
+    lv_obj_align(cable, LV_ALIGN_TOP_MID, 4, 0);
+    lv_obj_remove_flag(cable, LV_OBJ_FLAG_CLICKABLE);
+
+    /* Media screen: full-screen overlay with six outline media keys. */
+    media_screen_ = lv_obj_create(screen);
+    lv_obj_set_size(media_screen_, LV_HOR_RES, LV_VER_RES);
+    lv_obj_set_style_radius(media_screen_, 0, 0);
+    lv_obj_set_style_bg_color(media_screen_, lvgl_theme->background_color(), 0);
+    lv_obj_set_style_bg_opa(media_screen_, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(media_screen_, 0, 0);
+    lv_obj_set_style_pad_all(media_screen_, 0, 0);
+    lv_obj_remove_flag(media_screen_, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollbar_mode(media_screen_, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_add_flag(media_screen_, LV_OBJ_FLAG_HIDDEN);
+
+    lv_obj_t* media_back = lv_button_create(media_screen_);
+    lv_obj_set_size(media_back, 44, 36);
+    lv_obj_align(media_back, LV_ALIGN_TOP_LEFT, 4, 2);
+    lv_obj_set_style_bg_opa(media_back, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(media_back, 0, 0);
+    lv_obj_set_style_shadow_width(media_back, 0, 0);
+    lv_obj_set_style_pad_all(media_back, 0, 0);
+    lv_obj_add_event_cb(media_back, &LcdDisplay::OnMediaBackClicked, LV_EVENT_CLICKED, this);
+    lv_obj_t* media_back_icon = lv_label_create(media_back);
+    lv_obj_set_style_text_font(media_back_icon, icon_font, 0);
+    lv_obj_set_style_text_color(media_back_icon, lvgl_theme->text_color(), 0);
+    lv_label_set_text(media_back_icon, MATERIAL_SYMBOLS_ARROW_BACK);
+    lv_obj_center(media_back_icon);
+
+    media_title_ = lv_label_create(media_screen_);
+    lv_obj_set_style_text_font(media_title_, text_font, 0);
+    lv_obj_set_style_text_color(media_title_, lvgl_theme->text_color(), 0);
+    lv_label_set_text(media_title_, "媒 体");
+    lv_obj_align(media_title_, LV_ALIGN_TOP_MID, 0, 10);
+
+    lv_obj_t* bt_entry = lv_button_create(media_screen_);
+    lv_obj_set_size(bt_entry, 44, 36);
+    lv_obj_align(bt_entry, LV_ALIGN_TOP_RIGHT, -4, 2);
+    lv_obj_set_style_bg_opa(bt_entry, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(bt_entry, 0, 0);
+    lv_obj_set_style_shadow_width(bt_entry, 0, 0);
+    lv_obj_set_style_pad_all(bt_entry, 0, 0);
+    lv_obj_add_event_cb(bt_entry, &LcdDisplay::OnBluetoothEntryClicked, LV_EVENT_CLICKED, this);
+    lv_obj_t* bt_icon = lv_label_create(bt_entry);
+    lv_obj_set_style_text_font(bt_icon, icon_font, 0);
+    lv_obj_set_style_text_color(bt_icon, lvgl_theme->text_color(), 0);
+    lv_label_set_text(bt_icon, MATERIAL_SYMBOLS_BLUETOOTH);
+    lv_obj_center(bt_icon);
+
+    const char* media_icons[6] = {
+        MATERIAL_SYMBOLS_SKIP_PREVIOUS, MATERIAL_SYMBOLS_PLAY_ARROW, MATERIAL_SYMBOLS_SKIP_NEXT,
+        MATERIAL_SYMBOLS_VOLUME_DOWN,   MATERIAL_SYMBOLS_VOLUME_OFF, MATERIAL_SYMBOLS_VOLUME_UP,
+    };
+    for (int i = 0; i < 6; ++i) {
+        lv_obj_t* key = lv_button_create(media_screen_);
+        media_keys_[i] = key;
+        lv_obj_set_size(key, 64, 64);
+        lv_obj_set_pos(key, 8 + (i % 3) * 80, 72 + (i / 3) * 88);
+        lv_obj_set_style_radius(key, 14, 0);
+        lv_obj_set_style_bg_opa(key, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_border_width(key, 2, 0);
+        lv_obj_set_style_border_color(key, lvgl_theme->text_color(), 0);
+        lv_obj_set_style_shadow_width(key, 0, 0);
+        lv_obj_set_style_pad_all(key, 0, 0);
+        lv_obj_set_style_bg_opa(key, LV_OPA_20, LV_STATE_PRESSED);
+        lv_obj_set_style_bg_color(key, lvgl_theme->text_color(), LV_STATE_PRESSED);
+        lv_obj_add_event_cb(key, &LcdDisplay::OnMediaKeyClicked, LV_EVENT_CLICKED, this);
+        lv_obj_t* key_icon = lv_label_create(key);
+        lv_obj_set_style_text_font(key_icon, large_icon_font, 0);
+        lv_obj_set_style_text_color(key_icon, lvgl_theme->text_color(), 0);
+        lv_label_set_text(key_icon, media_icons[i]);
+        lv_obj_center(key_icon);
+    }
+
+    media_hint_ = lv_label_create(media_screen_);
+    lv_obj_set_width(media_hint_, 224);
+    lv_obj_set_style_text_align(media_hint_, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_style_text_font(media_hint_, text_font, 0);
+    lv_obj_set_style_text_color(media_hint_, lvgl_theme->text_color(), 0);
+    lv_label_set_text(media_hint_, "蓝牙未连接");
+    lv_obj_align(media_hint_, LV_ALIGN_BOTTOM_MID, 0, -14);
+
+    /* Paired-device screen (populated once BLE HID lands). */
+    bluetooth_screen_ = lv_obj_create(screen);
+    lv_obj_set_size(bluetooth_screen_, LV_HOR_RES, LV_VER_RES);
+    lv_obj_set_style_radius(bluetooth_screen_, 0, 0);
+    lv_obj_set_style_bg_color(bluetooth_screen_, lvgl_theme->background_color(), 0);
+    lv_obj_set_style_bg_opa(bluetooth_screen_, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(bluetooth_screen_, 0, 0);
+    lv_obj_set_style_pad_all(bluetooth_screen_, 0, 0);
+    lv_obj_remove_flag(bluetooth_screen_, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollbar_mode(bluetooth_screen_, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_add_flag(bluetooth_screen_, LV_OBJ_FLAG_HIDDEN);
+
+    lv_obj_t* bt_back = lv_button_create(bluetooth_screen_);
+    lv_obj_set_size(bt_back, 44, 36);
+    lv_obj_align(bt_back, LV_ALIGN_TOP_LEFT, 4, 2);
+    lv_obj_set_style_bg_opa(bt_back, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(bt_back, 0, 0);
+    lv_obj_set_style_shadow_width(bt_back, 0, 0);
+    lv_obj_set_style_pad_all(bt_back, 0, 0);
+    lv_obj_add_event_cb(bt_back, &LcdDisplay::OnBluetoothBackClicked, LV_EVENT_CLICKED, this);
+    lv_obj_t* bt_back_icon = lv_label_create(bt_back);
+    lv_obj_set_style_text_font(bt_back_icon, icon_font, 0);
+    lv_obj_set_style_text_color(bt_back_icon, lvgl_theme->text_color(), 0);
+    lv_label_set_text(bt_back_icon, MATERIAL_SYMBOLS_ARROW_BACK);
+    lv_obj_center(bt_back_icon);
+
+    bt_title_ = lv_label_create(bluetooth_screen_);
+    lv_obj_set_style_text_font(bt_title_, text_font, 0);
+    lv_obj_set_style_text_color(bt_title_, lvgl_theme->text_color(), 0);
+    lv_label_set_text(bt_title_, "已配对设备");
+    lv_obj_align(bt_title_, LV_ALIGN_TOP_MID, 0, 10);
+
+    bt_empty_ = lv_label_create(bluetooth_screen_);
+    lv_obj_set_width(bt_empty_, 216);
+    lv_obj_set_style_text_align(bt_empty_, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_style_text_font(bt_empty_, text_font, 0);
+    lv_obj_set_style_text_color(bt_empty_, lvgl_theme->text_color(), 0);
+    lv_label_set_text(bt_empty_, "尚未配对任何设备\n在电脑/手机蓝牙里\n搜索 Xiaozhi-Media 配对");
+    lv_obj_align(bt_empty_, LV_ALIGN_CENTER, 0, 10);
+
+    chat_lines_per_page_ = 5;  // idle layout: five lines + media entry icon
     ApplyChatLayout();
 
     // 25 fps avatar animation: breathing, blink and state-driven motion.
@@ -1380,10 +1558,10 @@ void LcdDisplay::RebuildChatPages() {
     chat_pages_.clear();
     for (size_t i = 0; i < chat_messages_.size(); ++i) {
         const int lines = static_cast<int>(chat_messages_[i].line_starts.size());
-        const int pages = std::max(1, (lines + kChatLinesPerPage - 1) / kChatLinesPerPage);
+        const int pages = std::max(1, (lines + chat_lines_per_page_ - 1) / chat_lines_per_page_);
         for (int page = 0; page < pages; ++page) {
             chat_pages_.push_back(ChatPage{static_cast<uint16_t>(i),
-                                           static_cast<uint16_t>(page * kChatLinesPerPage)});
+                                           static_cast<uint16_t>(page * chat_lines_per_page_)});
         }
     }
     if (chat_pages_.empty()) {
@@ -1403,7 +1581,7 @@ std::string LcdDisplay::BuildPageText(const ChatPage& page) const {
     }
     const int first = page.line;
     const int last =
-        std::min<int>(first + kChatLinesPerPage, static_cast<int>(message.line_starts.size()));
+        std::min<int>(first + chat_lines_per_page_, static_cast<int>(message.line_starts.size()));
     std::string out;
     for (int line = first; line < last; ++line) {
         const uint32_t start = message.line_starts[line];
@@ -1510,10 +1688,11 @@ void LcdDisplay::ApplyChatLayout() {
     const lv_coord_t chat_line_space = 4;
     const lv_coord_t chat_pitch = chat_line_h + chat_line_space;
     const lv_coord_t chat_w = LV_HOR_RES - 2 * kChatSidePad;
-    const lv_coord_t chat_h = (kChatLinesPerPage - 1) * chat_pitch + chat_line_h;
+    const lv_coord_t chat_h = (chat_lines_per_page_ - 1) * chat_pitch + chat_line_h;
     const lv_coord_t avatar_y = top_h + kAvatarTopGap;
     const lv_coord_t text_top = avatar_y + kAvatarSize + kAvatarGap;
-    const lv_coord_t text_space = LV_VER_RES - 10 - text_top;
+    const lv_coord_t bottom_reserve = chat_lines_per_page_ == 5 ? 46 : 10;
+    const lv_coord_t text_space = LV_VER_RES - bottom_reserve - text_top;
     const lv_coord_t chat_y = text_top + LV_MAX((text_space - chat_h) / 2, 0);
 
     lv_obj_set_size(emoji_box_, kAvatarSize, kAvatarSize);
@@ -1526,6 +1705,9 @@ void LcdDisplay::ApplyChatLayout() {
     if (avatar_think_dots_ != nullptr) {
         lv_obj_align_to(avatar_think_dots_, emoji_box_, LV_ALIGN_TOP_RIGHT, 6, -4);
     }
+    if (media_bar_ != nullptr) {
+        lv_obj_align(media_bar_, LV_ALIGN_BOTTOM_MID, 0, -2);
+    }
 
     lv_obj_set_pos(chat_area_, kChatSidePad, chat_y);
     lv_obj_set_size(chat_area_, chat_w, chat_h);
@@ -1537,6 +1719,13 @@ void LcdDisplay::ApplyChatLayout() {
         // Rebind: SetTextFont() replaces the theme font when assets load.
         lv_obj_set_style_text_font(avatar_think_dots_, font, 0);
         lv_obj_set_style_text_color(avatar_think_dots_, lvgl_theme->text_color(), 0);
+    }
+    lv_obj_t* themed_labels[] = {media_title_, media_hint_, bt_title_, bt_empty_};
+    for (lv_obj_t* label : themed_labels) {
+        if (label != nullptr) {
+            lv_obj_set_style_text_font(label, font, 0);
+            lv_obj_set_style_text_color(label, lvgl_theme->text_color(), 0);
+        }
     }
     lv_obj_set_style_text_line_space(chat_message_label_, chat_line_space, 0);
     lv_obj_set_width(chat_message_label_, chat_w);
@@ -1554,6 +1743,7 @@ void LcdDisplay::ApplyChatLayout() {
         page_index_ = -1;
         lv_label_set_text(chat_message_label_, "");
     }
+    UpdateMediaBarVisibility();
 }
 
 void LcdDisplay::ShowPressRing() {
@@ -1653,6 +1843,13 @@ void LcdDisplay::SetAvatarMood(AvatarMood mood) {
     avatar_blink_at_ = avatar_anim_epoch_ + 2600 + (esp_random() % 3500);
     avatar_blink_start_ = 0;
     gaze_next_ = 0;
+    if (mood != kAvatarMoodIdle) {
+        // A conversation started: leave the media/paired screens so the user
+        // sees the dialog immediately.
+        ShowMediaScreen(false);
+        ShowBluetoothScreen(false);
+    }
+    UpdateChatViewport();
 }
 
 void LcdDisplay::AvatarAnimTimerCb(lv_timer_t* timer) {
@@ -1663,6 +1860,9 @@ void LcdDisplay::AvatarAnimTimerCb(lv_timer_t* timer) {
     // The preview image temporarily hides the avatar; skip while hidden.
     if (lv_obj_has_flag(self->emoji_box_, LV_OBJ_FLAG_HIDDEN)) {
         return;
+    }
+    if (self->media_screen_visible_ || self->bluetooth_screen_visible_) {
+        return;  // Overlay covers the AI screen; no need to animate.
     }
 
     constexpr float kPi = 3.14159265f;
@@ -1992,6 +2192,108 @@ void LcdDisplay::SetAvatarEmotion(const char* emotion) {
     }
     avatar_override_ = expression;
     avatar_override_until_ = lv_tick_get() + 2500;
+}
+
+void LcdDisplay::UpdateChatViewport() {
+    const int lines = avatar_mood_ == kAvatarMoodIdle ? 5 : 6;
+    if (lines == chat_lines_per_page_) {
+        UpdateMediaBarVisibility();
+        return;
+    }
+    chat_lines_per_page_ = lines;
+    follow_latest_ = true;
+    ApplyChatLayout();
+}
+
+void LcdDisplay::UpdateMediaBarVisibility() {
+    if (media_bar_ == nullptr) {
+        return;
+    }
+    const bool show = chat_lines_per_page_ == 5 && !media_screen_visible_ &&
+                      !bluetooth_screen_visible_ && avatar_mood_ == kAvatarMoodIdle;
+    if (show) {
+        lv_obj_remove_flag(media_bar_, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        lv_obj_add_flag(media_bar_, LV_OBJ_FLAG_HIDDEN);
+    }
+}
+
+void LcdDisplay::ShowMediaScreen(bool show) {
+    if (media_screen_ == nullptr) {
+        return;
+    }
+    DisplayLockGuard lock(this);
+    media_screen_visible_ = show;
+    if (show) {
+        ShowBluetoothScreen(false);
+        lv_obj_remove_flag(media_screen_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_move_foreground(media_screen_);
+    } else {
+        lv_obj_add_flag(media_screen_, LV_OBJ_FLAG_HIDDEN);
+    }
+    UpdateMediaBarVisibility();
+}
+
+void LcdDisplay::ShowBluetoothScreen(bool show) {
+    if (bluetooth_screen_ == nullptr) {
+        return;
+    }
+    DisplayLockGuard lock(this);
+    bluetooth_screen_visible_ = show;
+    if (show) {
+        lv_obj_remove_flag(bluetooth_screen_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_move_foreground(bluetooth_screen_);
+    } else {
+        lv_obj_add_flag(bluetooth_screen_, LV_OBJ_FLAG_HIDDEN);
+    }
+    UpdateMediaBarVisibility();
+}
+
+void LcdDisplay::OnMediaBarClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self != nullptr) {
+        self->ShowMediaScreen(true);
+    }
+}
+
+void LcdDisplay::OnMediaBackClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self != nullptr) {
+        self->ShowMediaScreen(false);
+    }
+}
+
+void LcdDisplay::OnMediaKeyClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self == nullptr) {
+        return;
+    }
+    lv_obj_t* target = lv_event_get_target_obj(e);
+    static const char* kHints[6] = {"上一首（BLE 待接入）", "播放/暂停（BLE 待接入）",
+                                    "下一首（BLE 待接入）", "音量-（BLE 待接入）",
+                                    "静音（BLE 待接入）",   "音量+（BLE 待接入）"};
+    for (int i = 0; i < 6; ++i) {
+        if (target == self->media_keys_[i]) {
+            if (self->media_hint_ != nullptr) {
+                lv_label_set_text(self->media_hint_, kHints[i]);
+            }
+            return;
+        }
+    }
+}
+
+void LcdDisplay::OnBluetoothEntryClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self != nullptr) {
+        self->ShowBluetoothScreen(true);
+    }
+}
+
+void LcdDisplay::OnBluetoothBackClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self != nullptr) {
+        self->ShowBluetoothScreen(false);
+    }
 }
 
 void LcdDisplay::SetEmotion(const char* emotion) {
