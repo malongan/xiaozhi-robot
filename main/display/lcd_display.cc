@@ -1113,10 +1113,22 @@ void LcdDisplay::SetupUI() {
         lv_obj_set_style_transform_pivot_x(eye, lv_pct(50), 0);
         lv_obj_set_style_transform_pivot_y(eye, lv_pct(50), 0);
         lv_obj_align(eye, LV_ALIGN_CENTER, 0, 0);
+        lv_obj_t* hl = lv_obj_create(eye);
+        lv_obj_remove_flag(hl, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_remove_flag(hl, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_set_scrollbar_mode(hl, LV_SCROLLBAR_MODE_OFF);
+        lv_obj_set_size(hl, 3, 4);
+        lv_obj_set_style_radius(hl, LV_RADIUS_CIRCLE, 0);
+        lv_obj_set_style_bg_color(hl, lv_color_hex(0x4A4A52), 0);
+        lv_obj_set_style_bg_opa(hl, LV_OPA_60, 0);
+        lv_obj_set_style_border_width(hl, 0, 0);
+        lv_obj_align(hl, LV_ALIGN_TOP_MID, 0, 2);
         return eye;
     };
     avatar_eye_left_ = create_pill_eye();
     avatar_eye_right_ = create_pill_eye();
+    avatar_eye_hl_left_ = lv_obj_get_child(avatar_eye_left_, 0);
+    avatar_eye_hl_right_ = lv_obj_get_child(avatar_eye_right_, 0);
 
     auto create_happy_eye = [this]() {
         lv_obj_t* arc = lv_arc_create(avatar_face_);
@@ -1743,6 +1755,18 @@ void LcdDisplay::AvatarAnimTimerCb(lv_timer_t* timer) {
             break;
     }
 
+    lv_coord_t eye_left_x = 0;
+    lv_coord_t eye_left_y = 0;
+    lv_coord_t eye_right_x = 0;
+    lv_coord_t eye_right_y = 0;
+    lv_coord_t eye_left_w = eye_w;
+    lv_coord_t eye_left_h = eye_h;
+    lv_coord_t eye_right_w = eye_w;
+    lv_coord_t eye_right_h = eye_h;
+    int32_t eye_left_rot = eye_rot;
+    int32_t eye_right_rot = eye_rot;
+    bool have_eye_pos = false;
+
     if (gaze_active) {
         if (self->gaze_next_ == 0 || now >= self->gaze_next_) {
             self->PickAvatarGaze();
@@ -1765,19 +1789,61 @@ void LcdDisplay::AvatarAnimTimerCb(lv_timer_t* timer) {
         const bool listening = expression == kAvatarExpressionListening;
         const lv_coord_t base_w = listening ? 7 : 8;
         const lv_coord_t base_h = listening ? 20 : 22;
-        eye_gap = listening ? 9 : 10;
-        eye_w = static_cast<lv_coord_t>(base_w * self->gaze_zoom_);
-        eye_h = static_cast<lv_coord_t>(base_h * self->gaze_zoom_ * self->gaze_eye_);
-        look_x = static_cast<lv_coord_t>(self->gaze_x_);
-        look_y = static_cast<lv_coord_t>(self->gaze_y_);
+        const lv_coord_t base_gap = listening ? 9 : 10;
+
+        // Fake 3D: yaw/pitch make the near eye bigger, the far eye smaller,
+        // compress the spacing and tilt both eyes slightly in opposite ways.
+        const float yaw_deg = self->gaze_x_ * 3.7f;     // +-26 degrees
+        const float pitch_deg = -self->gaze_y_ * 3.2f;  // +-16 degrees
+        const float yaw = yaw_deg * kPi / 180.0f;
+        const float pitch = pitch_deg * kPi / 180.0f;
+
+        for (int side = 0; side < 2; ++side) {
+            const float sign = side == 0 ? -1.0f : 1.0f;
+            const float depth = -sign * sinf(yaw);
+            const float persp = 1.0f / (1.0f + 0.45f * depth);
+            const lv_coord_t x =
+                static_cast<lv_coord_t>(sign * base_gap * cosf(yaw) * persp + self->gaze_x_);
+            const lv_coord_t y = static_cast<lv_coord_t>(self->gaze_y_);
+            const lv_coord_t w =
+                static_cast<lv_coord_t>(base_w * cosf(yaw) * persp * self->gaze_zoom_);
+            const lv_coord_t h = static_cast<lv_coord_t>(base_h * cosf(pitch) * persp *
+                                                         self->gaze_zoom_ * self->gaze_eye_);
+            const float rot_deg =
+                self->gaze_tilt_ + sign * yaw_deg * 0.18f + sign * pitch_deg * 0.10f;
+
+            // The farther eye is drawn a touch lighter for depth.
+            const float far = LV_CLAMP(0.0f, (1.0f - persp) * 0.30f, 0.45f);
+            lv_color_t eye_color =
+                lv_color_mix(lv_color_hex(kAvatarFaceColor), lv_color_hex(kAvatarEyeColor),
+                             static_cast<uint8_t>(far * 255.0f));
+            lv_obj_t* eye = side == 0 ? self->avatar_eye_left_ : self->avatar_eye_right_;
+            lv_obj_t* hl = side == 0 ? self->avatar_eye_hl_left_ : self->avatar_eye_hl_right_;
+            lv_obj_set_style_bg_color(eye, eye_color, 0);
+
+            if (side == 0) {
+                eye_left_x = x;
+                eye_left_y = y;
+                eye_left_w = LV_MAX(w, static_cast<lv_coord_t>(3));
+                eye_left_h = LV_MAX(h, static_cast<lv_coord_t>(6));
+                eye_left_rot = static_cast<int32_t>(rot_deg * 10.0f);
+            } else {
+                eye_right_x = x;
+                eye_right_y = y;
+                eye_right_w = LV_MAX(w, static_cast<lv_coord_t>(3));
+                eye_right_h = LV_MAX(h, static_cast<lv_coord_t>(6));
+                eye_right_rot = static_cast<int32_t>(rot_deg * 10.0f);
+            }
+        }
+        have_eye_pos = true;
         bob = static_cast<lv_coord_t>(self->gaze_y_ * 0.25f);
         face_tx = static_cast<lv_coord_t>(self->gaze_x_ * 0.45f);
-        face_rot = static_cast<int32_t>(self->gaze_tilt_ * 45.0f);  // 4.5 deg max
-        eye_rot = static_cast<int32_t>(self->gaze_tilt_ * 100.0f);  // 10 deg max
+        face_rot = static_cast<int32_t>(self->gaze_tilt_ * 20.0f);  // 2 deg max
     }
 
     if (!happy) {
-        lv_coord_t eye_h_draw = eye_h;
+        lv_coord_t left_h_draw = eye_left_h;
+        lv_coord_t right_h_draw = eye_right_h;
         if (self->avatar_blink_start_ == 0 && now >= self->avatar_blink_at_) {
             self->avatar_blink_start_ = now;
         }
@@ -1790,18 +1856,41 @@ void LcdDisplay::AvatarAnimTimerCb(lv_timer_t* timer) {
             } else {
                 const float p = static_cast<float>(elapsed) / kBlinkDurationMs;
                 const float envelope = p < 0.5f ? p * 2.0f : (1.0f - p) * 2.0f;
-                eye_h_draw = static_cast<lv_coord_t>(eye_h * (1.0f - 0.85f * envelope));
-                if (eye_h_draw < 3) {
-                    eye_h_draw = 3;
-                }
+                const float factor = 1.0f - 0.85f * envelope;
+                left_h_draw = LV_MAX(static_cast<lv_coord_t>(3),
+                                     static_cast<lv_coord_t>(eye_left_h * factor));
+                right_h_draw = LV_MAX(static_cast<lv_coord_t>(3),
+                                      static_cast<lv_coord_t>(eye_right_h * factor));
             }
         }
-        lv_obj_set_size(self->avatar_eye_left_, eye_w, eye_h_draw);
-        lv_obj_set_size(self->avatar_eye_right_, eye_w, eye_h_draw);
-        lv_obj_align(self->avatar_eye_left_, LV_ALIGN_CENTER, -eye_gap + look_x, look_y);
-        lv_obj_align(self->avatar_eye_right_, LV_ALIGN_CENTER, eye_gap + look_x, look_y);
-        lv_obj_set_style_transform_rotation(self->avatar_eye_left_, eye_rot, 0);
-        lv_obj_set_style_transform_rotation(self->avatar_eye_right_, eye_rot, 0);
+
+        if (have_eye_pos) {
+            lv_obj_set_size(self->avatar_eye_left_, eye_left_w, left_h_draw);
+            lv_obj_set_size(self->avatar_eye_right_, eye_right_w, right_h_draw);
+            lv_obj_align(self->avatar_eye_left_, LV_ALIGN_CENTER, eye_left_x, eye_left_y);
+            lv_obj_align(self->avatar_eye_right_, LV_ALIGN_CENTER, eye_right_x, eye_right_y);
+            lv_obj_set_style_transform_rotation(self->avatar_eye_left_, eye_left_rot, 0);
+            lv_obj_set_style_transform_rotation(self->avatar_eye_right_, eye_right_rot, 0);
+            if (self->avatar_eye_hl_left_ != nullptr) {
+                lv_obj_set_size(self->avatar_eye_hl_left_, LV_MAX(2, eye_left_w / 3),
+                                LV_MAX(2, left_h_draw / 7));
+                lv_obj_align(self->avatar_eye_hl_left_, LV_ALIGN_TOP_MID, 0,
+                             LV_MAX(1, left_h_draw / 10));
+            }
+            if (self->avatar_eye_hl_right_ != nullptr) {
+                lv_obj_set_size(self->avatar_eye_hl_right_, LV_MAX(2, eye_right_w / 3),
+                                LV_MAX(2, right_h_draw / 7));
+                lv_obj_align(self->avatar_eye_hl_right_, LV_ALIGN_TOP_MID, 0,
+                             LV_MAX(1, right_h_draw / 10));
+            }
+        } else {
+            lv_obj_set_size(self->avatar_eye_left_, eye_w, left_h_draw);
+            lv_obj_set_size(self->avatar_eye_right_, eye_w, right_h_draw);
+            lv_obj_align(self->avatar_eye_left_, LV_ALIGN_CENTER, -eye_gap + look_x, look_y);
+            lv_obj_align(self->avatar_eye_right_, LV_ALIGN_CENTER, eye_gap + look_x, look_y);
+            lv_obj_set_style_transform_rotation(self->avatar_eye_left_, eye_rot, 0);
+            lv_obj_set_style_transform_rotation(self->avatar_eye_right_, eye_rot, 0);
+        }
     } else {
         lv_obj_align(self->avatar_eye_happy_left_, LV_ALIGN_CENTER, -eye_gap, 0);
         lv_obj_align(self->avatar_eye_happy_right_, LV_ALIGN_CENTER, eye_gap, 0);

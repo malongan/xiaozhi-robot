@@ -63,6 +63,8 @@ protected:
     lv_obj_t* avatar_face_ = nullptr;
     lv_obj_t* avatar_eye_left_ = nullptr;
     lv_obj_t* avatar_eye_right_ = nullptr;
+    lv_obj_t* avatar_eye_hl_left_ = nullptr;  // highlight: fake 3D gloss
+    lv_obj_t* avatar_eye_hl_right_ = nullptr;
     lv_obj_t* avatar_eye_happy_left_ = nullptr;
     lv_obj_t* avatar_eye_happy_right_ = nullptr;
     lv_obj_t* avatar_think_dots_ = nullptr;
