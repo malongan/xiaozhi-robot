@@ -1317,11 +1317,11 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_shadow_width(bt_entry, 0, 0);
     lv_obj_set_style_pad_all(bt_entry, 0, 0);
     lv_obj_add_event_cb(bt_entry, &LcdDisplay::OnBluetoothEntryClicked, LV_EVENT_CLICKED, this);
-    lv_obj_t* bt_icon = lv_label_create(bt_entry);
-    lv_obj_set_style_text_font(bt_icon, icon_font, 0);
-    lv_obj_set_style_text_color(bt_icon, lvgl_theme->text_color(), 0);
-    lv_label_set_text(bt_icon, MATERIAL_SYMBOLS_BLUETOOTH);
-    lv_obj_center(bt_icon);
+    media_bt_icon_ = lv_label_create(bt_entry);
+    lv_obj_set_style_text_font(media_bt_icon_, icon_font, 0);
+    lv_obj_set_style_text_color(media_bt_icon_, lv_color_hex(0x777777), 0);
+    lv_label_set_text(media_bt_icon_, MATERIAL_SYMBOLS_BLUETOOTH);
+    lv_obj_center(media_bt_icon_);
 
     const char* media_icons[6] = {
         MATERIAL_SYMBOLS_SKIP_PREVIOUS, MATERIAL_SYMBOLS_PLAY_ARROW,  MATERIAL_SYMBOLS_SKIP_NEXT,
@@ -1369,8 +1369,8 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_text_align(media_hint_, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_text_font(media_hint_, text_font, 0);
     lv_obj_set_style_text_color(media_hint_, lvgl_theme->text_color(), 0);
-    lv_label_set_text(media_hint_, "等待配对（蓝牙广播中）");
-    lv_obj_align(media_hint_, LV_ALIGN_BOTTOM_MID, 0, -14);
+    lv_label_set_text(media_hint_, "");
+    lv_obj_add_flag(media_hint_, LV_OBJ_FLAG_HIDDEN);
 
     /* Paired-device screen (populated once BLE HID lands). */
     bluetooth_screen_ = lv_obj_create(screen);
@@ -1453,8 +1453,9 @@ void LcdDisplay::SetupUI() {
     MediaBle::GetInstance().SetStatusCallback([this](bool connected) {
         Application::GetInstance().Schedule([this, connected]() {
             DisplayLockGuard lock(this);
-            if (media_hint_ != nullptr) {
-                lv_label_set_text(media_hint_, connected ? "蓝牙已连接" : "等待配对（蓝牙广播中）");
+            if (media_bt_icon_ != nullptr) {
+                lv_obj_set_style_text_color(
+                    media_bt_icon_, connected ? lv_color_hex(0x4CD964) : lv_color_hex(0x777777), 0);
             }
             if (bluetooth_screen_visible_) {
                 RefreshBluetoothList();

@@ -74,6 +74,7 @@ protected:
     uint32_t media_repeat_next_ = 0;
     bool media_playing_ = false;
     lv_obj_t* media_hint_ = nullptr;
+    lv_obj_t* media_bt_icon_ = nullptr;
     lv_obj_t* media_title_ = nullptr;
     lv_obj_t* bt_title_ = nullptr;
     lv_obj_t* bt_empty_ = nullptr;
