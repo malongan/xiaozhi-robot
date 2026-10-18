@@ -864,6 +864,7 @@ constexpr lv_coord_t kChatSidePad = 8;
 constexpr lv_coord_t kAvatarSize = 64;
 constexpr lv_coord_t kAvatarTopGap = 7;
 constexpr lv_coord_t kAvatarGap = 16;
+constexpr uint16_t kAvatarLongPressMs = 2000;
 constexpr lv_coord_t kTopBarPad = 6;
 constexpr lv_coord_t kTopBarIconGap = 4;
 
@@ -1049,8 +1050,16 @@ void LcdDisplay::SetupUI() {
     lv_label_set_text(notification_label_, "");
     lv_obj_add_flag(notification_label_, LV_OBJ_FLAG_HIDDEN);
 
-    /* Avatar: tap = continue chatting (history is kept), long press 3s = new
-       session (history is cleared) */
+    /* 2 second press = new session (history cleared immediately) */
+    for (lv_indev_t* indev = lv_indev_get_next(nullptr); indev != nullptr;
+         indev = lv_indev_get_next(indev)) {
+        if (lv_indev_get_type(indev) == LV_INDEV_TYPE_POINTER) {
+            lv_indev_set_long_press_time(indev, kAvatarLongPressMs);
+        }
+    }
+
+    /* Avatar: tap = continue chatting (history is kept), 2s press = new
+       session (the screen clearing is the feedback) */
     emoji_box_ = lv_obj_create(screen);
     lv_obj_set_style_radius(emoji_box_, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_bg_opa(emoji_box_, LV_OPA_TRANSP, 0);
@@ -1064,6 +1073,7 @@ void LcdDisplay::SetupUI() {
     lv_obj_add_event_cb(emoji_box_, &LcdDisplay::OnAvatarPressed, LV_EVENT_PRESSED, this);
     lv_obj_add_event_cb(emoji_box_, &LcdDisplay::OnAvatarReleased, LV_EVENT_RELEASED, this);
     lv_obj_add_event_cb(emoji_box_, &LcdDisplay::OnAvatarReleased, LV_EVENT_PRESS_LOST, this);
+    lv_obj_add_event_cb(emoji_box_, &LcdDisplay::OnAvatarLongPressed, LV_EVENT_LONG_PRESSED, this);
     lv_obj_add_event_cb(emoji_box_, &LcdDisplay::OnMicButtonClicked, LV_EVENT_CLICKED, this);
 
     emoji_label_ = lv_label_create(emoji_box_);
@@ -1233,21 +1243,43 @@ void LcdDisplay::SetChatMessage(const char* role, const char* content) {
     }
 }
 
+const lv_font_t* LcdDisplay::GetChatFont() {
+    auto lvgl_theme = static_cast<LvglTheme*>(current_theme_);
+    const lv_font_t* theme_font = lvgl_theme != nullptr && lvgl_theme->text_font() != nullptr
+                                      ? lvgl_theme->text_font()->font()
+                                      : nullptr;
+    if (chat_font_ == nullptr) {
+        void* data = nullptr;
+        size_t size = 0;
+        if (Assets::GetInstance().GetAssetData("font_chat_common_18_4.bin", data, size)) {
+            chat_font_ = new LvglCBinFont(data);
+            ESP_LOGI(TAG, "Chat font loaded: font_chat_common_18_4.bin (%u bytes)", (unsigned)size);
+        }
+    }
+    if (chat_font_ != nullptr && chat_font_->font() != nullptr) {
+        if (theme_font != nullptr) {
+            // Rare glyphs the 18px Common subset does not cover fall back to
+            // the 20px UI font.
+            chat_font_->SetFallback(theme_font);
+        }
+        return chat_font_->font();
+    }
+    return theme_font;
+}
+
 void LcdDisplay::RewrapMessage(size_t index) {
     if (index >= chat_messages_.size() || chat_area_ == nullptr) {
         return;
     }
-    auto lvgl_theme = static_cast<LvglTheme*>(current_theme_);
-    auto text_font = lvgl_theme->text_font();
-    if (text_font == nullptr || text_font->font() == nullptr) {
+    const lv_font_t* font = GetChatFont();
+    if (font == nullptr) {
         return;
     }
     const lv_coord_t width = lv_obj_get_width(chat_area_);
     if (width <= 0) {
         return;
     }
-    WrapChatText(chat_messages_[index].text, text_font->font(), width,
-                 chat_messages_[index].line_starts);
+    WrapChatText(chat_messages_[index].text, font, width, chat_messages_[index].line_starts);
 }
 
 void LcdDisplay::RewrapAllMessages() {
@@ -1384,10 +1416,17 @@ void LcdDisplay::ApplyChatLayout() {
     lv_obj_set_height(notification_label_, top_h);
     lv_obj_align(notification_label_, LV_ALIGN_CENTER, 0, 0);
 
+    const lv_font_t* chat_font = GetChatFont();
+    const lv_coord_t chat_line_h =
+        chat_font != nullptr ? chat_font->line_height : static_cast<lv_coord_t>(30);
+    const lv_coord_t chat_line_space = 4;
+    const lv_coord_t chat_pitch = chat_line_h + chat_line_space;
     const lv_coord_t chat_w = LV_HOR_RES - 2 * kChatSidePad;
-    const lv_coord_t chat_h = line_h * kChatLinesPerPage;
+    const lv_coord_t chat_h = (kChatLinesPerPage - 1) * chat_pitch + chat_line_h;
     const lv_coord_t avatar_y = top_h + kAvatarTopGap;
-    const lv_coord_t chat_y = avatar_y + kAvatarSize + kAvatarGap;
+    const lv_coord_t text_top = avatar_y + kAvatarSize + kAvatarGap;
+    const lv_coord_t text_space = LV_VER_RES - 10 - text_top;
+    const lv_coord_t chat_y = text_top + LV_MAX((text_space - chat_h) / 2, 0);
 
     lv_obj_set_size(emoji_box_, kAvatarSize, kAvatarSize);
     lv_obj_align(emoji_box_, LV_ALIGN_TOP_MID, 0, avatar_y);
@@ -1400,8 +1439,10 @@ void LcdDisplay::ApplyChatLayout() {
     lv_obj_set_pos(chat_area_, kChatSidePad, chat_y);
     lv_obj_set_size(chat_area_, chat_w, chat_h);
 
-    lv_obj_set_style_text_font(chat_message_label_, font, 0);
-    lv_obj_set_style_text_line_space(chat_message_label_, 0, 0);
+    if (chat_font != nullptr) {
+        lv_obj_set_style_text_font(chat_message_label_, chat_font, 0);
+    }
+    lv_obj_set_style_text_line_space(chat_message_label_, chat_line_space, 0);
     lv_obj_set_width(chat_message_label_, chat_w);
 
     RewrapAllMessages();
@@ -1471,26 +1512,25 @@ void LcdDisplay::OnAvatarReleased(lv_event_t* e) {
 
 void LcdDisplay::OnMicButtonClicked(lv_event_t* e) {
     auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
-    static constexpr int64_t kDoubleClickWindowUs = 400 * 1000;
-    const int64_t now = esp_timer_get_time();
-    const bool double_click = self != nullptr && self->last_avatar_click_us_ != 0 &&
-                              (now - self->last_avatar_click_us_) < kDoubleClickWindowUs;
-    if (self != nullptr) {
-        self->last_avatar_click_us_ = double_click ? 0 : now;
-    }
-    if (double_click) {
-        // Double click = new session: drop the server session and the history.
-        Application::GetInstance().Schedule([]() { Application::GetInstance().StartNewSession(); });
-        if (self != nullptr) {
-            self->ShowNotification("新会话", 1200);
-        }
-        return;
-    }
     if (self != nullptr && !self->chat_pages_.empty()) {
         // Continue the conversation from the live page.
         self->GoToPage(static_cast<int>(self->chat_pages_.size()) - 1, false);
     }
     Application::GetInstance().ToggleChatState();
+}
+
+void LcdDisplay::OnAvatarLongPressed(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self == nullptr) {
+        return;
+    }
+    self->HidePressRing();
+    // Swallow the CLICKED event that LVGL still sends on release.
+    if (lv_indev_t* indev = lv_indev_active(); indev != nullptr) {
+        lv_indev_wait_release(indev);
+    }
+    // Clearing the screen is the feedback: a new session has started.
+    Application::GetInstance().Schedule([]() { Application::GetInstance().StartNewSession(); });
 }
 
 void LcdDisplay::ClearChatMessages() {

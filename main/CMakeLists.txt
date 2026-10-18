@@ -874,6 +874,8 @@ elseif(CONFIG_BOARD_TYPE_Freenove_ESP32S3_DISPLAY_2_8_LCD)
     set(BUILTIN_TEXT_FONT font_noto_sans_basic_20_4)
     set(BUILTIN_ICON_FONT font_material_symbols_20_4)
     set(DEFAULT_EMOJI_COLLECTION noto-color-emoji_64)
+    # Extra 18px chat font loaded from the assets partition (paged caption).
+    set(DEFAULT_ASSETS_EXTRA_FILES "${CMAKE_CURRENT_LIST_DIR}/assets/chat-font")
 elseif(CONFIG_BOARD_TYPE_AI_VOX3)
     set(BOARD_DIR "nulllab-ai-vox-v3")
     set(BUILTIN_TEXT_FONT font_noto_sans_basic_20_4)

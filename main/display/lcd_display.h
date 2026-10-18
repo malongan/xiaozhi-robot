@@ -15,6 +15,8 @@
 
 #define PREVIEW_IMAGE_DURATION_MS 5000
 
+class LvglCBinFont;
+
 class LcdDisplay : public LvglDisplay {
 protected:
     esp_lcd_panel_io_handle_t panel_io_ = nullptr;
@@ -55,9 +57,10 @@ protected:
     bool follow_latest_ = true;
     lv_obj_t* chat_area_ = nullptr;
     lv_obj_t* page_progress_ = nullptr;  // faint press ring around the avatar
-    int64_t last_avatar_click_us_ = 0;   // double-click detection for new session
+    LvglCBinFont* chat_font_ = nullptr;  // 18px Common font loaded from the assets partition
 
     void ApplyChatLayout();
+    const lv_font_t* GetChatFont();
     void RewrapMessage(size_t index);
     void RewrapAllMessages();
     void RebuildChatPages();
@@ -71,6 +74,7 @@ protected:
     static void OnChatAreaClicked(lv_event_t* e);
     static void OnAvatarPressed(lv_event_t* e);
     static void OnAvatarReleased(lv_event_t* e);
+    static void OnAvatarLongPressed(lv_event_t* e);
     static void OnMicButtonClicked(lv_event_t* e);
 
     void InitializeLcdThemes();
