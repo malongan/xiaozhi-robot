@@ -7,7 +7,6 @@
 #include <esp_lcd_panel_io.h>
 #include <esp_lcd_panel_ops.h>
 #include <atomic>
-#include <deque>
 #include <memory>
 #include <string>
 
@@ -37,34 +36,14 @@ protected:
     std::unique_ptr<LvglImage> preview_image_cached_ = nullptr;
     bool hide_subtitle_ = false;  // Control whether to hide chat messages/subtitles
 
-    // Persistent chat history (default message style only)
-    struct ChatMessage {
-        std::string role;
-        std::string text;
-        lv_obj_t* container = nullptr;
-        lv_obj_t* label = nullptr;
-    };
-    std::deque<ChatMessage> chat_messages_;
-    lv_obj_t* latest_button_ = nullptr;
-    lv_obj_t* latest_icon_ = nullptr;
-    lv_obj_t* latest_label_ = nullptr;
-    lv_obj_t* new_session_button_ = nullptr;
-    lv_obj_t* mic_button_ = nullptr;
-    lv_obj_t* new_session_confirm_ = nullptr;
-    bool auto_follow_ = true;
+    // Default message style: one fixed-size viewport that shows the tail of the
+    // latest message. No history, no pagination, no user scrolling.
+    lv_obj_t* chat_area_ = nullptr;
 
-    lv_obj_t* CreateChatMessageBlock(const std::string& role, const std::string& text);
-    void ScrollToLatest(bool animated);
-    void UpdateAutoFollowFromScroll();
-    void ShowNewSessionConfirm();
+    void ApplyChatLayout();
+    void UpdateChatTextOverflow();
 
-    static void OnContentScrolled(lv_event_t* e);
-    static void OnLatestButtonClicked(lv_event_t* e);
     static void OnMicButtonClicked(lv_event_t* e);
-    static void OnNewSessionButtonClicked(lv_event_t* e);
-    static void OnNewSessionConfirmClicked(lv_event_t* e);
-    static void OnNewSessionCancelClicked(lv_event_t* e);
-    static void OnNewSessionOverlayDeleted(lv_event_t* e);
 
     void InitializeLcdThemes();
     virtual bool Lock(int timeout_ms = 0) override;
