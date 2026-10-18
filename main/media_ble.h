@@ -59,6 +59,8 @@ private:
     volatile bool connected_ = false;
     uint16_t conn_handle_ = 0xFFFF;
     uint16_t report_val_handle_ = 0;
+    uint16_t subscribed_handle_ = 0;
+    bool subscribed_notify_ = false;
     StatusCallback status_callback_;
 };
 

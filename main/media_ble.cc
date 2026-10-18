@@ -309,7 +309,7 @@ void MediaBle::OnSync() {
         ESP_LOGE(TAG, "report characteristic not found");
     }
     self.StartAdvertising();
-    ESP_LOGI(TAG, "host synced, advertise");
+    ESP_LOGI(TAG, "host synced, advertise, report val handle=%d", self.report_val_handle_);
 }
 
 void MediaBle::StartAdvertising() {
@@ -397,8 +397,11 @@ int MediaBle::GapEvent(struct ble_gap_event* event, void*) {
             ESP_LOGI(TAG, "encryption change, status=%d", event->enc_change.status);
             return 0;
         case BLE_GAP_EVENT_SUBSCRIBE:
-            ESP_LOGI(TAG, "subscribe, handle=%d notify=%d", event->subscribe.attr_handle,
-                     event->subscribe.cur_notify);
+            self.subscribed_handle_ = event->subscribe.attr_handle;
+            self.subscribed_notify_ = event->subscribe.cur_notify != 0;
+            ESP_LOGI(TAG, "subscribe, cccd_handle=%d notify=%d report_val_handle=%d",
+                     event->subscribe.attr_handle, event->subscribe.cur_notify,
+                     self.report_val_handle_);
             return 0;
         default:
             return 0;
@@ -456,15 +459,21 @@ bool MediaBle::SendKey(MediaBleKey key) {
         return false;
     }
     const uint8_t bit = static_cast<uint8_t>(1u << static_cast<uint8_t>(key));
-    auto notify = [this](uint8_t value) {
+    int rc = 0;
+    auto notify = [this, &rc](uint8_t value) {
         g_report_value = value;
         struct os_mbuf* om = ble_hs_mbuf_from_flat(&value, 1);
-        if (om != nullptr) {
-            ble_gatts_notify_custom(conn_handle_, report_val_handle_, om);
+        if (om == nullptr) {
+            rc = BLE_HS_ENOMEM;
+            return;
         }
+        rc = ble_gatts_notify_custom(conn_handle_, report_val_handle_, om);
     };
     notify(bit);
     vTaskDelay(pdMS_TO_TICKS(20));
     notify(0);
+    ESP_LOGI(TAG, "send key %d bit=0x%02X val_handle=%d cccd=%d notify_on=%d rc=%d",
+             static_cast<int>(key), bit, report_val_handle_, subscribed_handle_, subscribed_notify_,
+             rc);
     return true;
 }
