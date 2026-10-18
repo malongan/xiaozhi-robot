@@ -35,6 +35,13 @@ private:
     std::string name_;
 };
 
+enum AvatarMood {
+    kAvatarMoodIdle = 0,
+    kAvatarMoodListening,
+    kAvatarMoodSpeaking,
+    kAvatarMoodThinking,
+};
+
 class Display {
 public:
     Display();
@@ -44,6 +51,8 @@ public:
     virtual void ShowNotification(const char* notification, int duration_ms = 3000);
     virtual void ShowNotification(const std::string& notification, int duration_ms = 3000);
     virtual void SetEmotion(const char* emotion);
+    // Drives the idle/active animation of the avatar (breathing, bounce...).
+    virtual void SetAvatarMood(AvatarMood mood) { (void)mood; }
     virtual void SetChatMessage(const char* role, const char* content);
     virtual void ClearChatMessages();
     // Whether this display keeps chat history across idle/notification events.

@@ -16,6 +16,7 @@
 #include <noto_emoji.h>
 #include <src/misc/cache/lv_cache.h>
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 #include <mutex>
 #include <vector>
@@ -337,6 +338,11 @@ LcdDisplay::~LcdDisplay() {
     if (preview_timer_ != nullptr) {
         esp_timer_stop(preview_timer_);
         esp_timer_delete(preview_timer_);
+    }
+
+    if (avatar_anim_timer_ != nullptr) {
+        lv_timer_delete(avatar_anim_timer_);
+        avatar_anim_timer_ = nullptr;
     }
 
     if (preview_image_ != nullptr) {
@@ -857,7 +863,7 @@ void LcdDisplay::ClearChatMessages() {
 #else
 namespace {
 
-constexpr int kChatLinesPerPage = 5;
+constexpr int kChatLinesPerPage = 6;
 constexpr size_t kMaxChatMessages = 40;
 constexpr size_t kMaxChatTextBytes = 1000;
 constexpr lv_coord_t kChatSidePad = 8;
@@ -1065,6 +1071,8 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_bg_opa(emoji_box_, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(emoji_box_, 0, 0);
     lv_obj_set_style_pad_all(emoji_box_, 0, 0);
+    lv_obj_set_style_transform_pivot_x(emoji_box_, lv_pct(50), 0);
+    lv_obj_set_style_transform_pivot_y(emoji_box_, lv_pct(50), 0);
     lv_obj_set_style_clip_corner(emoji_box_, true, 0);
     lv_obj_remove_flag(emoji_box_, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_scrollbar_mode(emoji_box_, LV_SCROLLBAR_MODE_OFF);
@@ -1146,6 +1154,11 @@ void LcdDisplay::SetupUI() {
     lv_obj_add_flag(low_battery_popup_, LV_OBJ_FLAG_HIDDEN);
 
     ApplyChatLayout();
+
+    // 25 fps avatar animation: breathing, blink and state-driven motion.
+    avatar_anim_epoch_ = lv_tick_get();
+    avatar_blink_at_ = avatar_anim_epoch_ + 2600;
+    avatar_anim_timer_ = lv_timer_create(&LcdDisplay::AvatarAnimTimerCb, 40, this);
 }
 
 void LcdDisplay::SetPreviewImage(std::unique_ptr<LvglImage> image) {
@@ -1546,6 +1559,82 @@ void LcdDisplay::ClearChatMessages() {
     ESP_LOGI(TAG, "Chat history cleared (new session)");
 }
 #endif
+
+void LcdDisplay::SetAvatarMood(AvatarMood mood) {
+    DisplayLockGuard lock(this);
+    if (avatar_mood_ == mood) {
+        return;
+    }
+    avatar_mood_ = mood;
+    avatar_anim_epoch_ = lv_tick_get();
+    avatar_blink_at_ = avatar_anim_epoch_ + 2600 + (esp_random() % 3500);
+    avatar_blink_start_ = 0;
+}
+
+void LcdDisplay::AvatarAnimTimerCb(lv_timer_t* timer) {
+    auto* self = static_cast<LcdDisplay*>(lv_timer_get_user_data(timer));
+    if (self == nullptr || self->emoji_box_ == nullptr) {
+        return;
+    }
+    // The preview image temporarily hides the avatar; skip while hidden.
+    if (lv_obj_has_flag(self->emoji_box_, LV_OBJ_FLAG_HIDDEN)) {
+        return;
+    }
+
+    constexpr float kPi = 3.14159265f;
+    const uint32_t now = lv_tick_get();
+    const float t = (now - self->avatar_anim_epoch_) / 1000.0f;
+
+    lv_coord_t breath = 0;
+    lv_coord_t translate_y = 0;
+    int32_t rotation = 0;
+    switch (self->avatar_mood_) {
+        case kAvatarMoodListening:
+            // Attentive: faster, slightly deeper breathing.
+            breath = static_cast<lv_coord_t>(10.0f * sinf(t * 2 * kPi / 2.4f));
+            break;
+        case kAvatarMoodSpeaking:
+            // Talking: gentle bob plus a light breath.
+            breath = static_cast<lv_coord_t>(5.0f * sinf(t * 2 * kPi / 1.2f));
+            translate_y = -static_cast<lv_coord_t>(fabsf(sinf(t * 2 * kPi / 0.6f)) * 2.0f);
+            break;
+        case kAvatarMoodThinking:
+            // Waiting for the reply: slow rotation with a calm breath.
+            rotation = static_cast<int32_t>(45.0f * sinf(t * 2 * kPi / 3.0f));
+            breath = static_cast<lv_coord_t>(4.0f * sinf(t * 2 * kPi / 3.0f + 1.2f));
+            break;
+        case kAvatarMoodIdle:
+        default:
+            // Idle: slow, subtle breathing.
+            breath = static_cast<lv_coord_t>(8.0f * sinf(t * 2 * kPi / 4.0f));
+            break;
+    }
+
+    lv_coord_t scale_x = 256 + breath;
+    lv_coord_t scale_y = 256 + breath;
+
+    // Blink: squash the avatar vertically for ~140 ms every few seconds.
+    if (self->avatar_blink_start_ == 0 && now >= self->avatar_blink_at_) {
+        self->avatar_blink_start_ = now;
+    }
+    if (self->avatar_blink_start_ != 0) {
+        constexpr uint32_t kBlinkDurationMs = 140;
+        const uint32_t elapsed = now - self->avatar_blink_start_;
+        if (elapsed >= kBlinkDurationMs) {
+            self->avatar_blink_start_ = 0;
+            self->avatar_blink_at_ = now + 2600 + (esp_random() % 3500);
+        } else {
+            const float progress = static_cast<float>(elapsed) / kBlinkDurationMs;
+            const float envelope = progress < 0.5f ? progress * 2.0f : (1.0f - progress) * 2.0f;
+            scale_y = static_cast<lv_coord_t>(scale_y * (1.0f - 0.75f * envelope));
+        }
+    }
+
+    lv_obj_set_style_transform_scale_x(self->emoji_box_, scale_x, 0);
+    lv_obj_set_style_transform_scale_y(self->emoji_box_, scale_y, 0);
+    lv_obj_set_style_translate_y(self->emoji_box_, translate_y, 0);
+    lv_obj_set_style_transform_rotation(self->emoji_box_, rotation, 0);
+}
 
 void LcdDisplay::SetEmotion(const char* emotion) {
     if (!setup_ui_called_) {

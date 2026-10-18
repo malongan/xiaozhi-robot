@@ -59,8 +59,16 @@ protected:
     lv_obj_t* page_progress_ = nullptr;  // faint press ring around the avatar
     LvglCBinFont* chat_font_ = nullptr;  // 18px Common font loaded from the assets partition
 
+    // Procedural avatar animation (breathing, blink, state motion).
+    lv_timer_t* avatar_anim_timer_ = nullptr;
+    AvatarMood avatar_mood_ = kAvatarMoodIdle;
+    uint32_t avatar_anim_epoch_ = 0;
+    uint32_t avatar_blink_at_ = 0;
+    uint32_t avatar_blink_start_ = 0;
+
     void ApplyChatLayout();
     const lv_font_t* GetChatFont();
+    static void AvatarAnimTimerCb(lv_timer_t* timer);
     void RewrapMessage(size_t index);
     void RewrapAllMessages();
     void RebuildChatPages();
@@ -89,6 +97,7 @@ protected:
 public:
     ~LcdDisplay();
     virtual void SetEmotion(const char* emotion) override;
+    virtual void SetAvatarMood(AvatarMood mood) override;
     virtual void SetChatMessage(const char* role, const char* content) override;
     virtual void ClearChatMessages() override;
     virtual bool KeepsChatHistory() const override { return true; }
