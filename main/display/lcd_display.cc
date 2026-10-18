@@ -1510,7 +1510,6 @@ void LcdDisplay::SetupUI() {
     });
     MediaBle::GetInstance().Start();
 
-    xTaskCreate(&LcdDisplay::SleepSoundTask, "sleep_snd", 4096, this, 2, &sleep_sound_task_);
 
     // 25 fps avatar animation: breathing, blink and state-driven motion.
     avatar_anim_epoch_ = lv_tick_get();
@@ -1954,40 +1953,6 @@ void LcdDisplay::ClearChatMessages() {
 }
 #endif
 
-void LcdDisplay::SleepSoundTask(void* arg) {
-    auto* self = static_cast<LcdDisplay*>(arg);
-    std::vector<int16_t> buffer;
-    while (true) {
-        if (self->avatar_sleeping_) {
-            auto* codec = Application::GetInstance().GetAudioService().GetCodec();
-            if (codec != nullptr) {
-                const int rate = codec->output_sample_rate();
-                if (buffer.empty()) {
-                    buffer.resize(static_cast<size_t>(rate * 50 / 100));  // 500 ms breath
-                }
-                for (size_t i = 0; i < buffer.size(); ++i) {
-                    const float phase = 2.0f * 3.14159265f * 210.0f *
-                                        static_cast<float>(i) / static_cast<float>(rate);
-                    const float envelope = sinf(3.14159265f * static_cast<float>(i) /
-                                                static_cast<float>(buffer.size()));
-                    buffer[i] = static_cast<int16_t>(sinf(phase) * envelope * 4000.0f);
-                }
-                const int previous_volume = codec->output_volume();
-                codec->SetOutputVolume(85);
-                codec->EnableOutput(true);
-                vTaskDelay(pdMS_TO_TICKS(30));
-                ESP_LOGI("SleepSound", "playing breath (rate=%d)", rate);
-                codec->OutputData(buffer);
-                codec->EnableOutput(false);
-                codec->SetOutputVolume(previous_volume);
-            }
-            vTaskDelay(pdMS_TO_TICKS(4000));
-        } else {
-            vTaskDelay(pdMS_TO_TICKS(400));
-        }
-    }
-}
-
 void LcdDisplay::MarkUserActivity() {
     last_activity_tick_ = lv_tick_get();
     if (avatar_sleeping_) {
@@ -2062,9 +2027,27 @@ void LcdDisplay::AvatarAnimTimerCb(lv_timer_t* timer) {
         expression = self->avatar_override_;
     }
 
+    constexpr uint32_t kIdleBeforeSleepMs = 20 * 60 * 1000;   // 20 min idle -> doze
+    constexpr uint32_t kSleepDurationMs = 5 * 60 * 1000;      // 5 min doze -> wake
     const uint32_t idle_ms = now - self->last_activity_tick_;
-    const bool sleeping = self->avatar_mood_ == kAvatarMoodIdle && idle_ms > 120000 &&
-                          self->avatar_override_ == kAvatarExpressionNone;
+    bool sleeping = self->avatar_sleeping_;
+    if (sleeping) {
+        if (now - self->sleep_start_tick_ >= kSleepDurationMs) {
+            // Pomodoro-like cue: wake up with a short happy face and restart the
+            // idle timer, so the next doze starts after another 20 minutes.
+            self->MarkUserActivity();
+            self->avatar_sleeping_ = false;
+            self->avatar_override_ = kAvatarExpressionHappy;
+            self->avatar_override_until_ = now + 2500;
+            sleeping = false;
+            ESP_LOGI("Avatar", "sleep cycle finished, back to idle");
+        }
+    } else if (self->avatar_mood_ == kAvatarMoodIdle && idle_ms > kIdleBeforeSleepMs &&
+               self->avatar_override_ == kAvatarExpressionNone) {
+        sleeping = true;
+        self->sleep_start_tick_ = now;
+        ESP_LOGI("Avatar", "idle for 20 minutes, doze off for 5 minutes");
+    }
     if (sleeping) {
         expression = kAvatarExpressionClosed;
     }

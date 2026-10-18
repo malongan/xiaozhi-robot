@@ -78,6 +78,7 @@ protected:
     float avatar_face_scale_ = 1.0f;  // 1.0 = 80px, 1.875 = 150px idle face
     uint32_t last_activity_tick_ = 0;
     bool avatar_sleeping_ = false;
+    uint32_t sleep_start_tick_ = 0;
     lv_obj_t* sleep_zzz_ = nullptr;
     lv_obj_t* media_hint_ = nullptr;
     lv_obj_t* media_bt_icon_ = nullptr;
@@ -103,7 +104,6 @@ protected:
     lv_obj_t* avatar_eye_happy_left_ = nullptr;
     lv_obj_t* avatar_eye_happy_right_ = nullptr;
     lv_obj_t* avatar_think_dots_ = nullptr;
-    TaskHandle_t sleep_sound_task_ = nullptr;
     AvatarExpression avatar_override_ = kAvatarExpressionNone;
     uint32_t avatar_override_until_ = 0;
 
@@ -139,7 +139,6 @@ protected:
     void ApplyChatLayout();
     const lv_font_t* GetChatFont();
     static void AvatarAnimTimerCb(lv_timer_t* timer);
-    static void SleepSoundTask(void* arg);
     void SetAvatarEmotion(const char* emotion);
     void PickAvatarGaze();
     void RewrapMessage(size_t index);
