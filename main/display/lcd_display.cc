@@ -1528,6 +1528,20 @@ void LcdDisplay::SetupUI() {
     lv_label_set_text(bt_title_, "已配对设备");
     lv_obj_align(bt_title_, LV_ALIGN_TOP_MID, 0, 10);
 
+    lv_obj_t* bt_clear = lv_button_create(bluetooth_screen_);
+    lv_obj_set_size(bt_clear, 62, 34);
+    lv_obj_align(bt_clear, LV_ALIGN_TOP_RIGHT, -4, 4);
+    lv_obj_set_style_radius(bt_clear, 6, 0);
+    lv_obj_set_style_bg_opa(bt_clear, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(bt_clear, 1, 0);
+    lv_obj_set_style_border_color(bt_clear, lvgl_theme->text_color(), 0);
+    lv_obj_set_style_shadow_width(bt_clear, 0, 0);
+    lv_obj_set_style_pad_all(bt_clear, 0, 0);
+    lv_obj_add_event_cb(bt_clear, &LcdDisplay::OnBtClearAllClicked, LV_EVENT_CLICKED, this);
+    bt_clear_label_ = lv_label_create(bt_clear);
+    lv_label_set_text(bt_clear_label_, "清空");
+    lv_obj_center(bt_clear_label_);
+
     bt_status_ = lv_label_create(bluetooth_screen_);
     lv_obj_set_style_text_font(bt_status_, text_font, 0);
     lv_obj_set_style_text_color(bt_status_, lvgl_theme->text_color(), 0);
@@ -2718,6 +2732,15 @@ void LcdDisplay::OnBtDisconnectClicked(lv_event_t* e) {
         return;
     }
     MediaBle::GetInstance().Disconnect();
+    self->RefreshBluetoothList();
+}
+
+void LcdDisplay::OnBtClearAllClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self == nullptr) {
+        return;
+    }
+    MediaBle::GetInstance().UnpairAll();
     self->RefreshBluetoothList();
 }
 

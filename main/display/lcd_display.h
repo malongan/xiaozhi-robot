@@ -89,6 +89,7 @@ protected:
     lv_obj_t* bt_forget_buttons_[8] = {};
     lv_obj_t* bt_disconnect_btn_ = nullptr;
     lv_obj_t* bt_disconnect_label_ = nullptr;
+    lv_obj_t* bt_clear_label_ = nullptr;
     lv_obj_t* page_progress_ = nullptr;  // faint press ring around the avatar
     LvglCBinFont* chat_font_ = nullptr;  // 18px Common font loaded from the assets partition
 
@@ -164,6 +165,7 @@ protected:
     static void OnBluetoothEntryClicked(lv_event_t* e);
     static void OnBluetoothBackClicked(lv_event_t* e);
     static void OnBtForgetClicked(lv_event_t* e);
+    static void OnBtClearAllClicked(lv_event_t* e);
     static void OnBtDisconnectClicked(lv_event_t* e);
     void RefreshBluetoothList();
     void ShowMediaScreen(bool show);

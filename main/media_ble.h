@@ -42,6 +42,7 @@ public:
     // Bonded peers, newest first.
     int GetBondedPeers(MediaBlePeer* peers, int max_peers);
     bool Unpair(const MediaBlePeer& peer);
+    int UnpairAll();
     bool GetConnectedPeer(MediaBlePeer* peer);
     bool Disconnect();
 

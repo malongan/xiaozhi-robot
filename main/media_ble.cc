@@ -426,6 +426,22 @@ bool MediaBle::Unpair(const MediaBlePeer& peer) {
     return ble_gap_unpair(&addr) == 0;
 }
 
+int MediaBle::UnpairAll() {
+    ble_addr_t addrs[CONFIG_BT_NIMBLE_MAX_BONDS] = {};
+    int count = 0;
+    if (ble_store_util_bonded_peers(addrs, &count, CONFIG_BT_NIMBLE_MAX_BONDS) != 0) {
+        return 0;
+    }
+    int removed = 0;
+    for (int i = 0; i < count; ++i) {
+        if (ble_gap_unpair(&addrs[i]) == 0) {
+            ++removed;
+        }
+    }
+    ESP_LOGI(TAG, "unpair all: removed %d bond(s)", removed);
+    return removed;
+}
+
 bool MediaBle::GetConnectedPeer(MediaBlePeer* peer) {
     if (!connected_ || conn_handle_ == 0xFFFF || peer == nullptr) {
         return false;
