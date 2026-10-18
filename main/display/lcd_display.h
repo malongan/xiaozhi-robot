@@ -148,7 +148,6 @@ protected:
     static void OnMediaBarClicked(lv_event_t* e);
     static void OnMediaBackClicked(lv_event_t* e);
     static void OnMediaKeyClicked(lv_event_t* e);
-    static void OnAiTalkClicked(lv_event_t* e);
     static void MediaFeedbackTimerCb(lv_timer_t* timer);
     void ShowMediaFeedback(const char* text);
     static void MediaRepeatTimerCb(lv_timer_t* timer);

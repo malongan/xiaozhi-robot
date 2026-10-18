@@ -1317,20 +1317,6 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_shadow_width(bt_entry, 0, 0);
     lv_obj_set_style_pad_all(bt_entry, 0, 0);
     lv_obj_add_event_cb(bt_entry, &LcdDisplay::OnBluetoothEntryClicked, LV_EVENT_CLICKED, this);
-    lv_obj_t* ai_entry = lv_button_create(media_screen_);
-    lv_obj_set_size(ai_entry, 44, 36);
-    lv_obj_align(ai_entry, LV_ALIGN_TOP_RIGHT, -52, 2);
-    lv_obj_set_style_bg_opa(ai_entry, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(ai_entry, 0, 0);
-    lv_obj_set_style_shadow_width(ai_entry, 0, 0);
-    lv_obj_set_style_pad_all(ai_entry, 0, 0);
-    lv_obj_add_event_cb(ai_entry, &LcdDisplay::OnAiTalkClicked, LV_EVENT_CLICKED, this);
-    lv_obj_t* ai_icon = lv_label_create(ai_entry);
-    lv_obj_set_style_text_font(ai_icon, icon_font, 0);
-    lv_obj_set_style_text_color(ai_icon, lvgl_theme->text_color(), 0);
-    lv_label_set_text(ai_icon, MATERIAL_SYMBOLS_MIC);
-    lv_obj_center(ai_icon);
-
     media_bt_icon_ = lv_label_create(bt_entry);
     lv_obj_set_style_text_font(media_bt_icon_, icon_font, 0);
     lv_obj_set_style_text_color(media_bt_icon_, lv_color_hex(0x777777), 0);
@@ -2429,15 +2415,6 @@ void LcdDisplay::HandleMediaKeyUp() {
     if (media_repeat_timer_ != nullptr) {
         lv_timer_pause(media_repeat_timer_);
     }
-}
-
-void LcdDisplay::OnAiTalkClicked(lv_event_t* e) {
-    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
-    if (self == nullptr) {
-        return;
-    }
-    self->ShowMediaFeedback("AI 对话");
-    Application::GetInstance().ToggleChatState();
 }
 
 void LcdDisplay::OnMediaKeyClicked(lv_event_t* e) {
