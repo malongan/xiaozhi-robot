@@ -860,7 +860,6 @@ namespace {
 constexpr int kChatLinesPerPage = 5;
 constexpr size_t kMaxChatMessages = 40;
 constexpr size_t kMaxChatTextBytes = 1000;
-constexpr uint16_t kAvatarLongPressMs = 3000;
 constexpr lv_coord_t kChatSidePad = 8;
 constexpr lv_coord_t kAvatarSize = 64;
 constexpr lv_coord_t kAvatarTopGap = 7;
@@ -994,14 +993,6 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_scrollbar_mode(screen, LV_SCROLLBAR_MODE_OFF);
     ESP_LOGI(TAG, "Layout canvas: %dx%d", (int)LV_HOR_RES, (int)LV_VER_RES);
 
-    /* Avatar long-press (new session) needs 3 seconds instead of the LVGL default. */
-    for (lv_indev_t* indev = lv_indev_get_next(nullptr); indev != nullptr;
-         indev = lv_indev_get_next(indev)) {
-        if (lv_indev_get_type(indev) == LV_INDEV_TYPE_POINTER) {
-            lv_indev_set_long_press_time(indev, kAvatarLongPressMs);
-        }
-    }
-
     /* Container - used as background */
     container_ = lv_obj_create(screen);
     lv_obj_set_style_radius(container_, 0, 0);
@@ -1062,9 +1053,8 @@ void LcdDisplay::SetupUI() {
        session (history is cleared) */
     emoji_box_ = lv_obj_create(screen);
     lv_obj_set_style_radius(emoji_box_, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_bg_color(emoji_box_, lvgl_theme->chat_background_color(), 0);
-    lv_obj_set_style_border_width(emoji_box_, 1, 0);
-    lv_obj_set_style_border_color(emoji_box_, lvgl_theme->border_color(), 0);
+    lv_obj_set_style_bg_opa(emoji_box_, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(emoji_box_, 0, 0);
     lv_obj_set_style_pad_all(emoji_box_, 0, 0);
     lv_obj_set_style_clip_corner(emoji_box_, true, 0);
     lv_obj_remove_flag(emoji_box_, LV_OBJ_FLAG_SCROLLABLE);
@@ -1074,7 +1064,6 @@ void LcdDisplay::SetupUI() {
     lv_obj_add_event_cb(emoji_box_, &LcdDisplay::OnAvatarPressed, LV_EVENT_PRESSED, this);
     lv_obj_add_event_cb(emoji_box_, &LcdDisplay::OnAvatarReleased, LV_EVENT_RELEASED, this);
     lv_obj_add_event_cb(emoji_box_, &LcdDisplay::OnAvatarReleased, LV_EVENT_PRESS_LOST, this);
-    lv_obj_add_event_cb(emoji_box_, &LcdDisplay::OnAvatarLongPressed, LV_EVENT_LONG_PRESSED, this);
     lv_obj_add_event_cb(emoji_box_, &LcdDisplay::OnMicButtonClicked, LV_EVENT_CLICKED, this);
 
     emoji_label_ = lv_label_create(emoji_box_);
@@ -1096,10 +1085,11 @@ void LcdDisplay::SetupUI() {
     lv_obj_remove_flag(page_progress_, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_style_bg_opa(page_progress_, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(page_progress_, 0, 0);
-    lv_obj_set_style_arc_width(page_progress_, 4, LV_PART_MAIN);
+    lv_obj_set_style_arc_width(page_progress_, 2, LV_PART_MAIN);
+    lv_obj_set_style_arc_opa(page_progress_, LV_OPA_40, LV_PART_MAIN);
     lv_obj_set_style_arc_color(page_progress_, lvgl_theme->border_color(), LV_PART_MAIN);
-    lv_obj_set_style_arc_width(page_progress_, 4, LV_PART_INDICATOR);
-    lv_obj_set_style_arc_color(page_progress_, lvgl_theme->text_color(), LV_PART_INDICATOR);
+    lv_obj_set_style_arc_width(page_progress_, 2, LV_PART_INDICATOR);
+    lv_obj_set_style_arc_opa(page_progress_, LV_OPA_TRANSP, LV_PART_INDICATOR);
     lv_obj_set_style_bg_opa(page_progress_, LV_OPA_TRANSP, LV_PART_KNOB);
     lv_obj_set_style_border_width(page_progress_, 0, LV_PART_KNOB);
     lv_arc_set_range(page_progress_, 0, 100);
@@ -1429,30 +1419,19 @@ void LcdDisplay::ApplyChatLayout() {
     }
 }
 
-void LcdDisplay::StartLongPressRing() {
+void LcdDisplay::ShowPressRing() {
     if (page_progress_ == nullptr) {
         return;
     }
-    lv_obj_remove_flag(page_progress_, LV_OBJ_FLAG_HIDDEN);
     lv_arc_set_value(page_progress_, 0);
-    lv_anim_t anim;
-    lv_anim_init(&anim);
-    lv_anim_set_var(&anim, page_progress_);
-    lv_anim_set_values(&anim, 0, 100);
-    lv_anim_set_duration(&anim, kAvatarLongPressMs);
-    lv_anim_set_exec_cb(&anim, [](void* var, int32_t value) {
-        lv_arc_set_value(static_cast<lv_obj_t*>(var), value);
-    });
-    lv_anim_start(&anim);
+    lv_obj_remove_flag(page_progress_, LV_OBJ_FLAG_HIDDEN);
 }
 
-void LcdDisplay::StopLongPressRing() {
+void LcdDisplay::HidePressRing() {
     if (page_progress_ == nullptr) {
         return;
     }
-    lv_anim_delete(page_progress_, nullptr);
     lv_obj_add_flag(page_progress_, LV_OBJ_FLAG_HIDDEN);
-    lv_arc_set_value(page_progress_, 0);
 }
 
 void LcdDisplay::OnChatAreaClicked(lv_event_t* e) {
@@ -1470,42 +1449,43 @@ void LcdDisplay::OnChatAreaClicked(lv_event_t* e) {
     lv_obj_get_coords(self->chat_area_, &area);
     const lv_coord_t middle = (area.x1 + area.x2) / 2;
     if (point.x < middle) {
-        self->GoToPage(self->page_index_ - 1, true);
-    } else {
         self->GoToPage(self->page_index_ + 1, true);
+    } else {
+        self->GoToPage(self->page_index_ - 1, true);
     }
 }
 
 void LcdDisplay::OnAvatarPressed(lv_event_t* e) {
     auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
     if (self != nullptr) {
-        self->StartLongPressRing();
+        self->ShowPressRing();
     }
 }
 
 void LcdDisplay::OnAvatarReleased(lv_event_t* e) {
     auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
     if (self != nullptr) {
-        self->StopLongPressRing();
+        self->HidePressRing();
     }
-}
-
-void LcdDisplay::OnAvatarLongPressed(lv_event_t* e) {
-    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
-    if (self == nullptr) {
-        return;
-    }
-    self->StopLongPressRing();
-    // Swallow the CLICKED event that LVGL still sends on release.
-    if (lv_indev_t* indev = lv_indev_active(); indev != nullptr) {
-        lv_indev_wait_release(indev);
-    }
-    Application::GetInstance().Schedule([]() { Application::GetInstance().StartNewSession(); });
-    self->ShowNotification("新会话", 1200);
 }
 
 void LcdDisplay::OnMicButtonClicked(lv_event_t* e) {
     auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    static constexpr int64_t kDoubleClickWindowUs = 400 * 1000;
+    const int64_t now = esp_timer_get_time();
+    const bool double_click = self != nullptr && self->last_avatar_click_us_ != 0 &&
+                              (now - self->last_avatar_click_us_) < kDoubleClickWindowUs;
+    if (self != nullptr) {
+        self->last_avatar_click_us_ = double_click ? 0 : now;
+    }
+    if (double_click) {
+        // Double click = new session: drop the server session and the history.
+        Application::GetInstance().Schedule([]() { Application::GetInstance().StartNewSession(); });
+        if (self != nullptr) {
+            self->ShowNotification("新会话", 1200);
+        }
+        return;
+    }
     if (self != nullptr && !self->chat_pages_.empty()) {
         // Continue the conversation from the live page.
         self->GoToPage(static_cast<int>(self->chat_pages_.size()) - 1, false);
@@ -1515,7 +1495,7 @@ void LcdDisplay::OnMicButtonClicked(lv_event_t* e) {
 
 void LcdDisplay::ClearChatMessages() {
     DisplayLockGuard lock(this);
-    StopLongPressRing();
+    HidePressRing();
     chat_messages_.clear();
     chat_pages_.clear();
     page_index_ = -1;
@@ -1762,7 +1742,8 @@ void LcdDisplay::SetTheme(Theme* theme) {
     }
     if (page_progress_ != nullptr) {
         lv_obj_set_style_arc_color(page_progress_, lvgl_theme->border_color(), LV_PART_MAIN);
-        lv_obj_set_style_arc_color(page_progress_, lvgl_theme->text_color(), LV_PART_INDICATOR);
+        lv_obj_set_style_arc_opa(page_progress_, LV_OPA_40, LV_PART_MAIN);
+        lv_obj_set_style_arc_opa(page_progress_, LV_OPA_TRANSP, LV_PART_INDICATOR);
     }
     if (bottom_bar_ != nullptr) {
         lv_obj_set_style_bg_opa(bottom_bar_, LV_OPA_50, 0);

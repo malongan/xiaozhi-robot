@@ -45,6 +45,31 @@ Application::Application() : notify_player_(audio_service_) {
                                                 .name = "clock_timer",
                                                 .skip_unhandled_events = true};
     esp_timer_create(&clock_timer_args, &clock_timer_handle_);
+
+    esp_timer_create_args_t restart_timer_args = {
+        .callback =
+            [](void* arg) {
+                static_cast<Application*>(arg)->Schedule([]() {
+                    Application* app = &Application::GetInstance();
+                    if (app->GetDeviceState() != kDeviceStateIdle) {
+                        app->pending_wake_word_.clear();
+                        return;
+                    }
+                    const std::string wake_word = app->pending_wake_word_;
+                    app->pending_wake_word_.clear();
+                    if (!wake_word.empty()) {
+                        app->BeginWakeWordInvoke(wake_word);
+                    } else {
+                        app->StartListening();
+                    }
+                });
+            },
+        .arg = this,
+        .dispatch_method = ESP_TIMER_TASK,
+        .name = "session_restart",
+        .skip_unhandled_events = true,
+    };
+    esp_timer_create(&restart_timer_args, &session_restart_timer_);
 }
 
 Application::~Application() {
@@ -52,6 +77,10 @@ Application::~Application() {
     if (clock_timer_handle_ != nullptr) {
         esp_timer_stop(clock_timer_handle_);
         esp_timer_delete(clock_timer_handle_);
+    }
+    if (session_restart_timer_ != nullptr) {
+        esp_timer_stop(session_restart_timer_);
+        esp_timer_delete(session_restart_timer_);
     }
     vEventGroupDelete(event_group_);
 }
@@ -708,10 +737,9 @@ void Application::InitializeProtocol() {
             if (cJSON_IsObject(payload)) {
                 CJsonStringUniquePtr payload_json(cJSON_PrintUnformatted(payload));
                 if (payload_json) {
-                    Schedule(
-                        [this, display, payload_str = std::string(payload_json.get())]() {
-                            display->SetChatMessage("system", payload_str.c_str());
-                        });
+                    Schedule([this, display, payload_str = std::string(payload_json.get())]() {
+                        display->SetChatMessage("system", payload_str.c_str());
+                    });
                 }
             } else {
                 ESP_LOGW(TAG, "Invalid custom message format: missing payload");
@@ -779,18 +807,37 @@ void Application::StartNewSession() {
         StopNotification();
     } else if (state == kDeviceStateSpeaking) {
         AbortSpeaking(kAbortReasonNone);
-    } else if (state == kDeviceStateListening || state == kDeviceStateConnecting) {
-        if (protocol_ && protocol_->IsAudioChannelOpened()) {
-            protocol_->CloseAudioChannel();
-        }
+    }
+    // Always drop the current server session, even when the device is idle
+    // with an open audio channel; otherwise the next turn would silently
+    // continue the previous conversation context.
+    if (protocol_ && protocol_->IsAudioChannelOpened()) {
+        protocol_->CloseAudioChannel();
     }
     auto display = Board::GetInstance().GetDisplay();
     if (display != nullptr) {
         display->ClearChatMessages();
     }
-    if (GetDeviceState() == kDeviceStateIdle) {
-        StartListening();
+    // Leave transient connecting/listening states so the fresh session starts
+    // from a clean idle state.
+    if (GetDeviceState() != kDeviceStateIdle) {
+        SetDeviceState(kDeviceStateIdle);
     }
+    if (GetDeviceState() == kDeviceStateIdle) {
+        RestartAfterSessionClose();
+    }
+}
+
+void Application::RestartAfterSessionClose(const std::string& wake_word) {
+    pending_wake_word_ = wake_word;
+    if (session_restart_timer_ == nullptr) {
+        return;
+    }
+    // Closing an MQTT audio channel and immediately opening a new one fails
+    // while the server's goodbye is still in flight, so give the handshake a
+    // moment before opening the fresh session.
+    esp_timer_stop(session_restart_timer_);
+    ESP_ERROR_CHECK(esp_timer_start_once(session_restart_timer_, 300 * 1000));
 }
 
 void Application::StartListening() { xEventGroupSetBits(event_group_, MAIN_EVENT_START_LISTENING); }
@@ -924,7 +971,16 @@ void Application::HandleWakeWordDetectedEvent() {
     ESP_LOGI(TAG, "Wake word detected: %s (state: %d)", wake_word.c_str(), (int)state);
 
     if (state == kDeviceStateIdle) {
-        BeginWakeWordInvoke(wake_word);
+        // The wake word starts a fresh conversation: reset the server session
+        // and the on-screen history before listening.
+        if (protocol_ && protocol_->IsAudioChannelOpened()) {
+            protocol_->CloseAudioChannel();
+        }
+        auto display = Board::GetInstance().GetDisplay();
+        if (display != nullptr) {
+            display->ClearChatMessages();
+        }
+        RestartAfterSessionClose(wake_word);
     } else if (state == kDeviceStateNotifying) {
         StopNotification();
         BeginWakeWordInvoke(wake_word);

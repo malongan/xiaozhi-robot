@@ -54,7 +54,8 @@ protected:
     int page_index_ = -1;
     bool follow_latest_ = true;
     lv_obj_t* chat_area_ = nullptr;
-    lv_obj_t* page_progress_ = nullptr;  // long-press-to-reset ring around the avatar
+    lv_obj_t* page_progress_ = nullptr;  // faint press ring around the avatar
+    int64_t last_avatar_click_us_ = 0;   // double-click detection for new session
 
     void ApplyChatLayout();
     void RewrapMessage(size_t index);
@@ -63,14 +64,13 @@ protected:
     void RenderCurrentPage();
     void GoToPage(int index, bool show_indicator);
     void ShowPageIndicator();
-    void StartLongPressRing();
-    void StopLongPressRing();
+    void ShowPressRing();
+    void HidePressRing();
     std::string BuildPageText(const ChatPage& page) const;
 
     static void OnChatAreaClicked(lv_event_t* e);
     static void OnAvatarPressed(lv_event_t* e);
     static void OnAvatarReleased(lv_event_t* e);
-    static void OnAvatarLongPressed(lv_event_t* e);
     static void OnMicButtonClicked(lv_event_t* e);
 
     void InitializeLcdThemes();
