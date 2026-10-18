@@ -1034,6 +1034,7 @@ void LcdDisplay::SetupUI() {
 
     mute_label_ = lv_label_create(top_bar_);
     lv_label_set_text(mute_label_, "");
+    lv_obj_add_flag(mute_label_, LV_OBJ_FLAG_HIDDEN);  // no mic/mute icon in the status bar
     lv_obj_set_style_text_font(mute_label_, icon_font, 0);
     lv_obj_set_style_text_color(mute_label_, lvgl_theme->text_color(), 0);
 
