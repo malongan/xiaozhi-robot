@@ -8,6 +8,8 @@
 #include <esp_lcd_panel_io.h>
 #include <esp_lcd_panel_ops.h>
 #include <atomic>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 #include <cstdint>
 #include <deque>
 #include <memory>
@@ -101,6 +103,9 @@ protected:
     lv_obj_t* avatar_eye_happy_left_ = nullptr;
     lv_obj_t* avatar_eye_happy_right_ = nullptr;
     lv_obj_t* avatar_think_dots_ = nullptr;
+    lv_obj_t* avatar_eye_sleep_left_ = nullptr;
+    lv_obj_t* avatar_eye_sleep_right_ = nullptr;
+    TaskHandle_t sleep_sound_task_ = nullptr;
     AvatarExpression avatar_override_ = kAvatarExpressionNone;
     uint32_t avatar_override_until_ = 0;
 
@@ -136,6 +141,7 @@ protected:
     void ApplyChatLayout();
     const lv_font_t* GetChatFont();
     static void AvatarAnimTimerCb(lv_timer_t* timer);
+    static void SleepSoundTask(void* arg);
     void SetAvatarEmotion(const char* emotion);
     void PickAvatarGaze();
     void RewrapMessage(size_t index);

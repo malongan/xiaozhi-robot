@@ -117,6 +117,7 @@ public:
     ~AudioService();
 
     void Initialize(AudioCodec* codec);
+    AudioCodec* GetCodec() { return codec_; }
     void Start();
     void Stop();
     void EncodeWakeWord();

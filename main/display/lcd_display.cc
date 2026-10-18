@@ -7,6 +7,8 @@
 #include "lvgl_theme.h"
 #include "media_ble.h"
 
+LV_FONT_DECLARE(font_zzz_30);
+
 #include <cstdio>
 #include "settings.h"
 
@@ -21,7 +23,9 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <cmath>
 #include <mutex>
+#include <vector>
 #include <vector>
 
 #include "board.h"
@@ -1155,6 +1159,28 @@ void LcdDisplay::SetupUI() {
     avatar_eye_happy_left_ = create_happy_eye();
     avatar_eye_happy_right_ = create_happy_eye();
 
+    auto create_sleep_eye = [this]() {
+        lv_obj_t* arc = lv_arc_create(avatar_face_);
+        lv_obj_remove_flag(arc, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_remove_flag(arc, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_set_scrollbar_mode(arc, LV_SCROLLBAR_MODE_OFF);
+        lv_obj_set_size(arc, 20, 20);
+        lv_obj_set_style_bg_opa(arc, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_border_width(arc, 0, 0);
+        lv_obj_set_style_arc_width(arc, 4, LV_PART_MAIN);
+        lv_obj_set_style_arc_color(arc, lv_color_hex(kAvatarEyeColor), LV_PART_MAIN);
+        lv_obj_set_style_arc_opa(arc, LV_OPA_COVER, LV_PART_MAIN);
+        lv_obj_set_style_arc_opa(arc, LV_OPA_TRANSP, LV_PART_INDICATOR);
+        lv_obj_set_style_bg_opa(arc, LV_OPA_TRANSP, LV_PART_KNOB);
+        lv_obj_set_style_border_width(arc, 0, LV_PART_KNOB);
+        lv_arc_set_bg_angles(arc, 20, 160);  // smile-shaped closed eye
+        lv_arc_set_angles(arc, 0, 0);
+        lv_obj_add_flag(arc, LV_OBJ_FLAG_HIDDEN);
+        return arc;
+    };
+    avatar_eye_sleep_left_ = create_sleep_eye();
+    avatar_eye_sleep_right_ = create_sleep_eye();
+
     avatar_think_dots_ = lv_label_create(screen);
     lv_obj_set_style_text_font(avatar_think_dots_, text_font, 0);
     lv_obj_set_style_text_color(avatar_think_dots_, lvgl_theme->text_color(), 0);
@@ -1162,8 +1188,9 @@ void LcdDisplay::SetupUI() {
     lv_obj_add_flag(avatar_think_dots_, LV_OBJ_FLAG_HIDDEN);
 
     sleep_zzz_ = lv_label_create(screen);
-    lv_obj_set_style_text_font(sleep_zzz_, text_font, 0);
-    lv_obj_set_style_text_color(sleep_zzz_, lv_color_hex(0xC8C8D0), 0);
+    lv_obj_set_style_text_font(sleep_zzz_, &font_zzz_30, 0);
+    lv_obj_set_style_text_color(sleep_zzz_, lv_color_hex(0xD8D8E0), 0);
+    lv_obj_set_style_text_opa(sleep_zzz_, LV_OPA_80, 0);
     lv_obj_set_style_transform_pivot_x(sleep_zzz_, lv_pct(50), 0);
     lv_obj_set_style_transform_pivot_y(sleep_zzz_, lv_pct(50), 0);
     lv_label_set_text(sleep_zzz_, "Zzz");
@@ -1482,6 +1509,8 @@ void LcdDisplay::SetupUI() {
     });
     MediaBle::GetInstance().Start();
 
+    xTaskCreate(&LcdDisplay::SleepSoundTask, "sleep_snd", 4096, this, 2, &sleep_sound_task_);
+
     // 25 fps avatar animation: breathing, blink and state-driven motion.
     avatar_anim_epoch_ = lv_tick_get();
     avatar_blink_at_ = avatar_anim_epoch_ + 2600;
@@ -1793,7 +1822,7 @@ void LcdDisplay::ApplyChatLayout() {
         lv_obj_align_to(avatar_think_dots_, emoji_box_, LV_ALIGN_TOP_RIGHT, 6, -4);
     }
     if (sleep_zzz_ != nullptr) {
-        lv_obj_align_to(sleep_zzz_, emoji_box_, LV_ALIGN_TOP_RIGHT, 4, -10);
+        lv_obj_align_to(sleep_zzz_, emoji_box_, LV_ALIGN_TOP_MID, 0, -30);
     }
     if (media_bar_ != nullptr) {
         lv_obj_align(media_bar_, LV_ALIGN_BOTTOM_MID, 0, -10);
@@ -1810,9 +1839,8 @@ void LcdDisplay::ApplyChatLayout() {
         lv_obj_set_style_text_font(avatar_think_dots_, font, 0);
         lv_obj_set_style_text_color(avatar_think_dots_, lvgl_theme->text_color(), 0);
     }
-    lv_obj_t* themed_labels[] = {media_title_,        media_hint_, bt_title_,
-                                 bt_empty_,           bt_status_,  bt_disconnect_label_,
-                                 sleep_zzz_};
+    lv_obj_t* themed_labels[] = {media_title_, media_hint_, bt_title_,
+                                 bt_empty_,    bt_status_,  bt_disconnect_label_};
     for (lv_obj_t* label : themed_labels) {
         if (label != nullptr) {
             lv_obj_set_style_text_font(label, font, 0);
@@ -1925,6 +1953,35 @@ void LcdDisplay::ClearChatMessages() {
 }
 #endif
 
+void LcdDisplay::SleepSoundTask(void* arg) {
+    auto* self = static_cast<LcdDisplay*>(arg);
+    std::vector<int16_t> buffer;
+    while (true) {
+        if (self->avatar_sleeping_) {
+            auto* codec = Application::GetInstance().GetAudioService().GetCodec();
+            if (codec != nullptr) {
+                const int rate = codec->output_sample_rate();
+                if (buffer.empty()) {
+                    buffer.resize(static_cast<size_t>(rate * 30 / 100));  // 300 ms breath
+                }
+                for (size_t i = 0; i < buffer.size(); ++i) {
+                    const float phase = 2.0f * 3.14159265f * 95.0f *
+                                        static_cast<float>(i) / static_cast<float>(rate);
+                    const float envelope = sinf(3.14159265f * static_cast<float>(i) /
+                                                static_cast<float>(buffer.size()));
+                    buffer[i] = static_cast<int16_t>(sinf(phase) * envelope * 1400.0f);
+                }
+                codec->EnableOutput(true);
+                codec->OutputData(buffer);
+                codec->EnableOutput(false);
+            }
+            vTaskDelay(pdMS_TO_TICKS(4500));
+        } else {
+            vTaskDelay(pdMS_TO_TICKS(400));
+        }
+    }
+}
+
 void LcdDisplay::MarkUserActivity() {
     last_activity_tick_ = lv_tick_get();
     if (avatar_sleeping_) {
@@ -2000,7 +2057,7 @@ void LcdDisplay::AvatarAnimTimerCb(lv_timer_t* timer) {
     }
 
     const uint32_t idle_ms = now - self->last_activity_tick_;
-    const bool sleeping = self->avatar_mood_ == kAvatarMoodIdle && idle_ms > 300000 &&
+    const bool sleeping = self->avatar_mood_ == kAvatarMoodIdle && idle_ms > 120000 &&
                           self->avatar_override_ == kAvatarExpressionNone;
     if (sleeping) {
         expression = kAvatarExpressionClosed;
@@ -2025,6 +2082,19 @@ void LcdDisplay::AvatarAnimTimerCb(lv_timer_t* timer) {
         }
         lv_obj_add_flag(self->avatar_eye_happy_left_, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(self->avatar_eye_happy_right_, LV_OBJ_FLAG_HIDDEN);
+    }
+    if (sleeping) {
+        if (!lv_obj_has_flag(self->avatar_eye_left_, LV_OBJ_FLAG_HIDDEN)) {
+            lv_obj_add_flag(self->avatar_eye_left_, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(self->avatar_eye_right_, LV_OBJ_FLAG_HIDDEN);
+        }
+        lv_obj_add_flag(self->avatar_eye_happy_left_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(self->avatar_eye_happy_right_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(self->avatar_eye_sleep_left_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(self->avatar_eye_sleep_right_, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        lv_obj_add_flag(self->avatar_eye_sleep_left_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(self->avatar_eye_sleep_right_, LV_OBJ_FLAG_HIDDEN);
     }
     if (thinking) {
         lv_obj_remove_flag(self->avatar_think_dots_, LV_OBJ_FLAG_HIDDEN);
@@ -2077,9 +2147,11 @@ void LcdDisplay::AvatarAnimTimerCb(lv_timer_t* timer) {
         gaze_active = false;
         look_x = 0;
         look_y = 0;
-        bob = 0;
+        // Slow breathing plus a gentle nod (head sinks periodically).
+        const float nod = fmaxf(0.0f, sinf(t * 2 * kPi / 2.4f));
+        bob = static_cast<lv_coord_t>(3.0f * nod);
         breath = static_cast<lv_coord_t>(5.0f * sinf(t * 2 * kPi / 6.0f));
-        face_rot = static_cast<int32_t>(40.0f * sinf(t * 2 * kPi / 7.0f));
+        face_rot = static_cast<int32_t>(30.0f * sinf(t * 2 * kPi / 7.0f));
     }
 
     const bool closed = expression == kAvatarExpressionClosed;
@@ -2197,6 +2269,17 @@ void LcdDisplay::AvatarAnimTimerCb(lv_timer_t* timer) {
     }
 
     const float fs = self->avatar_face_scale_;
+    if (sleeping) {
+        const lv_coord_t sleep_gap = static_cast<lv_coord_t>(10 * fs);
+        const lv_coord_t arc_size = static_cast<lv_coord_t>(20 * fs);
+        const lv_coord_t arc_width = LV_MAX(static_cast<lv_coord_t>(2), static_cast<lv_coord_t>(4 * fs));
+        lv_obj_set_size(self->avatar_eye_sleep_left_, arc_size, arc_size);
+        lv_obj_set_size(self->avatar_eye_sleep_right_, arc_size, arc_size);
+        lv_obj_set_style_arc_width(self->avatar_eye_sleep_left_, arc_width, LV_PART_MAIN);
+        lv_obj_set_style_arc_width(self->avatar_eye_sleep_right_, arc_width, LV_PART_MAIN);
+        lv_obj_align(self->avatar_eye_sleep_left_, LV_ALIGN_CENTER, -sleep_gap, 0);
+        lv_obj_align(self->avatar_eye_sleep_right_, LV_ALIGN_CENTER, sleep_gap, 0);
+    }
     if (fs != 1.0f) {
         eye_left_x = static_cast<lv_coord_t>(eye_left_x * fs);
         eye_left_y = static_cast<lv_coord_t>(eye_left_y * fs);
@@ -2210,7 +2293,9 @@ void LcdDisplay::AvatarAnimTimerCb(lv_timer_t* timer) {
         face_tx = static_cast<lv_coord_t>(face_tx * fs);
     }
 
-    if (!happy) {
+    if (sleeping) {
+        // sleeping arcs are already placed above
+    } else if (!happy) {
         lv_coord_t left_h_draw = eye_left_h;
         lv_coord_t right_h_draw = eye_right_h;
         bool do_blink = !closed && !wink;
@@ -2292,7 +2377,7 @@ void LcdDisplay::AvatarAnimTimerCb(lv_timer_t* timer) {
             lv_obj_set_style_translate_y(
                 self->sleep_zzz_, static_cast<lv_coord_t>(-4.0f * sinf(zt * 2 * kPi / 1.8f)), 0);
             lv_obj_set_style_transform_scale(
-                self->sleep_zzz_, 200 + static_cast<int32_t>(40.0f * sinf(zt * 2 * kPi / 1.4f)), 0);
+                self->sleep_zzz_, 300 + static_cast<int32_t>(110.0f * sinf(zt * 2 * kPi / 1.3f)), 0);
             lv_obj_remove_flag(self->sleep_zzz_, LV_OBJ_FLAG_HIDDEN);
         } else {
             lv_obj_add_flag(self->sleep_zzz_, LV_OBJ_FLAG_HIDDEN);
