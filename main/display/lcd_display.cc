@@ -1324,11 +1324,10 @@ void LcdDisplay::SetupUI() {
     lv_obj_center(bt_icon);
 
     const char* media_icons[9] = {
-        MATERIAL_SYMBOLS_SKIP_PREVIOUS, MATERIAL_SYMBOLS_PLAY_ARROW,
-        MATERIAL_SYMBOLS_SKIP_NEXT,     MATERIAL_SYMBOLS_KEYBOARD_DOUBLE_ARROW_LEFT,
-        MATERIAL_SYMBOLS_STOP,          MATERIAL_SYMBOLS_KEYBOARD_DOUBLE_ARROW_RIGHT,
-        MATERIAL_SYMBOLS_VOLUME_DOWN,   MATERIAL_SYMBOLS_VOLUME_OFF,
-        MATERIAL_SYMBOLS_VOLUME_UP,
+        MATERIAL_SYMBOLS_SKIP_PREVIOUS, MATERIAL_SYMBOLS_PLAY_ARROW, MATERIAL_SYMBOLS_SKIP_NEXT,
+        MATERIAL_SYMBOLS_VOLUME_DOWN,   MATERIAL_SYMBOLS_VOLUME_OFF, MATERIAL_SYMBOLS_VOLUME_UP,
+        MATERIAL_SYMBOLS_HOME,          MATERIAL_SYMBOLS_ARROW_BACK,
+        MATERIAL_SYMBOLS_KEY,  // menu: hidden and replaced by three bars
     };
     for (int i = 0; i < 9; ++i) {
         lv_obj_t* key = lv_button_create(media_screen_);
@@ -1352,10 +1351,20 @@ void LcdDisplay::SetupUI() {
         lv_obj_set_style_text_color(key_icon, lvgl_theme->text_color(), 0);
         lv_label_set_text(key_icon, media_icons[i]);
         lv_obj_center(key_icon);
-        if (i == 3) {  // brightness down: upside-down sun so the pair is distinct
-            lv_obj_set_style_transform_pivot_x(key_icon, lv_pct(50), 0);
-            lv_obj_set_style_transform_pivot_y(key_icon, lv_pct(50), 0);
-            lv_obj_set_style_transform_rotation(key_icon, 1800, 0);
+        if (i == 8) {  // menu: three horizontal bars
+            lv_obj_add_flag(key_icon, LV_OBJ_FLAG_HIDDEN);
+            for (int bar_index = 0; bar_index < 3; ++bar_index) {
+                lv_obj_t* bar = lv_obj_create(key);
+                lv_obj_set_size(bar, 22, 3);
+                lv_obj_align(bar, LV_ALIGN_CENTER, 0, -6 + bar_index * 6);
+                lv_obj_set_style_radius(bar, 2, 0);
+                lv_obj_set_style_bg_color(bar, lvgl_theme->text_color(), 0);
+                lv_obj_set_style_bg_opa(bar, LV_OPA_COVER, 0);
+                lv_obj_set_style_border_width(bar, 0, 0);
+                lv_obj_set_style_pad_all(bar, 0, 0);
+                lv_obj_remove_flag(bar, LV_OBJ_FLAG_SCROLLABLE);
+                lv_obj_remove_flag(bar, LV_OBJ_FLAG_CLICKABLE);
+            }
         }
     }
     media_repeat_timer_ = lv_timer_create(&LcdDisplay::MediaRepeatTimerCb, 60, this);
@@ -2318,14 +2327,14 @@ void LcdDisplay::OnMediaBackClicked(lv_event_t* e) {
 }
 
 static const MediaBleKey kMediaKeys[9] = {
-    MediaBleKey::kPrevious,       MediaBleKey::kPlayPause,    MediaBleKey::kNext,
-    MediaBleKey::kBrightnessDown, MediaBleKey::kBrightnessUp, MediaBleKey::kLockScreen,
-    MediaBleKey::kVolumeDown,     MediaBleKey::kMute,         MediaBleKey::kVolumeUp,
+    MediaBleKey::kPrevious,   MediaBleKey::kPlayPause, MediaBleKey::kNext,
+    MediaBleKey::kVolumeDown, MediaBleKey::kMute,      MediaBleKey::kVolumeUp,
+    MediaBleKey::kHome,       MediaBleKey::kBack,      MediaBleKey::kMenu,
 };
-// Volume and brightness repeat while held.
-static const bool kMediaRepeat[9] = {false, false, false, true, true, false, true, false, true};
-static const char* kMediaHints[9] = {"上一首", "播放/暂停", "下一首", "亮度-", "亮度+",
-                                     "锁屏",   "音量-",     "静音",   "音量+"};
+// Volume repeats while held; navigation keys are single-shot.
+static const bool kMediaRepeat[9] = {false, false, false, true, false, true, false, false, false};
+static const char* kMediaHints[9] = {"上一首", "播放/暂停", "下一首", "音量-", "静音",
+                                     "音量+",  "首页",      "返回",   "菜单"};
 
 void LcdDisplay::HandleMediaKeyDown(int index) {
     const bool sent = MediaBle::GetInstance().SendKey(kMediaKeys[index]);

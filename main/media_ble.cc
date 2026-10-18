@@ -472,9 +472,9 @@ bool MediaBle::SendKey(MediaBleKey key) {
     if (!connected_ || conn_handle_ == 0xFFFF || report_val_handle_ == 0) {
         return false;
     }
-    if (key == MediaBleKey::kLockScreen) {
-        // Ctrl+Cmd+Q
-        return SendShortcut(0x08 | 0x01, 0x14);
+    if (key == MediaBleKey::kMenu) {
+        // Keyboard Application key -> Android menu
+        return SendShortcut(0x00, 0x65);
     }
     const uint8_t bit = static_cast<uint8_t>(1u << static_cast<uint8_t>(key));
     int rc = 0;

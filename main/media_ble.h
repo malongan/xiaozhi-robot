@@ -12,9 +12,9 @@ enum class MediaBleKey : uint8_t {
     kMute = 3,
     kVolumeUp = 4,
     kVolumeDown = 5,
-    kBrightnessDown = 6,  // macOS: display brightness
-    kBrightnessUp = 7,
-    kLockScreen = 8,  // macOS: Ctrl+Cmd+Q via the keyboard report
+    kHome = 6,  // Android: Consumer AC Home
+    kBack = 7,  // Android: Consumer AC Back
+    kMenu = 8,  // Android: keyboard Application key
 };
 
 struct MediaBlePeer {
