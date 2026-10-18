@@ -9,6 +9,7 @@
 #include <host/ble_gatt.h>
 #include <host/ble_hs.h>
 #include <host/ble_hs_adv.h>
+#include <host/ble_store.h>
 #include <host/util/util.h>
 #include <nimble/nimble_port.h>
 #include <nimble/nimble_port_freertos.h>
@@ -17,7 +18,6 @@
 
 #define TAG "MediaBle"
 
-// Called by NimBLE to initialise the NVS-backed bond store.
 extern "C" void ble_store_config_init(void);
 
 namespace {
@@ -31,13 +31,44 @@ const ble_uuid16_t kHidControlUuid = BLE_UUID16_INIT(0x2A4C);
 const ble_uuid16_t kReportUuid = BLE_UUID16_INIT(0x2A4D);
 const ble_uuid16_t kProtocolModeUuid = BLE_UUID16_INIT(0x2A4E);
 const ble_uuid16_t kReportRefUuid = BLE_UUID16_INIT(0x2908);
+const ble_uuid16_t kDisServiceUuid = BLE_UUID16_INIT(0x180A);
+const ble_uuid16_t kManufacturerUuid = BLE_UUID16_INIT(0x2A29);
+const ble_uuid16_t kPnpIdUuid = BLE_UUID16_INIT(0x2A50);
+const ble_uuid16_t kBatteryServiceUuid = BLE_UUID16_INIT(0x180F);
+const ble_uuid16_t kBatteryLevelUuid = BLE_UUID16_INIT(0x2A19);
 
-// Consumer Control: six 1-bit keys + two padding bits, report ID 2.
+// Keyboard (report ID 1, boot-style 8 bytes) + consumer control (report ID 2).
 const uint8_t kReportMap[] = {
+    0x05, 0x01,  // Usage Page (Generic Desktop)
+    0x09, 0x06,  // Usage (Keyboard)
+    0xA1, 0x01,  // Collection (Application)
+    0x85, 0x01,  //   Report ID (1)
+    0x05, 0x07,  //   Usage Page (Key Codes)
+    0x19, 0xE0,  //   Usage Minimum (Left Control)
+    0x29, 0xE7,  //   Usage Maximum (Right GUI)
+    0x15, 0x00,  //   Logical Minimum (0)
+    0x25, 0x01,  //   Logical Maximum (1)
+    0x75, 0x01,  //   Report Size (1)
+    0x95, 0x08,  //   Report Count (8)
+    0x81, 0x02,  //   Input (Data,Var,Abs)
+    0x95, 0x01,  //   Report Count (1)
+    0x75, 0x08,  //   Report Size (8)
+    0x81, 0x01,  //   Input (Const)
+    0x95, 0x06,  //   Report Count (6)
+    0x75, 0x08,  //   Report Size (8)
+    0x15, 0x00,  //   Logical Minimum (0)
+    0x25, 0x65,  //   Logical Maximum (101)
+    0x05, 0x07,  //   Usage Page (Key Codes)
+    0x19, 0x00,  //   Usage Minimum (0)
+    0x29, 0x65,  //   Usage Maximum (101)
+    0x81, 0x00,  //   Input (Data,Array)
+    0xC0,        // End Collection
+
     0x05, 0x0C,  // Usage Page (Consumer)
     0x09, 0x01,  // Usage (Consumer Control)
     0xA1, 0x01,  // Collection (Application)
     0x85, 0x02,  //   Report ID (2)
+    0x05, 0x0C,  //   Usage Page (Consumer)
     0x15, 0x00,  //   Logical Minimum (0)
     0x25, 0x01,  //   Logical Maximum (1)
     0x75, 0x01,  //   Report Size (1)
@@ -50,20 +81,26 @@ const uint8_t kReportMap[] = {
     0x09, 0xEA,  //   Usage (Volume Decrement)
     0x81, 0x02,  //   Input (Data,Var,Abs)
     0x95, 0x02,  //   Report Count (2)
-    0x81, 0x03,  //   Input (Const,Var,Abs)
+    0x81, 0x03,  //   Input (Const)
     0xC0,        // End Collection
 };
 
-const uint8_t kHidInfo[] = {0x11, 0x01, 0x00, 0x02};  // bcdHID 1.11, country 0, flags
-const uint8_t kReportReference[] = {0x02, 0x01};      // report id 2, input report
-uint8_t g_protocol_mode = 1;                          // report protocol
+const uint8_t kHidInfo[] = {0x11, 0x01, 0x00, 0x02};  // bcdHID 1.11
+const uint8_t kReportRefKeyboard[] = {0x01, 0x01};
+const uint8_t kReportRefConsumer[] = {0x02, 0x01};
+const uint8_t kManufacturerName[] = "Xiaozhi";
+const uint8_t kPnpId[] = {0x02, 0xE5, 0x02, 0x01, 0x00, 0x00, 0x01};  // USB vid 02E5
+uint8_t g_protocol_mode = 1;
 uint8_t g_report_value = 0;
+uint8_t g_battery_level = 100;
 
 uint8_t g_own_addr_type = 0;
 
-ble_gatt_chr_def g_hid_chrs[6] = {};
-ble_gatt_dsc_def g_hid_dscs[2] = {};
-ble_gatt_svc_def g_hid_svcs[2] = {};
+ble_gatt_chr_def g_hid_chrs[7] = {};
+ble_gatt_dsc_def g_hid_dscs[3] = {};
+ble_gatt_svc_def g_svcs[4] = {};
+ble_gatt_chr_def g_di_chrs[3] = {};
+ble_gatt_chr_def g_batt_chrs[2] = {};
 
 int HidInfoAccess(uint16_t, uint16_t, struct ble_gatt_access_ctxt* ctxt, void*) {
     return os_mbuf_append(ctxt->om, kHidInfo, sizeof(kHidInfo)) == 0 ? 0
@@ -77,10 +114,7 @@ int ReportMapAccess(uint16_t, uint16_t, struct ble_gatt_access_ctxt* ctxt, void*
 }
 
 int ControlPointAccess(uint16_t, uint16_t, struct ble_gatt_access_ctxt* ctxt, void*) {
-    if (ctxt->op == BLE_GATT_ACCESS_OP_WRITE_CHR) {
-        return 0;
-    }
-    return BLE_ATT_ERR_UNLIKELY;
+    return ctxt->op == BLE_GATT_ACCESS_OP_WRITE_CHR ? 0 : BLE_ATT_ERR_UNLIKELY;
 }
 
 int ProtocolModeAccess(uint16_t, uint16_t, struct ble_gatt_access_ctxt* ctxt, void*) {
@@ -89,10 +123,7 @@ int ProtocolModeAccess(uint16_t, uint16_t, struct ble_gatt_access_ctxt* ctxt, vo
                                                                   : BLE_ATT_ERR_INSUFFICIENT_RES;
     }
     if (ctxt->op == BLE_GATT_ACCESS_OP_WRITE_CHR && OS_MBUF_PKTLEN(ctxt->om) >= 1) {
-        if (os_mbuf_copydata(ctxt->om, 0, 1, &g_protocol_mode) != 0) {
-            return BLE_ATT_ERR_UNLIKELY;
-        }
-        return 0;
+        return os_mbuf_copydata(ctxt->om, 0, 1, &g_protocol_mode) == 0 ? 0 : BLE_ATT_ERR_UNLIKELY;
     }
     return BLE_ATT_ERR_UNLIKELY;
 }
@@ -104,10 +135,34 @@ int ReportAccess(uint16_t, uint16_t, struct ble_gatt_access_ctxt* ctxt, void*) {
     return BLE_ATT_ERR_UNLIKELY;
 }
 
-int ReportReferenceAccess(uint16_t, uint16_t, struct ble_gatt_access_ctxt* ctxt, void*) {
-    return os_mbuf_append(ctxt->om, kReportReference, sizeof(kReportReference)) == 0
+int ReportRefConsumerAccess(uint16_t, uint16_t, struct ble_gatt_access_ctxt* ctxt, void*) {
+    return os_mbuf_append(ctxt->om, kReportRefConsumer, sizeof(kReportRefConsumer)) == 0
                ? 0
                : BLE_ATT_ERR_INSUFFICIENT_RES;
+}
+
+int ReportRefKeyboardAccess(uint16_t, uint16_t, struct ble_gatt_access_ctxt* ctxt, void*) {
+    return os_mbuf_append(ctxt->om, kReportRefKeyboard, sizeof(kReportRefKeyboard)) == 0
+               ? 0
+               : BLE_ATT_ERR_INSUFFICIENT_RES;
+}
+
+int ManufacturerAccess(uint16_t, uint16_t, struct ble_gatt_access_ctxt* ctxt, void*) {
+    return os_mbuf_append(ctxt->om, kManufacturerName, sizeof(kManufacturerName) - 1) == 0
+               ? 0
+               : BLE_ATT_ERR_INSUFFICIENT_RES;
+}
+
+int PnpIdAccess(uint16_t, uint16_t, struct ble_gatt_access_ctxt* ctxt, void*) {
+    return os_mbuf_append(ctxt->om, kPnpId, sizeof(kPnpId)) == 0 ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
+}
+
+int BatteryLevelAccess(uint16_t, uint16_t, struct ble_gatt_access_ctxt* ctxt, void*) {
+    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) {
+        return os_mbuf_append(ctxt->om, &g_battery_level, 1) == 0 ? 0
+                                                                  : BLE_ATT_ERR_INSUFFICIENT_RES;
+    }
+    return BLE_ATT_ERR_UNLIKELY;
 }
 
 }  // namespace
@@ -125,8 +180,12 @@ void MediaBle::InitGattServices() {
     g_hid_dscs[0] = {};
     g_hid_dscs[0].uuid = &kReportRefUuid.u;
     g_hid_dscs[0].att_flags = BLE_ATT_F_READ;
-    g_hid_dscs[0].access_cb = ReportReferenceAccess;
+    g_hid_dscs[0].access_cb = ReportRefConsumerAccess;
     g_hid_dscs[1] = {};
+    g_hid_dscs[1].uuid = &kReportRefUuid.u;
+    g_hid_dscs[1].att_flags = BLE_ATT_F_READ;
+    g_hid_dscs[1].access_cb = ReportRefKeyboardAccess;
+    g_hid_dscs[2] = {};
 
     g_hid_chrs[0] = {};
     g_hid_chrs[0].uuid = &kHidInfoUuid.u;
@@ -148,23 +207,52 @@ void MediaBle::InitGattServices() {
     g_hid_chrs[4].uuid = &kReportUuid.u;
     g_hid_chrs[4].access_cb = ReportAccess;
     g_hid_chrs[4].flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_NOTIFY;
-    g_hid_chrs[4].descriptors = g_hid_dscs;
+    g_hid_chrs[4].descriptors = &g_hid_dscs[0];
     g_hid_chrs[5] = {};
+    g_hid_chrs[5].uuid = &kReportUuid.u;
+    g_hid_chrs[5].access_cb = ReportAccess;
+    g_hid_chrs[5].flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_NOTIFY;
+    g_hid_chrs[5].descriptors = &g_hid_dscs[1];
+    g_hid_chrs[6] = {};
 
-    g_hid_svcs[0] = {};
-    g_hid_svcs[0].type = BLE_GATT_SVC_TYPE_PRIMARY;
-    g_hid_svcs[0].uuid = &kHidServiceUuid.u;
-    g_hid_svcs[0].characteristics = g_hid_chrs;
-    g_hid_svcs[1] = {};
+    g_di_chrs[0] = {};
+    g_di_chrs[0].uuid = &kManufacturerUuid.u;
+    g_di_chrs[0].access_cb = ManufacturerAccess;
+    g_di_chrs[0].flags = BLE_GATT_CHR_F_READ;
+    g_di_chrs[1] = {};
+    g_di_chrs[1].uuid = &kPnpIdUuid.u;
+    g_di_chrs[1].access_cb = PnpIdAccess;
+    g_di_chrs[1].flags = BLE_GATT_CHR_F_READ;
+    g_di_chrs[2] = {};
+
+    g_batt_chrs[0] = {};
+    g_batt_chrs[0].uuid = &kBatteryLevelUuid.u;
+    g_batt_chrs[0].access_cb = BatteryLevelAccess;
+    g_batt_chrs[0].flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_NOTIFY;
+    g_batt_chrs[1] = {};
+
+    g_svcs[0] = {};
+    g_svcs[0].type = BLE_GATT_SVC_TYPE_PRIMARY;
+    g_svcs[0].uuid = &kHidServiceUuid.u;
+    g_svcs[0].characteristics = g_hid_chrs;
+    g_svcs[1] = {};
+    g_svcs[1].type = BLE_GATT_SVC_TYPE_PRIMARY;
+    g_svcs[1].uuid = &kDisServiceUuid.u;
+    g_svcs[1].characteristics = g_di_chrs;
+    g_svcs[2] = {};
+    g_svcs[2].type = BLE_GATT_SVC_TYPE_PRIMARY;
+    g_svcs[2].uuid = &kBatteryServiceUuid.u;
+    g_svcs[2].characteristics = g_batt_chrs;
+    g_svcs[3] = {};
 
     ble_svc_gap_init();
     ble_svc_gatt_init();
-    int rc = ble_gatts_count_cfg(g_hid_svcs);
+    int rc = ble_gatts_count_cfg(g_svcs);
     if (rc != 0) {
         ESP_LOGE(TAG, "ble_gatts_count_cfg failed: %d", rc);
         return;
     }
-    rc = ble_gatts_add_svcs(g_hid_svcs);
+    rc = ble_gatts_add_svcs(g_svcs);
     if (rc != 0) {
         ESP_LOGE(TAG, "ble_gatts_add_svcs failed: %d", rc);
     }
@@ -189,8 +277,8 @@ void MediaBle::Start() {
     ble_hs_cfg.sm_bonding = 1;
     ble_hs_cfg.sm_mitm = 0;
     ble_hs_cfg.sm_sc = 1;
-    ble_hs_cfg.sm_our_key_dist |= BLE_SM_PAIR_KEY_DIST_ENC;
-    ble_hs_cfg.sm_their_key_dist |= BLE_SM_PAIR_KEY_DIST_ENC;
+    ble_hs_cfg.sm_our_key_dist = BLE_SM_PAIR_KEY_DIST_ENC | BLE_SM_PAIR_KEY_DIST_ID;
+    ble_hs_cfg.sm_their_key_dist = BLE_SM_PAIR_KEY_DIST_ENC | BLE_SM_PAIR_KEY_DIST_ID;
 
     InitGattServices();
     ble_store_config_init();
@@ -212,6 +300,7 @@ void MediaBle::OnSync() {
         ESP_LOGE(TAG, "failed to infer address type");
     }
     auto& self = GetInstance();
+    // Consumer report is the first 0x2A4D characteristic.
     if (ble_gatts_find_chr(&kHidServiceUuid.u, &kReportUuid.u, nullptr, &self.report_val_handle_) !=
         0) {
         ESP_LOGE(TAG, "report characteristic not found");
@@ -283,11 +372,20 @@ int MediaBle::GapEvent(struct ble_gap_event* event, void*) {
         case BLE_GAP_EVENT_ADV_COMPLETE:
             self.StartAdvertising();
             return 0;
+        case BLE_GAP_EVENT_REPEAT_PAIRING: {
+            struct ble_gap_conn_desc desc;
+            if (ble_gap_conn_find(event->repeat_pairing.conn_handle, &desc) == 0) {
+                ble_store_util_delete_peer(&desc.peer_id_addr);
+                ESP_LOGW(TAG, "repeat pairing: dropped stale bond");
+            }
+            return BLE_GAP_REPEAT_PAIRING_RETRY;
+        }
         case BLE_GAP_EVENT_ENC_CHANGE:
             ESP_LOGI(TAG, "encryption change, status=%d", event->enc_change.status);
             return 0;
         case BLE_GAP_EVENT_SUBSCRIBE:
-            ESP_LOGI(TAG, "subscribe, notify=%d", event->subscribe.cur_notify);
+            ESP_LOGI(TAG, "subscribe, handle=%d notify=%d", event->subscribe.attr_handle,
+                     event->subscribe.cur_notify);
             return 0;
         default:
             return 0;
