@@ -1,6 +1,7 @@
 #ifndef LCD_DISPLAY_H
 #define LCD_DISPLAY_H
 
+#include "game/math_cannon.h"
 #include "gif/lvgl_gif.h"
 #include "lvgl_display.h"
 #include "media_ble.h"
@@ -75,6 +76,7 @@ protected:
     bool media_playing_ = false;
     lv_obj_t* media_hint_ = nullptr;
     lv_obj_t* media_bt_icon_ = nullptr;
+    MathCannonGame game_;
     lv_obj_t* media_title_ = nullptr;
     lv_obj_t* bt_title_ = nullptr;
     lv_obj_t* bt_empty_ = nullptr;
@@ -148,6 +150,7 @@ protected:
     static void OnMediaBarClicked(lv_event_t* e);
     static void OnMediaBackClicked(lv_event_t* e);
     static void OnMediaKeyClicked(lv_event_t* e);
+    static void OnGameEntryClicked(lv_event_t* e);
     static void MediaFeedbackTimerCb(lv_timer_t* timer);
     void ShowMediaFeedback(const char* text);
     static void MediaRepeatTimerCb(lv_timer_t* timer);

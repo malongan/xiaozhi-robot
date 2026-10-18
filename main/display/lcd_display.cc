@@ -1317,6 +1317,20 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_shadow_width(bt_entry, 0, 0);
     lv_obj_set_style_pad_all(bt_entry, 0, 0);
     lv_obj_add_event_cb(bt_entry, &LcdDisplay::OnBluetoothEntryClicked, LV_EVENT_CLICKED, this);
+    lv_obj_t* game_entry = lv_button_create(media_screen_);
+    lv_obj_set_size(game_entry, 44, 36);
+    lv_obj_align(game_entry, LV_ALIGN_TOP_RIGHT, -52, 2);
+    lv_obj_set_style_bg_opa(game_entry, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(game_entry, 0, 0);
+    lv_obj_set_style_shadow_width(game_entry, 0, 0);
+    lv_obj_set_style_pad_all(game_entry, 0, 0);
+    lv_obj_add_event_cb(game_entry, &LcdDisplay::OnGameEntryClicked, LV_EVENT_CLICKED, this);
+    lv_obj_t* game_icon = lv_label_create(game_entry);
+    lv_obj_set_style_text_font(game_icon, icon_font, 0);
+    lv_obj_set_style_text_color(game_icon, lvgl_theme->text_color(), 0);
+    lv_label_set_text(game_icon, MATERIAL_SYMBOLS_SPORTS_ESPORTS);
+    lv_obj_center(game_icon);
+
     media_bt_icon_ = lv_label_create(bt_entry);
     lv_obj_set_style_text_font(media_bt_icon_, icon_font, 0);
     lv_obj_set_style_text_color(media_bt_icon_, lv_color_hex(0x777777), 0);
@@ -1916,8 +1930,9 @@ void LcdDisplay::SetAvatarMood(AvatarMood mood) {
     avatar_blink_start_ = 0;
     gaze_next_ = 0;
     if (mood != kAvatarMoodIdle) {
-        // A conversation started: leave the media/paired screens so the user
-        // sees the dialog immediately.
+        // A conversation started: leave the media/paired/game screens so the
+        // user sees the dialog immediately.
+        game_.Hide();
         ShowMediaScreen(false);
         ShowBluetoothScreen(false);
     }
@@ -1933,7 +1948,7 @@ void LcdDisplay::AvatarAnimTimerCb(lv_timer_t* timer) {
     if (lv_obj_has_flag(self->emoji_box_, LV_OBJ_FLAG_HIDDEN)) {
         return;
     }
-    if (self->media_screen_visible_ || self->bluetooth_screen_visible_) {
+    if (self->media_screen_visible_ || self->bluetooth_screen_visible_ || self->game_.IsVisible()) {
         return;  // Overlay covers the AI screen; no need to animate.
     }
 
@@ -2301,6 +2316,7 @@ void LcdDisplay::ShowMediaScreen(bool show) {
         lv_obj_remove_flag(media_screen_, LV_OBJ_FLAG_HIDDEN);
         lv_obj_move_foreground(media_screen_);
     } else {
+        game_.Hide();
         lv_obj_add_flag(media_screen_, LV_OBJ_FLAG_HIDDEN);
     }
     UpdateMediaBarVisibility();
@@ -2414,6 +2430,13 @@ void LcdDisplay::HandleMediaKeyUp() {
     media_repeat_key_ = -1;
     if (media_repeat_timer_ != nullptr) {
         lv_timer_pause(media_repeat_timer_);
+    }
+}
+
+void LcdDisplay::OnGameEntryClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self != nullptr) {
+        self->game_.Show();
     }
 }
 
