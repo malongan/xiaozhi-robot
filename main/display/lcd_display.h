@@ -74,6 +74,9 @@ protected:
     uint32_t media_repeat_next_ = 0;
     bool media_playing_ = false;
     float avatar_face_scale_ = 1.0f;  // 1.0 = 80px, 1.875 = 150px idle face
+    uint32_t last_activity_tick_ = 0;
+    bool avatar_sleeping_ = false;
+    lv_obj_t* sleep_zzz_ = nullptr;
     lv_obj_t* media_hint_ = nullptr;
     lv_obj_t* media_bt_icon_ = nullptr;
     lv_obj_t* media_title_ = nullptr;
@@ -166,6 +169,8 @@ protected:
     static void OnAvatarPressed(lv_event_t* e);
     static void OnAvatarReleased(lv_event_t* e);
     static void OnAvatarLongPressed(lv_event_t* e);
+    static void OnUserActivity(lv_event_t* e);
+    void MarkUserActivity();
     static void OnMicButtonClicked(lv_event_t* e);
 
     void InitializeLcdThemes();

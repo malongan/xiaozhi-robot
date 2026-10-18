@@ -1161,6 +1161,14 @@ void LcdDisplay::SetupUI() {
     lv_label_set_text(avatar_think_dots_, "···");
     lv_obj_add_flag(avatar_think_dots_, LV_OBJ_FLAG_HIDDEN);
 
+    sleep_zzz_ = lv_label_create(screen);
+    lv_obj_set_style_text_font(sleep_zzz_, text_font, 0);
+    lv_obj_set_style_text_color(sleep_zzz_, lv_color_hex(0xC8C8D0), 0);
+    lv_obj_set_style_transform_pivot_x(sleep_zzz_, lv_pct(50), 0);
+    lv_obj_set_style_transform_pivot_y(sleep_zzz_, lv_pct(50), 0);
+    lv_label_set_text(sleep_zzz_, "Zzz");
+    lv_obj_add_flag(sleep_zzz_, LV_OBJ_FLAG_HIDDEN);
+
     emoji_label_ = lv_label_create(emoji_box_);
     lv_obj_set_style_text_font(emoji_label_, large_icon_font, 0);
     lv_obj_set_style_text_color(emoji_label_, lvgl_theme->text_color(), 0);
@@ -1452,6 +1460,9 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_text_color(bt_empty_, lvgl_theme->text_color(), 0);
     lv_label_set_text(bt_empty_, "尚未配对任何设备\n在电脑/手机蓝牙里\n搜索 Xiaozhi-Media 配对");
     lv_obj_align(bt_empty_, LV_ALIGN_CENTER, 0, 10);
+
+    lv_obj_add_event_cb(screen, &LcdDisplay::OnUserActivity, LV_EVENT_PRESSED, this);
+    lv_obj_add_event_cb(screen, &LcdDisplay::OnUserActivity, LV_EVENT_CLICKED, this);
 
     chat_lines_per_page_ = 5;  // idle layout: five lines + media entry icon
     ApplyChatLayout();
@@ -1781,6 +1792,9 @@ void LcdDisplay::ApplyChatLayout() {
     if (avatar_think_dots_ != nullptr) {
         lv_obj_align_to(avatar_think_dots_, emoji_box_, LV_ALIGN_TOP_RIGHT, 6, -4);
     }
+    if (sleep_zzz_ != nullptr) {
+        lv_obj_align_to(sleep_zzz_, emoji_box_, LV_ALIGN_TOP_RIGHT, 4, -10);
+    }
     if (media_bar_ != nullptr) {
         lv_obj_align(media_bar_, LV_ALIGN_BOTTOM_MID, 0, -10);
     }
@@ -1910,11 +1924,29 @@ void LcdDisplay::ClearChatMessages() {
 }
 #endif
 
+void LcdDisplay::MarkUserActivity() {
+    last_activity_tick_ = lv_tick_get();
+    if (avatar_sleeping_) {
+        avatar_sleeping_ = false;
+        if (sleep_zzz_ != nullptr) {
+            lv_obj_add_flag(sleep_zzz_, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+}
+
+void LcdDisplay::OnUserActivity(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self != nullptr) {
+        self->MarkUserActivity();
+    }
+}
+
 void LcdDisplay::SetAvatarMood(AvatarMood mood) {
     DisplayLockGuard lock(this);
     if (avatar_mood_ == mood) {
         return;
     }
+    MarkUserActivity();
     avatar_mood_ = mood;
     avatar_anim_epoch_ = lv_tick_get();
     avatar_blink_at_ = avatar_anim_epoch_ + 2600 + (esp_random() % 3500);
@@ -1965,6 +1997,14 @@ void LcdDisplay::AvatarAnimTimerCb(lv_timer_t* timer) {
     if (self->avatar_override_ != kAvatarExpressionNone && now < self->avatar_override_until_) {
         expression = self->avatar_override_;
     }
+
+    const uint32_t idle_ms = now - self->last_activity_tick_;
+    const bool sleeping = self->avatar_mood_ == kAvatarMoodIdle && idle_ms > 300000 &&
+                          self->avatar_override_ == kAvatarExpressionNone;
+    if (sleeping) {
+        expression = kAvatarExpressionClosed;
+    }
+    self->avatar_sleeping_ = sleeping;
 
     const bool happy = expression == kAvatarExpressionHappy;
     const bool thinking = expression == kAvatarExpressionThinking;
@@ -2030,6 +2070,15 @@ void LcdDisplay::AvatarAnimTimerCb(lv_timer_t* timer) {
             gaze_active = true;
             breath = static_cast<lv_coord_t>(10.0f * sinf(t * 2 * kPi / 3.2f));
             break;
+    }
+
+    if (sleeping) {
+        gaze_active = false;
+        look_x = 0;
+        look_y = 0;
+        bob = 0;
+        breath = static_cast<lv_coord_t>(5.0f * sinf(t * 2 * kPi / 6.0f));
+        face_rot = static_cast<int32_t>(40.0f * sinf(t * 2 * kPi / 7.0f));
     }
 
     const bool closed = expression == kAvatarExpressionClosed;
@@ -2233,6 +2282,21 @@ void LcdDisplay::AvatarAnimTimerCb(lv_timer_t* timer) {
     lv_obj_set_style_translate_x(self->emoji_box_, face_tx, 0);
     lv_obj_set_style_translate_y(self->emoji_box_, bob, 0);
     lv_obj_set_style_transform_rotation(self->emoji_box_, face_rot, 0);
+
+    if (self->sleep_zzz_ != nullptr) {
+        if (sleeping) {
+            const uint32_t phase = (now / 700) % 3;
+            lv_label_set_text(self->sleep_zzz_, phase == 0 ? "z" : phase == 1 ? "zz" : "zzz");
+            const float zt = static_cast<float>(idle_ms) / 1000.0f;
+            lv_obj_set_style_translate_y(
+                self->sleep_zzz_, static_cast<lv_coord_t>(-4.0f * sinf(zt * 2 * kPi / 1.8f)), 0);
+            lv_obj_set_style_transform_scale(
+                self->sleep_zzz_, 200 + static_cast<int32_t>(40.0f * sinf(zt * 2 * kPi / 1.4f)), 0);
+            lv_obj_remove_flag(self->sleep_zzz_, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(self->sleep_zzz_, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
 }
 
 void LcdDisplay::PickAvatarGaze() {
