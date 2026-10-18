@@ -97,6 +97,8 @@ protected:
     uint32_t avatar_anim_epoch_ = 0;
     uint32_t avatar_blink_at_ = 0;
     uint32_t avatar_blink_start_ = 0;
+    bool avatar_blink_single_eye_ = false;
+    uint8_t avatar_blink_eye_ = 0;
 
     void ApplyChatLayout();
     const lv_font_t* GetChatFont();

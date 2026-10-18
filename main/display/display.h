@@ -50,6 +50,8 @@ enum AvatarExpression {
     kAvatarExpressionSpeaking,
     kAvatarExpressionThinking,
     kAvatarExpressionHappy,
+    kAvatarExpressionClosed,  // both eyes closed (sleepy)
+    kAvatarExpressionWink,    // one eye closed
 };
 
 class Display {
