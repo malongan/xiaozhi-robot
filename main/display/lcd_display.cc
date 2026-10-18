@@ -1325,7 +1325,7 @@ void LcdDisplay::SetupUI() {
 
     const char* media_icons[6] = {
         MATERIAL_SYMBOLS_SKIP_PREVIOUS, MATERIAL_SYMBOLS_PLAY_ARROW,  MATERIAL_SYMBOLS_SKIP_NEXT,
-        MATERIAL_SYMBOLS_VOLUME_OFF,    MATERIAL_SYMBOLS_VOLUME_DOWN, MATERIAL_SYMBOLS_VOLUME_UP,
+        MATERIAL_SYMBOLS_VOLUME_DOWN,   MATERIAL_SYMBOLS_VOLUME_OFF,  MATERIAL_SYMBOLS_VOLUME_UP,
     };
     static const char* const kShortcutLabels[10] = {"调度", "切换", "锁屏", "截图", "聚焦",
                                                     "全屏", "关闭", "桌面", "复制", "粘贴"};
