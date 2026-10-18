@@ -62,7 +62,6 @@ protected:
     lv_obj_t* bluetooth_screen_ = nullptr;  // paired-device list
     bool media_screen_visible_ = false;
     bool bluetooth_screen_visible_ = false;
-    lv_point_precise_t media_cable_pts_[4] = {};
     lv_obj_t* media_keys_[6] = {};
     lv_obj_t* media_hint_ = nullptr;
     lv_obj_t* media_title_ = nullptr;

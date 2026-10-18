@@ -1,0 +1,313 @@
+#include "media_ble.h"
+
+#include <cstring>
+
+#include <esp_log.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <host/ble_gap.h>
+#include <host/ble_gatt.h>
+#include <host/ble_hs.h>
+#include <host/ble_hs_adv.h>
+#include <host/util/util.h>
+#include <nimble/nimble_port.h>
+#include <nimble/nimble_port_freertos.h>
+#include <services/gap/ble_svc_gap.h>
+#include <services/gatt/ble_svc_gatt.h>
+
+#define TAG "MediaBle"
+
+// Called by NimBLE to initialise the NVS-backed bond store.
+extern "C" void ble_store_config_init(void);
+
+namespace {
+
+constexpr const char* kDeviceName = "Xiaozhi-Media";
+
+const ble_uuid16_t kHidServiceUuid = BLE_UUID16_INIT(0x1812);
+const ble_uuid16_t kHidInfoUuid = BLE_UUID16_INIT(0x2A4A);
+const ble_uuid16_t kReportMapUuid = BLE_UUID16_INIT(0x2A4B);
+const ble_uuid16_t kHidControlUuid = BLE_UUID16_INIT(0x2A4C);
+const ble_uuid16_t kReportUuid = BLE_UUID16_INIT(0x2A4D);
+const ble_uuid16_t kProtocolModeUuid = BLE_UUID16_INIT(0x2A4E);
+const ble_uuid16_t kReportRefUuid = BLE_UUID16_INIT(0x2908);
+
+// Consumer Control: six 1-bit keys + two padding bits, report ID 2.
+const uint8_t kReportMap[] = {
+    0x05, 0x0C,  // Usage Page (Consumer)
+    0x09, 0x01,  // Usage (Consumer Control)
+    0xA1, 0x01,  // Collection (Application)
+    0x85, 0x02,  //   Report ID (2)
+    0x15, 0x00,  //   Logical Minimum (0)
+    0x25, 0x01,  //   Logical Maximum (1)
+    0x75, 0x01,  //   Report Size (1)
+    0x95, 0x06,  //   Report Count (6)
+    0x09, 0xB5,  //   Usage (Scan Next Track)
+    0x09, 0xB6,  //   Usage (Scan Previous Track)
+    0x09, 0xCD,  //   Usage (Play/Pause)
+    0x09, 0xE2,  //   Usage (Mute)
+    0x09, 0xE9,  //   Usage (Volume Increment)
+    0x09, 0xEA,  //   Usage (Volume Decrement)
+    0x81, 0x02,  //   Input (Data,Var,Abs)
+    0x95, 0x02,  //   Report Count (2)
+    0x81, 0x03,  //   Input (Const,Var,Abs)
+    0xC0,        // End Collection
+};
+
+const uint8_t kHidInfo[] = {0x11, 0x01, 0x00, 0x02};  // bcdHID 1.11, country 0, flags
+const uint8_t kReportReference[] = {0x02, 0x01};      // report id 2, input report
+uint8_t g_protocol_mode = 1;                          // report protocol
+uint8_t g_report_value = 0;
+
+uint8_t g_own_addr_type = 0;
+
+ble_gatt_chr_def g_hid_chrs[6] = {};
+ble_gatt_dsc_def g_hid_dscs[2] = {};
+ble_gatt_svc_def g_hid_svcs[2] = {};
+
+int HidInfoAccess(uint16_t, uint16_t, struct ble_gatt_access_ctxt* ctxt, void*) {
+    return os_mbuf_append(ctxt->om, kHidInfo, sizeof(kHidInfo)) == 0 ? 0
+                                                                     : BLE_ATT_ERR_INSUFFICIENT_RES;
+}
+
+int ReportMapAccess(uint16_t, uint16_t, struct ble_gatt_access_ctxt* ctxt, void*) {
+    return os_mbuf_append(ctxt->om, kReportMap, sizeof(kReportMap)) == 0
+               ? 0
+               : BLE_ATT_ERR_INSUFFICIENT_RES;
+}
+
+int ControlPointAccess(uint16_t, uint16_t, struct ble_gatt_access_ctxt* ctxt, void*) {
+    if (ctxt->op == BLE_GATT_ACCESS_OP_WRITE_CHR) {
+        return 0;
+    }
+    return BLE_ATT_ERR_UNLIKELY;
+}
+
+int ProtocolModeAccess(uint16_t, uint16_t, struct ble_gatt_access_ctxt* ctxt, void*) {
+    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) {
+        return os_mbuf_append(ctxt->om, &g_protocol_mode, 1) == 0 ? 0
+                                                                  : BLE_ATT_ERR_INSUFFICIENT_RES;
+    }
+    if (ctxt->op == BLE_GATT_ACCESS_OP_WRITE_CHR && OS_MBUF_PKTLEN(ctxt->om) >= 1) {
+        if (os_mbuf_copydata(ctxt->om, 0, 1, &g_protocol_mode) != 0) {
+            return BLE_ATT_ERR_UNLIKELY;
+        }
+        return 0;
+    }
+    return BLE_ATT_ERR_UNLIKELY;
+}
+
+int ReportAccess(uint16_t, uint16_t, struct ble_gatt_access_ctxt* ctxt, void*) {
+    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) {
+        return os_mbuf_append(ctxt->om, &g_report_value, 1) == 0 ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
+    }
+    return BLE_ATT_ERR_UNLIKELY;
+}
+
+int ReportReferenceAccess(uint16_t, uint16_t, struct ble_gatt_access_ctxt* ctxt, void*) {
+    return os_mbuf_append(ctxt->om, kReportReference, sizeof(kReportReference)) == 0
+               ? 0
+               : BLE_ATT_ERR_INSUFFICIENT_RES;
+}
+
+}  // namespace
+
+MediaBle& MediaBle::GetInstance() {
+    static MediaBle instance;
+    return instance;
+}
+
+void MediaBle::SetStatusCallback(StatusCallback callback) {
+    status_callback_ = std::move(callback);
+}
+
+void MediaBle::InitGattServices() {
+    g_hid_dscs[0] = {};
+    g_hid_dscs[0].uuid = &kReportRefUuid.u;
+    g_hid_dscs[0].att_flags = BLE_ATT_F_READ;
+    g_hid_dscs[0].access_cb = ReportReferenceAccess;
+    g_hid_dscs[1] = {};
+
+    g_hid_chrs[0] = {};
+    g_hid_chrs[0].uuid = &kHidInfoUuid.u;
+    g_hid_chrs[0].access_cb = HidInfoAccess;
+    g_hid_chrs[0].flags = BLE_GATT_CHR_F_READ;
+    g_hid_chrs[1] = {};
+    g_hid_chrs[1].uuid = &kReportMapUuid.u;
+    g_hid_chrs[1].access_cb = ReportMapAccess;
+    g_hid_chrs[1].flags = BLE_GATT_CHR_F_READ;
+    g_hid_chrs[2] = {};
+    g_hid_chrs[2].uuid = &kHidControlUuid.u;
+    g_hid_chrs[2].access_cb = ControlPointAccess;
+    g_hid_chrs[2].flags = BLE_GATT_CHR_F_WRITE_NO_RSP;
+    g_hid_chrs[3] = {};
+    g_hid_chrs[3].uuid = &kProtocolModeUuid.u;
+    g_hid_chrs[3].access_cb = ProtocolModeAccess;
+    g_hid_chrs[3].flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE_NO_RSP;
+    g_hid_chrs[4] = {};
+    g_hid_chrs[4].uuid = &kReportUuid.u;
+    g_hid_chrs[4].access_cb = ReportAccess;
+    g_hid_chrs[4].flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_NOTIFY;
+    g_hid_chrs[4].descriptors = g_hid_dscs;
+    g_hid_chrs[5] = {};
+
+    g_hid_svcs[0] = {};
+    g_hid_svcs[0].type = BLE_GATT_SVC_TYPE_PRIMARY;
+    g_hid_svcs[0].uuid = &kHidServiceUuid.u;
+    g_hid_svcs[0].characteristics = g_hid_chrs;
+    g_hid_svcs[1] = {};
+
+    ble_svc_gap_init();
+    ble_svc_gatt_init();
+    int rc = ble_gatts_count_cfg(g_hid_svcs);
+    if (rc != 0) {
+        ESP_LOGE(TAG, "ble_gatts_count_cfg failed: %d", rc);
+        return;
+    }
+    rc = ble_gatts_add_svcs(g_hid_svcs);
+    if (rc != 0) {
+        ESP_LOGE(TAG, "ble_gatts_add_svcs failed: %d", rc);
+    }
+}
+
+void MediaBle::Start() {
+    if (started_) {
+        return;
+    }
+    started_ = true;
+
+    int rc = nimble_port_init();
+    if (rc != ESP_OK) {
+        ESP_LOGE(TAG, "nimble_port_init failed: %d", rc);
+        return;
+    }
+
+    ble_hs_cfg.reset_cb = &MediaBle::OnReset;
+    ble_hs_cfg.sync_cb = &MediaBle::OnSync;
+    ble_hs_cfg.store_status_cb = ble_store_util_status_rr;
+    ble_hs_cfg.sm_io_cap = BLE_SM_IO_CAP_NO_IO;
+    ble_hs_cfg.sm_bonding = 1;
+    ble_hs_cfg.sm_mitm = 0;
+    ble_hs_cfg.sm_sc = 1;
+    ble_hs_cfg.sm_our_key_dist |= BLE_SM_PAIR_KEY_DIST_ENC;
+    ble_hs_cfg.sm_their_key_dist |= BLE_SM_PAIR_KEY_DIST_ENC;
+
+    InitGattServices();
+    ble_store_config_init();
+
+    nimble_port_freertos_init(&MediaBle::HostTask);
+    ESP_LOGI(TAG, "BLE HID started, advertising as %s", kDeviceName);
+}
+
+void MediaBle::HostTask(void*) {
+    nimble_port_run();
+    nimble_port_freertos_deinit();
+}
+
+void MediaBle::OnReset(int reason) { ESP_LOGW(TAG, "host reset, reason=%d", reason); }
+
+void MediaBle::OnSync() {
+    ble_svc_gap_device_name_set(kDeviceName);
+    if (ble_hs_id_infer_auto(0, &g_own_addr_type) != 0) {
+        ESP_LOGE(TAG, "failed to infer address type");
+    }
+    auto& self = GetInstance();
+    if (ble_gatts_find_chr(&kHidServiceUuid.u, &kReportUuid.u, nullptr, &self.report_val_handle_) !=
+        0) {
+        ESP_LOGE(TAG, "report characteristic not found");
+    }
+    self.StartAdvertising();
+    ESP_LOGI(TAG, "host synced, advertise");
+}
+
+void MediaBle::StartAdvertising() {
+    struct ble_hs_adv_fields fields = {};
+    fields.flags = BLE_HS_ADV_F_DISC_GEN | BLE_HS_ADV_F_BREDR_UNSUP;
+    ble_uuid16_t hid_uuid = BLE_UUID16_INIT(0x1812);
+    fields.uuids16 = &hid_uuid;
+    fields.num_uuids16 = 1;
+    fields.uuids16_is_complete = 1;
+    fields.appearance = 0x03C1;  // keyboard
+    fields.appearance_is_present = 1;
+
+    int rc = ble_gap_adv_set_fields(&fields);
+    if (rc != 0) {
+        ESP_LOGE(TAG, "adv set fields failed: %d", rc);
+        return;
+    }
+
+    struct ble_hs_adv_fields rsp = {};
+    rsp.name = reinterpret_cast<const uint8_t*>(kDeviceName);
+    rsp.name_len = static_cast<uint8_t>(strlen(kDeviceName));
+    rsp.name_is_complete = 1;
+    rc = ble_gap_adv_rsp_set_fields(&rsp);
+    if (rc != 0) {
+        ESP_LOGE(TAG, "adv rsp set fields failed: %d", rc);
+        return;
+    }
+
+    struct ble_gap_adv_params params = {};
+    params.conn_mode = BLE_GAP_CONN_MODE_UND;
+    params.disc_mode = BLE_GAP_DISC_MODE_GEN;
+    rc = ble_gap_adv_start(g_own_addr_type, nullptr, BLE_HS_FOREVER, &params, &MediaBle::GapEvent,
+                           nullptr);
+    if (rc != 0 && rc != BLE_HS_EALREADY) {
+        ESP_LOGE(TAG, "adv start failed: %d", rc);
+    }
+}
+
+int MediaBle::GapEvent(struct ble_gap_event* event, void*) {
+    auto& self = GetInstance();
+    switch (event->type) {
+        case BLE_GAP_EVENT_CONNECT:
+            if (event->connect.status == 0) {
+                self.conn_handle_ = event->connect.conn_handle;
+                self.connected_ = true;
+                ESP_LOGI(TAG, "host connected, handle=%d", self.conn_handle_);
+                if (self.status_callback_) {
+                    self.status_callback_(true);
+                }
+            } else {
+                self.StartAdvertising();
+            }
+            return 0;
+        case BLE_GAP_EVENT_DISCONNECT:
+            ESP_LOGI(TAG, "host disconnected, reason=%d", event->disconnect.reason);
+            self.connected_ = false;
+            self.conn_handle_ = 0xFFFF;
+            if (self.status_callback_) {
+                self.status_callback_(false);
+            }
+            self.StartAdvertising();
+            return 0;
+        case BLE_GAP_EVENT_ADV_COMPLETE:
+            self.StartAdvertising();
+            return 0;
+        case BLE_GAP_EVENT_ENC_CHANGE:
+            ESP_LOGI(TAG, "encryption change, status=%d", event->enc_change.status);
+            return 0;
+        case BLE_GAP_EVENT_SUBSCRIBE:
+            ESP_LOGI(TAG, "subscribe, notify=%d", event->subscribe.cur_notify);
+            return 0;
+        default:
+            return 0;
+    }
+}
+
+bool MediaBle::SendKey(MediaBleKey key) {
+    if (!connected_ || conn_handle_ == 0xFFFF || report_val_handle_ == 0) {
+        return false;
+    }
+    const uint8_t bit = static_cast<uint8_t>(1u << static_cast<uint8_t>(key));
+    auto notify = [this](uint8_t value) {
+        g_report_value = value;
+        struct os_mbuf* om = ble_hs_mbuf_from_flat(&value, 1);
+        if (om != nullptr) {
+            ble_gatts_notify_custom(conn_handle_, report_val_handle_, om);
+        }
+    };
+    notify(bit);
+    vTaskDelay(pdMS_TO_TICKS(20));
+    notify(0);
+    return true;
+}

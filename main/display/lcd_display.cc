@@ -5,6 +5,7 @@
 #include "gif/lvgl_gif.h"
 #include "lvgl_font.h"
 #include "lvgl_theme.h"
+#include "media_ble.h"
 #include "settings.h"
 
 #include <esp_err.h>
@@ -1274,18 +1275,6 @@ void LcdDisplay::SetupUI() {
     lv_obj_remove_flag(spacebar, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_remove_flag(spacebar, LV_OBJ_FLAG_CLICKABLE);
 
-    media_cable_pts_[0] = {0, 10};
-    media_cable_pts_[1] = {2, 4};
-    media_cable_pts_[2] = {7, 1};
-    media_cable_pts_[3] = {10, 0};
-    lv_obj_t* cable = lv_line_create(media_bar_);
-    lv_line_set_points(cable, media_cable_pts_, 4);
-    lv_obj_set_style_line_width(cable, 2, 0);
-    lv_obj_set_style_line_color(cable, lvgl_theme->text_color(), 0);
-    lv_obj_set_style_line_rounded(cable, true, 0);
-    lv_obj_align(cable, LV_ALIGN_TOP_MID, 2, 0);
-    lv_obj_remove_flag(cable, LV_OBJ_FLAG_CLICKABLE);
-
     /* Media screen: full-screen overlay with six outline media keys. */
     media_screen_ = lv_obj_create(screen);
     lv_obj_set_size(media_screen_, LV_HOR_RES, LV_VER_RES);
@@ -1407,6 +1396,17 @@ void LcdDisplay::SetupUI() {
 
     chat_lines_per_page_ = 5;  // idle layout: five lines + media entry icon
     ApplyChatLayout();
+
+    // Bring up the BLE HID media keyboard and reflect the link state.
+    MediaBle::GetInstance().SetStatusCallback([this](bool connected) {
+        Application::GetInstance().Schedule([this, connected]() {
+            DisplayLockGuard lock(this);
+            if (media_hint_ != nullptr) {
+                lv_label_set_text(media_hint_, connected ? "蓝牙已连接" : "蓝牙未连接");
+            }
+        });
+    });
+    MediaBle::GetInstance().Start();
 
     // 25 fps avatar animation: breathing, blink and state-driven motion.
     avatar_anim_epoch_ = lv_tick_get();
@@ -2269,13 +2269,15 @@ void LcdDisplay::OnMediaKeyClicked(lv_event_t* e) {
         return;
     }
     lv_obj_t* target = lv_event_get_target_obj(e);
-    static const char* kHints[6] = {"上一首（BLE 待接入）", "播放/暂停（BLE 待接入）",
-                                    "下一首（BLE 待接入）", "音量-（BLE 待接入）",
-                                    "静音（BLE 待接入）",   "音量+（BLE 待接入）"};
+    static const MediaBleKey kKeys[6] = {MediaBleKey::kPrevious, MediaBleKey::kPlayPause,
+                                         MediaBleKey::kNext,     MediaBleKey::kVolumeDown,
+                                         MediaBleKey::kMute,     MediaBleKey::kVolumeUp};
+    static const char* kHints[6] = {"上一首", "播放/暂停", "下一首", "音量-", "静音", "音量+"};
     for (int i = 0; i < 6; ++i) {
         if (target == self->media_keys_[i]) {
+            const bool sent = MediaBle::GetInstance().SendKey(kKeys[i]);
             if (self->media_hint_ != nullptr) {
-                lv_label_set_text(self->media_hint_, kHints[i]);
+                lv_label_set_text(self->media_hint_, sent ? kHints[i] : "蓝牙未连接");
             }
             return;
         }
