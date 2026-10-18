@@ -550,22 +550,33 @@ bool MediaBle::SendKey(MediaBleKey key) {
     memcpy(g_consumer_value, consumer, sizeof(consumer));
     int rc_mixed = 0;
     int rc_consumer = 0;
-    struct os_mbuf* om = ble_hs_mbuf_from_flat(mixed, sizeof(mixed));
-    if (om != nullptr) {
-        rc_mixed = ble_gatts_notify_custom(conn_handle_, report_val_handle_, om);
+    const bool send_mixed = send_mode_ != MediaSendMode::kConsumerOnly;
+    const bool send_consumer = send_mode_ != MediaSendMode::kMixedOnly;
+    struct os_mbuf* om = nullptr;
+    if (send_mixed) {
+        om = ble_hs_mbuf_from_flat(mixed, sizeof(mixed));
+        if (om != nullptr) {
+            rc_mixed = ble_gatts_notify_custom(conn_handle_, report_val_handle_, om);
+        }
     }
-    om = ble_hs_mbuf_from_flat(consumer, sizeof(consumer));
-    if (om != nullptr) {
-        rc_consumer = ble_gatts_notify_custom(conn_handle_, consumer_val_handle_, om);
+    if (send_consumer) {
+        om = ble_hs_mbuf_from_flat(consumer, sizeof(consumer));
+        if (om != nullptr) {
+            rc_consumer = ble_gatts_notify_custom(conn_handle_, consumer_val_handle_, om);
+        }
     }
     vTaskDelay(pdMS_TO_TICKS(20));
-    om = ble_hs_mbuf_from_flat(zeros, sizeof(zeros));
-    if (om != nullptr) {
-        ble_gatts_notify_custom(conn_handle_, report_val_handle_, om);
+    if (send_mixed) {
+        om = ble_hs_mbuf_from_flat(zeros, sizeof(zeros));
+        if (om != nullptr) {
+            ble_gatts_notify_custom(conn_handle_, report_val_handle_, om);
+        }
     }
-    om = ble_hs_mbuf_from_flat(zeros, sizeof(consumer));
-    if (om != nullptr) {
-        ble_gatts_notify_custom(conn_handle_, consumer_val_handle_, om);
+    if (send_consumer) {
+        om = ble_hs_mbuf_from_flat(zeros, sizeof(consumer));
+        if (om != nullptr) {
+            ble_gatts_notify_custom(conn_handle_, consumer_val_handle_, om);
+        }
     }
     ESP_LOGI(TAG, "send key %d mixed=%d consumer=%d handles=%d/%d", index, rc_mixed, rc_consumer,
              report_val_handle_, consumer_val_handle_);

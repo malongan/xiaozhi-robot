@@ -1382,6 +1382,20 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_width(media_hint_, 140);
     lv_obj_add_flag(media_hint_, LV_OBJ_FLAG_HIDDEN);
 
+    lv_obj_t* mode_btn = lv_button_create(media_screen_);
+    lv_obj_set_size(mode_btn, 140, 34);
+    lv_obj_align(mode_btn, LV_ALIGN_BOTTOM_MID, 0, -6);
+    lv_obj_set_style_radius(mode_btn, 8, 0);
+    lv_obj_set_style_bg_opa(mode_btn, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(mode_btn, 1, 0);
+    lv_obj_set_style_border_color(mode_btn, lvgl_theme->text_color(), 0);
+    lv_obj_set_style_shadow_width(mode_btn, 0, 0);
+    lv_obj_set_style_pad_all(mode_btn, 0, 0);
+    lv_obj_add_event_cb(mode_btn, &LcdDisplay::OnMediaModeClicked, LV_EVENT_CLICKED, this);
+    media_mode_label_ = lv_label_create(mode_btn);
+    lv_label_set_text(media_mode_label_, "发送:双发");
+    lv_obj_center(media_mode_label_);
+
     /* Keyboard panels: full QWERTY with arrows, and a numeric keypad. */
     struct KeyDef {
         const char* label;
@@ -2506,6 +2520,20 @@ void LcdDisplay::OnMediaPanelCycle(lv_event_t* e) {
     if (self != nullptr) {
         self->SetMediaPanel(self->media_panel_ + 1);
     }
+}
+
+void LcdDisplay::OnMediaModeClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self == nullptr) {
+        return;
+    }
+    static const char* kNames[] = {"发送:双发", "发送:混合", "发送:独立"};
+    const int next = (static_cast<int>(MediaBle::GetInstance().GetSendMode()) + 1) % 3;
+    MediaBle::GetInstance().SetSendMode(static_cast<MediaSendMode>(next));
+    if (self->media_mode_label_ != nullptr) {
+        lv_label_set_text(self->media_mode_label_, kNames[next]);
+    }
+    self->ShowTitleFeedback(kNames[next]);
 }
 
 void LcdDisplay::OnKeyboardKeyClicked(lv_event_t* e) {

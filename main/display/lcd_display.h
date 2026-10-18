@@ -79,6 +79,7 @@ protected:
     lv_obj_t* kb_shift_btn_ = nullptr;
     lv_timer_t* media_title_timer_ = nullptr;
     lv_obj_t* media_hint_ = nullptr;
+    lv_obj_t* media_mode_label_ = nullptr;
     lv_obj_t* media_title_ = nullptr;
     lv_obj_t* bt_title_ = nullptr;
     lv_obj_t* bt_empty_ = nullptr;
@@ -156,6 +157,7 @@ protected:
     static void MediaRepeatTimerCb(lv_timer_t* timer);
     static void OnMediaPanelCycle(lv_event_t* e);
     static void OnKeyboardKeyClicked(lv_event_t* e);
+    static void OnMediaModeClicked(lv_event_t* e);
     static void MediaTitleTimerCb(lv_timer_t* timer);
     void ShowTitleFeedback(const char* text);
     void UpdatePanelTitle();

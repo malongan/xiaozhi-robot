@@ -22,6 +22,14 @@ struct MediaBlePeer {
     uint8_t addr[6];
 };
 
+// How media keys are delivered: both reports, mixed report only (macOS),
+// or standalone consumer report only (Android).
+enum class MediaSendMode : uint8_t {
+    kBoth = 0,
+    kMixedOnly = 1,
+    kConsumerOnly = 2,
+};
+
 class MediaBle {
 public:
     using StatusCallback = std::function<void(bool connected)>;
@@ -35,6 +43,8 @@ public:
     // Pulses one consumer-control bit (press, 20 ms, release).
     bool SendKey(MediaBleKey key);
     bool SendShortcut(uint8_t modifiers, uint8_t keycode);
+    void SetSendMode(MediaSendMode mode) { send_mode_ = mode; }
+    MediaSendMode GetSendMode() const { return send_mode_; }
     bool SendKeycode(uint8_t keycode, uint8_t modifiers = 0);
 
     bool IsConnected() const { return connected_; }
@@ -69,6 +79,7 @@ private:
     uint16_t subscribed_handle_ = 0;
     bool subscribed_notify_ = false;
     StatusCallback status_callback_;
+    MediaSendMode send_mode_ = MediaSendMode::kBoth;
 };
 
 #endif  // MEDIA_BLE_H
