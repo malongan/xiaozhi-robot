@@ -278,6 +278,7 @@ public:
     ~LcdDisplay();
     virtual void SetEmotion(const char* emotion) override;
     virtual void SetAvatarMood(AvatarMood mood) override;
+    virtual void OnWakeWordDetected() override;
     virtual void SetChatMessage(const char* role, const char* content) override;
     virtual void ClearChatMessages() override;
     virtual bool KeepsChatHistory() const override { return true; }

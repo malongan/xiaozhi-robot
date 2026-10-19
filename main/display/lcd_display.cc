@@ -2345,6 +2345,16 @@ void LcdDisplay::OnRebootClicked(lv_event_t* e) {
     esp_restart();
 }
 
+void LcdDisplay::OnWakeWordDetected() {
+    DisplayLockGuard lock(this);
+    if (stroke_screen_visible_) {
+        ShowStrokeScreen(false);
+    }
+    if (settings_screen_visible_) {
+        ShowSettingsScreen(false);
+    }
+}
+
 void LcdDisplay::ShowPressRing() {
     if (page_progress_ == nullptr) {
         return;
@@ -2397,6 +2407,14 @@ void LcdDisplay::OnAvatarReleased(lv_event_t* e) {
 
 void LcdDisplay::OnMicButtonClicked(lv_event_t* e) {
     auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self != nullptr) {
+        if (self->stroke_screen_visible_) {
+            self->ShowStrokeScreen(false);
+        }
+        if (self->settings_screen_visible_) {
+            self->ShowSettingsScreen(false);
+        }
+    }
     if (self != nullptr && !self->chat_pages_.empty()) {
         // Continue the conversation from the live page.
         self->GoToPage(static_cast<int>(self->chat_pages_.size()) - 1, false);
@@ -2468,12 +2486,7 @@ void LcdDisplay::SetAvatarMood(AvatarMood mood) {
         if (settings_screen_visible_) {
             ShowSettingsScreen(false);
         }
-        // The stroke page is opened by the assistant while it is answering a
-        // "write ... for me" question, so only close it when the *user* starts
-        // talking (Listening). Closing it on Speaking cut the demo short.
-        if (mood == kAvatarMoodListening && stroke_screen_visible_) {
-            ShowStrokeScreen(false);
-        }
+
     }
     UpdateChatViewport();
 }
@@ -3197,7 +3210,7 @@ void LcdDisplay::StrokeAnimTick() {
     // Do not leave a demo looping on screen forever: after a minute without
     // any touch/voice activity return to the normal screen. A wake word also
     // exits immediately (SetAvatarMood hides the page on conversation start).
-    if (stroke_screen_visible_ && lv_tick_get() - last_activity_tick_ > 60000) {
+    if (stroke_screen_visible_ && lv_tick_get() - last_activity_tick_ > 300000) {
         ShowStrokeScreen(false);
         return;
     }

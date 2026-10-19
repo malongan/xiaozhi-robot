@@ -969,6 +969,9 @@ void Application::HandleWakeWordDetectedEvent() {
     auto state = GetDeviceState();
     auto wake_word = audio_service_.GetLastWakeWord();
     ESP_LOGI(TAG, "Wake word detected: %s (state: %d)", wake_word.c_str(), (int)state);
+    if (auto display = Board::GetInstance().GetDisplay()) {
+        display->OnWakeWordDetected();
+    }
 
     if (state == kDeviceStateIdle) {
         // The wake word starts a fresh conversation: reset the server session

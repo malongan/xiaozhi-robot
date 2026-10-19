@@ -65,6 +65,9 @@ public:
     virtual void SetEmotion(const char* emotion);
     // Drives the idle/active animation of the avatar (breathing, bounce...).
     virtual void SetAvatarMood(AvatarMood mood) { (void)mood; }
+    // A wake word starts a new conversation turn; pages that belong to the
+    // previous turn (e.g. the stroke demo) can close themselves here.
+    virtual void OnWakeWordDetected() {}
     virtual void SetChatMessage(const char* role, const char* content);
     virtual void ClearChatMessages();
     // Whether this display keeps chat history across idle/notification events.
