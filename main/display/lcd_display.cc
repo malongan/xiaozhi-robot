@@ -11,6 +11,7 @@
 #include <esp_system.h>
 
 LV_FONT_DECLARE(font_zzz_30);
+LV_FONT_DECLARE(font_pinyin_20);
 
 #include <cstdio>
 #include "settings.h"
@@ -1541,7 +1542,9 @@ void LcdDisplay::SetupUI() {
         lv_obj_center(close_icon);
 
         stroke_title_label_ = lv_label_create(stroke_screen_);
-        lv_obj_set_style_text_font(stroke_title_label_, text_font, 0);
+        // Dedicated font with pinyin tone marks (ā á ǎ à ...); the theme
+        // font does not necessarily contain them.
+        lv_obj_set_style_text_font(stroke_title_label_, &font_pinyin_20, 0);
         lv_obj_set_style_text_color(stroke_title_label_, lvgl_theme->text_color(), 0);
         lv_label_set_text(stroke_title_label_, "笔顺");
         lv_obj_align(stroke_title_label_, LV_ALIGN_TOP_MID, 0, 8);
@@ -2173,8 +2176,7 @@ void LcdDisplay::RebindStrokeFonts(const lv_font_t* text_font, const lv_font_t* 
     // moment.  When assets reload and the old fonts are freed we must move all
     // of its labels to the new fonts *before* any style change triggers a
     // label relayout, otherwise LVGL calls through a stale font pointer.
-    lv_obj_t* text_labels[] = {stroke_title_label_, stroke_pinyin_label_, stroke_info_label_,
-                               stroke_entry_label_};
+    lv_obj_t* text_labels[] = {stroke_pinyin_label_, stroke_info_label_, stroke_entry_label_};
     for (lv_obj_t* label : text_labels) {
         if (label != nullptr && text_font != nullptr) {
             lv_obj_set_style_text_font(label, text_font, 0);
@@ -3277,7 +3279,7 @@ void LcdDisplay::StrokeLoadChar(int idx) {
     stroke_color_done_ = lv_color_mix(lv_color_hex(0xFFFFFF), stroke_color_bg_, LV_OPA_60);
     stroke_color_active_ = lv_color_hex(0xFFFFFF);
 
-    lv_label_set_text(stroke_title_label_, StrokeAsciiPinyin(store.PinyinOf(idx)).c_str());
+    lv_label_set_text(stroke_title_label_, store.PinyinOf(idx).c_str());
 
     StrokeFillCanvas(stroke_color_bg_);
     StrokeBlitGlyph(stroke_color_dim_);
