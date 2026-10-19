@@ -2472,12 +2472,21 @@ void LcdDisplay::SetAvatarMood(AvatarMood mood) {
     if (avatar_mood_ == mood) {
         return;
     }
+    const AvatarMood previous_mood = avatar_mood_;
     MarkUserActivity();
     avatar_mood_ = mood;
     avatar_anim_epoch_ = lv_tick_get();
     avatar_blink_at_ = avatar_anim_epoch_ + 2600 + (esp_random() % 3500);
     avatar_blink_start_ = 0;
     gaze_next_ = 0;
+    if (mood == kAvatarMoodIdle && previous_mood == kAvatarMoodSpeaking &&
+        stroke_screen_visible_) {
+        // The session ended (e.g. the assistant said goodbye): the stroke demo
+        // belongs to that conversation, so go back to the idle screen instead
+        // of waiting for the five-minute timeout. A normal answer goes back to
+        // Listening, not Idle, so it keeps the demo running.
+        ShowStrokeScreen(false);
+    }
     if (mood != kAvatarMoodIdle) {
         // A conversation started: leave the media/paired/stroke/settings
         // screens so the user sees the dialog immediately.
@@ -3216,12 +3225,9 @@ void LcdDisplay::StrokeAnimTick() {
     }
     if (stroke_done_tick_ != 0) {
         if (static_cast<int32_t>(lv_tick_get() - stroke_done_tick_) >= 0) {
-            int grade = store.GradeAt(stroke_char_idx_);
-            int next = stroke_char_idx_ + 1;
-            if (next < store.GradeStart(grade) || next >= store.GradeEnd(grade)) {
-                next = store.GradeStart(grade);
-            }
-            StrokeLoadChar(next);
+            // Keep demonstrating the character the user asked for; switching
+            // characters only happens from the prev/next keys.
+            StrokeLoadChar(stroke_char_idx_);
         }
         return;
     }
@@ -3266,7 +3272,7 @@ void LcdDisplay::StrokeAnimTick() {
         int s = stroke_stroke_idx_ + 1;
         if (s >= static_cast<int>(stroke_metas_.size()) || s >= kStrokeMaxStrokes) {
             StrokeBlitGlyph(stroke_color_active_);
-            stroke_done_tick_ = lv_tick_get() + 4000;
+            stroke_done_tick_ = lv_tick_get() + 2500;
             lv_obj_invalidate(stroke_canvas_);
         } else {
             StrokeStartStroke(s);
