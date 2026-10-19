@@ -1552,30 +1552,6 @@ void LcdDisplay::SetupUI() {
             lv_color_mix(lvgl_theme->text_color(), lvgl_theme->background_color(), LV_OPA_40), 0);
         lv_obj_set_style_clip_corner(stroke_canvas_, true, 0);
 
-        auto create_badge = [this, text_font](int num) {
-            lv_obj_t* b = lv_obj_create(stroke_canvas_);
-            lv_obj_set_size(b, 20, 20);
-            lv_obj_set_style_radius(b, 10, 0);
-            lv_obj_set_style_bg_color(b, lv_color_hex(0x30303C), 0);
-            lv_obj_set_style_bg_opa(b, LV_OPA_COVER, 0);
-            lv_obj_set_style_border_width(b, 0, 0);
-            lv_obj_remove_flag(b, LV_OBJ_FLAG_SCROLLABLE);
-            lv_obj_clear_flag(b, LV_OBJ_FLAG_CLICKABLE);
-            lv_obj_add_flag(b, LV_OBJ_FLAG_HIDDEN);
-            lv_obj_t* t = lv_label_create(b);
-            lv_obj_set_style_text_font(t, text_font, 0);
-            lv_obj_set_style_text_color(t, lv_color_hex(0xE8E8F0), 0);
-            lv_label_set_text_fmt(t, "%d", num);
-            lv_obj_center(t);
-            return b;
-        };
-        for (int i = 0; i < kStrokeMaxStrokes; ++i) {
-            stroke_badges_[i] = create_badge(i + 1);
-            if (stroke_badges_[i] != nullptr) {
-                stroke_badge_labels_[i] = lv_obj_get_child(stroke_badges_[i], 0);
-            }
-        }
-
         stroke_pinyin_label_ = lv_label_create(stroke_screen_);
         lv_obj_set_style_text_font(stroke_pinyin_label_, text_font, 0);
         lv_obj_set_style_text_color(stroke_pinyin_label_, lvgl_theme->text_color(), 0);
@@ -2487,10 +2463,16 @@ void LcdDisplay::SetAvatarMood(AvatarMood mood) {
     avatar_blink_start_ = 0;
     gaze_next_ = 0;
     if (mood != kAvatarMoodIdle) {
-        // A conversation started: leave the media/paired screens so the user
-        // sees the dialog immediately.
+        // A conversation started: leave the media/paired/stroke/settings
+        // screens so the user sees the dialog immediately.
         ShowMediaScreen(false);
         ShowBluetoothScreen(false);
+        if (stroke_screen_visible_) {
+            ShowStrokeScreen(false);
+        }
+        if (settings_screen_visible_) {
+            ShowSettingsScreen(false);
+        }
     }
     UpdateChatViewport();
 }
@@ -3141,11 +3123,11 @@ void LcdDisplay::StrokeStartStroke(int s) {
         float dy = StrokeMapFpx(m.pts[i].y) - StrokeMapFpx(m.pts[i - 1].y);
         len += sqrtf(dx * dx + dy * dy);
     }
-    float seconds = 0.35f + len * 0.005f;
-    if (seconds < 0.35f) {
-        seconds = 0.35f;
-    } else if (seconds > 1.1f) {
-        seconds = 1.1f;
+    float seconds = 0.18f + len * 0.0025f;
+    if (seconds < 0.18f) {
+        seconds = 0.18f;
+    } else if (seconds > 0.6f) {
+        seconds = 0.6f;
     }
     stroke_speed_ = len > 0.5f ? len / (25.0f * seconds) : 2.0f;
 
@@ -3217,6 +3199,13 @@ void LcdDisplay::StrokeLoadChar(int idx) {
 void LcdDisplay::StrokeAnimTick() {
     auto& store = StrokeStore::GetInstance();
     if (stroke_canvas_ == nullptr || stroke_char_idx_ < 0 || !store.Ready()) {
+        return;
+    }
+    // Do not leave a demo looping on screen forever: after a minute without
+    // any touch/voice activity return to the normal screen. A wake word also
+    // exits immediately (SetAvatarMood hides the page on conversation start).
+    if (stroke_screen_visible_ && lv_tick_get() - last_activity_tick_ > 60000) {
+        ShowStrokeScreen(false);
         return;
     }
     if (stroke_done_tick_ != 0) {
