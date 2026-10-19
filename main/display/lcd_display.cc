@@ -3123,11 +3123,11 @@ void LcdDisplay::StrokeStartStroke(int s) {
         float dy = StrokeMapFpx(m.pts[i].y) - StrokeMapFpx(m.pts[i - 1].y);
         len += sqrtf(dx * dx + dy * dy);
     }
-    float seconds = 0.18f + len * 0.0025f;
-    if (seconds < 0.18f) {
-        seconds = 0.18f;
-    } else if (seconds > 0.6f) {
-        seconds = 0.6f;
+    float seconds = 0.09f + len * 0.00125f;
+    if (seconds < 0.09f) {
+        seconds = 0.09f;
+    } else if (seconds > 0.3f) {
+        seconds = 0.3f;
     }
     stroke_speed_ = len > 0.5f ? len / (25.0f * seconds) : 2.0f;
 
