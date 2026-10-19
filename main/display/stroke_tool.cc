@@ -3,6 +3,7 @@
 #include <esp_heap_caps.h>
 #include <esp_log.h>
 
+#include <cerrno>
 #include <cstdio>
 #include <cstring>
 
@@ -98,6 +99,7 @@ bool StrokeStore::Init() {
 bool StrokeStore::LoadIndex() {
     FILE* f = fopen("/sdcard/index.bin", "rb");
     if (f == nullptr) {
+        ESP_LOGW(TAG, "fopen /sdcard/index.bin 失败 errno=%d (%s)", errno, strerror(errno));
         return false;
     }
     bool ok = fseek(f, 0, SEEK_END) == 0;
@@ -110,6 +112,9 @@ bool StrokeStore::LoadIndex() {
         ok = false;
     }
     uint16_t ver = 0, n_chars = 0;
+    if (!ok) {
+        ESP_LOGW(TAG, "index.bin 校验失败 sz=%ld magic=%.4s", sz, hdr);
+    }
     if (ok) {
         ok = memcmp(hdr, "SZBI", 4) == 0;
         ver = rd_u16(hdr + 4);

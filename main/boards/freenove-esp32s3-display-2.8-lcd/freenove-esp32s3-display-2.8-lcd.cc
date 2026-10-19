@@ -8,6 +8,7 @@
 #include <sdmmc_cmd.h>
 
 #include <cstdio>
+#include <dirent.h>
 
 #include <wifi_station.h>
 #include "adc_battery_monitor.h"
@@ -73,6 +74,17 @@ private:
             return false;
         }
         sdmmc_card_print_info(stdout, card);
+        ESP_LOGI(TAG, "TF 卡 SDMMC 挂载成功");
+        DIR* dir = opendir(SD_MOUNT_POINT);
+        if (dir != nullptr) {
+            struct dirent* ent;
+            while ((ent = readdir(dir)) != nullptr) {
+                ESP_LOGI(TAG, "  /sdcard/%s", ent->d_name);
+            }
+            closedir(dir);
+        } else {
+            ESP_LOGW(TAG, "opendir(%s) 失败 errno=%d", SD_MOUNT_POINT, errno);
+        }
         return true;
     }
 
