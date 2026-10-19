@@ -2479,13 +2479,18 @@ void LcdDisplay::SetAvatarMood(AvatarMood mood) {
     avatar_blink_at_ = avatar_anim_epoch_ + 2600 + (esp_random() % 3500);
     avatar_blink_start_ = 0;
     gaze_next_ = 0;
-    if (mood == kAvatarMoodIdle && previous_mood == kAvatarMoodSpeaking &&
-        stroke_screen_visible_) {
-        // The session ended (e.g. the assistant said goodbye): the stroke demo
-        // belongs to that conversation, so go back to the idle screen instead
-        // of waiting for the five-minute timeout. A normal answer goes back to
-        // Listening, not Idle, so it keeps the demo running.
-        ShowStrokeScreen(false);
+    if (stroke_screen_visible_) {
+        // Two moments end the demo page:
+        //  - a new turn starts from Idle (wake word, button or touch), and
+        //  - the current session really ends (Speaking -> Idle, e.g. goodbye).
+        // The automatic Idle->Listening transition inside a turn is
+        // Speaking->Listening, so the demo keeps running for normal answers.
+        const bool new_turn = previous_mood == kAvatarMoodIdle &&
+                              (mood == kAvatarMoodListening || mood == kAvatarMoodThinking);
+        const bool session_end = mood == kAvatarMoodIdle && previous_mood == kAvatarMoodSpeaking;
+        if (new_turn || session_end) {
+            ShowStrokeScreen(false);
+        }
     }
     if (mood != kAvatarMoodIdle) {
         // A conversation started: leave the media/paired/stroke/settings
