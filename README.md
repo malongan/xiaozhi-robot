@@ -10,6 +10,10 @@
 > - 笔顺数据生成：[tools/stroke-pipeline/README.md](tools/stroke-pipeline/README.md)
 > - 界面预览：[docs/custom/](docs/custom/)
 >
+> **固件下载（两个版本）**：<https://github.com/malongan/xiaozhi-robot/releases>
+> - `custom-final-20261020` 定制版：竖屏 UI + 设置页 + 笔顺学习（含笔顺数据包）
+> - `v2.5.2` 官方版：上游原版，用于对照/回退（含本板构建镜像）
+>
 > 上游与许可证：本项目基于 MIT 协议的 [78/xiaozhi-esp32](https://github.com/78/xiaozhi-esp32)，
 > 保留原始 LICENSE 与署名；笔顺数据遵循 Arphic Public License（见 tools/stroke-pipeline/NOTICE.txt）。
 
