@@ -111,6 +111,10 @@ protected:
     float stroke_speed_ = 2.0f;
     uint32_t stroke_reveal_tick_ = 0;
     int stroke_revealed_ = 0;
+    lv_obj_t* stroke_lines_[kStrokeMaxStrokes] = {};
+    std::vector<std::vector<lv_point_precise_t>> stroke_line_pts_ =
+        std::vector<std::vector<lv_point_precise_t>>(kStrokeMaxStrokes);
+    void StrokeHideAllLines();
     uint32_t stroke_done_tick_ = 0;
     bool stroke_screen_visible_ = false;
     lv_timer_t* stroke_anim_timer_ = nullptr;

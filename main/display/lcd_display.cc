@@ -1558,6 +1558,17 @@ void LcdDisplay::SetupUI() {
             lv_color_mix(lvgl_theme->text_color(), lvgl_theme->background_color(), LV_OPA_40), 0);
         lv_obj_set_style_clip_corner(stroke_canvas_, true, 0);
 
+        // One vector line per stroke: revealing a stroke just shows a line
+        // object, so the 176x176 canvas is not redrawn during the demo.
+        for (int i = 0; i < kStrokeMaxStrokes; ++i) {
+            stroke_lines_[i] = lv_line_create(stroke_canvas_);
+            lv_obj_remove_flag(stroke_lines_[i], LV_OBJ_FLAG_CLICKABLE);
+            lv_obj_remove_flag(stroke_lines_[i], LV_OBJ_FLAG_SCROLLABLE);
+            lv_obj_set_style_line_color(stroke_lines_[i], lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_line_width(stroke_lines_[i], 4, 0);
+            lv_obj_add_flag(stroke_lines_[i], LV_OBJ_FLAG_HIDDEN);
+        }
+
         int stroke_key_slot = 0;
         auto create_key = [this, large_icon_font, lvgl_theme, &stroke_key_slot](
                               int x, const char* icon, lv_event_cb_t cb) {
@@ -3151,10 +3162,10 @@ void LcdDisplay::StrokeFillCanvas(lv_color_t color) {
     if (stroke_canvas_ == nullptr || stroke_canvas_buf_ == nullptr) {
         return;
     }
-    lv_canvas_set_px(stroke_canvas_, 0, 0, color, LV_OPA_COVER);
     auto* raw = reinterpret_cast<uint16_t*>(stroke_canvas_buf_);
-    const uint16_t v = raw[0];
-    for (int i = 0; i < kStrokeCanvasSide * kStrokeCanvasSide; ++i) {
+    const uint16_t v = lv_color_to_u16(color);
+    const int count = kStrokeCanvasSide * kStrokeCanvasSide;
+    for (int i = 0; i < count; ++i) {
         raw[i] = v;
     }
     lv_obj_invalidate(stroke_canvas_);
@@ -3169,10 +3180,13 @@ void LcdDisplay::StrokeBlitGlyph(lv_color_t color) {
         return;
     }
     const int span = StrokeStore::kGlyphSide;
+    auto* raw = reinterpret_cast<uint16_t*>(stroke_canvas_buf_);
+    const uint16_t v = lv_color_to_u16(color);
     for (int p = 0; p < span * span; ++p) {
         if ((stroke_bits_[p >> 3] >> (7 - (p & 7))) & 1) {
-            lv_canvas_set_px(stroke_canvas_, kStrokeCanvasMargin + p % span,
-                             kStrokeCanvasMargin + p / span, color, LV_OPA_COVER);
+            const int x = kStrokeCanvasMargin + p % span;
+            const int y = kStrokeCanvasMargin + p / span;
+            raw[y * kStrokeCanvasSide + x] = v;
         }
     }
     lv_obj_invalidate(stroke_canvas_);
@@ -3267,6 +3281,33 @@ void LcdDisplay::StrokeLoadChar(int idx) {
 
     StrokeFillCanvas(stroke_color_bg_);
     StrokeBlitGlyph(stroke_color_dim_);
+    for (int i = 0; i < kStrokeMaxStrokes; ++i) {
+        if (stroke_lines_[i] == nullptr) {
+            continue;
+        }
+        if (i < static_cast<int>(stroke_metas_.size())) {
+            const StrokeMeta& m = stroke_metas_[i];
+            auto& pts = stroke_line_pts_[i];
+            pts.clear();
+            pts.reserve(m.npts);
+            for (int k = 0; k < m.npts; ++k) {
+                pts.push_back(lv_point_precise_t{
+                    static_cast<lv_value_precise_t>(lroundf(StrokeMapFpx(m.pts[k].x))),
+                    static_cast<lv_value_precise_t>(lroundf(StrokeMapFpx(m.pts[k].y)))});
+            }
+            float radius = m.width * kStrokeGlyphSpan / (2.0f * StrokeStore::kGridMax) * 0.5f;
+            if (radius < 1.5f) {
+                radius = 1.5f;
+            }
+            lv_line_set_points(stroke_lines_[i], pts.data(), static_cast<uint32_t>(pts.size()));
+            lv_obj_set_style_line_width(stroke_lines_[i], LV_MAX(2, static_cast<int>(lroundf(radius * 2))), 0);
+            lv_obj_set_style_line_color(stroke_lines_[i], stroke_color_active_, 0);
+            lv_obj_remove_flag(stroke_lines_[i], LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(stroke_lines_[i], LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(stroke_lines_[i], LV_OBJ_FLAG_HIDDEN);
+        }
+    }
     stroke_done_tick_ = 0;
     stroke_revealed_ = 0;
     stroke_reveal_tick_ = lv_tick_get() + 400;
@@ -3286,30 +3327,38 @@ void LcdDisplay::StrokeAnimTick() {
     }
     if (stroke_done_tick_ != 0) {
         if (static_cast<int32_t>(now - stroke_done_tick_) >= 0) {
-            // Play the requested character again; switching characters only
-            // happens from the prev/next keys.
-            StrokeLoadChar(stroke_char_idx_);
+            // Replay the same character without redrawing the background: just
+            // hide the stroke lines again.
+            StrokeHideAllLines();
+            stroke_revealed_ = 0;
+            stroke_reveal_tick_ = now + 400;
+            stroke_done_tick_ = 0;
         }
         return;
     }
     const int total = static_cast<int>(stroke_metas_.size());
     if (stroke_revealed_ >= total) {
-        // Everything is shown: show the complete glyph for a moment, then loop.
-        StrokeBlitGlyph(stroke_color_active_);
-        lv_obj_invalidate(stroke_canvas_);
         stroke_done_tick_ = now + 2500;
         return;
     }
     if (static_cast<int32_t>(now - stroke_reveal_tick_) < 0) {
         return;
     }
-    // Light up one complete stroke at a time. Redrawing the canvas only once
-    // per stroke keeps the SPI/LVGL load low enough for streamed TTS audio to
-    // stay smooth (the previous pen-drawing animation ran every 40 ms).
-    StrokeDrawStroke(stroke_revealed_, stroke_color_active_);
+    // Showing a pre-built line object only repaints that stroke's area; the
+    // canvas with the dim glyph is not touched, so TTS audio stays smooth.
+    if (stroke_lines_[stroke_revealed_] != nullptr) {
+        lv_obj_remove_flag(stroke_lines_[stroke_revealed_], LV_OBJ_FLAG_HIDDEN);
+    }
     stroke_revealed_++;
     stroke_reveal_tick_ = now + 260;
-    lv_obj_invalidate(stroke_canvas_);
+}
+
+void LcdDisplay::StrokeHideAllLines() {
+    for (int i = 0; i < kStrokeMaxStrokes; ++i) {
+        if (stroke_lines_[i] != nullptr) {
+            lv_obj_add_flag(stroke_lines_[i], LV_OBJ_FLAG_HIDDEN);
+        }
+    }
 }
 
 void LcdDisplay::StrokeAnimTimerCb(lv_timer_t* timer) {
