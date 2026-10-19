@@ -17,6 +17,7 @@ set(SOURCES "audio/audio_codec.cc"
             "display/display.cc"
             "display/text_glyph.cc"
             "display/lcd_display.cc"
+            "display/stroke_tool.cc"
             "display/font_zzz.c"
             "display/oled_display.cc"
             "display/lvgl_display/lvgl_display.cc"
@@ -1121,6 +1122,13 @@ endif()
 if(CONFIG_BOARD_TYPE_ESP32_P4_FUNCTION_EV_BOARD)
     list(APPEND MAIN_PRIV_REQUIRES_EXTRA
         esp_driver_sdmmc
+        sdmmc
+    )
+endif()
+if(CONFIG_BOARD_TYPE_Freenove_ESP32S3_DISPLAY_2_8_LCD)
+    list(APPEND MAIN_PRIV_REQUIRES_EXTRA
+        esp_driver_sdmmc
+        esp_driver_sdspi
         sdmmc
     )
 endif()

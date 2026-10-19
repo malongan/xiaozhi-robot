@@ -4,6 +4,10 @@
 #include <esp_lcd_touch.h>
 #include <esp_lcd_touch_ft5x06.h>
 #include <esp_lvgl_port.h>
+#include <esp_vfs_fat.h>
+#include <sdmmc_cmd.h>
+
+#include <cstdio>
 
 #include <wifi_station.h>
 #include "adc_battery_monitor.h"
@@ -12,11 +16,14 @@
 #include "codecs/es8311_audio_codec.h"
 #include "config.h"
 #include "display/lcd_display.h"
+#include "display/stroke_tool.h"
 #include "mcp_server.h"
 #include "settings.h"
 #include "wifi_board.h"
 
 #include <driver/i2c_master.h>
+#include <driver/sdmmc_host.h>
+#include <driver/sdspi_host.h>
 #include <driver/spi_common.h>
 #include <esp_err.h>
 #include <esp_log.h>
@@ -38,6 +45,109 @@ private:
     esp_lcd_touch_handle_t touch_handle_ = nullptr;
     esp_lcd_panel_io_handle_t touch_io_handle_ = nullptr;
     AdcBatteryMonitor* adc_battery_monitor_;
+    esp_timer_handle_t sd_retry_timer_ = nullptr;
+
+    static bool MountSdSdmmc() {
+        esp_vfs_fat_mount_config_t mount_cfg = {
+            .format_if_mount_failed = false,
+            .max_files = 5,
+            .allocation_unit_size = 16 * 1024,
+        };
+        sdmmc_host_t host = SDMMC_HOST_DEFAULT();
+        host.max_freq_khz = SDMMC_FREQ_DEFAULT;
+        sdmmc_slot_config_t slot = SDMMC_SLOT_CONFIG_DEFAULT();
+        slot.clk = SD_CLK;
+        slot.cmd = SD_CMD;
+        slot.d0 = SD_DATA0;
+        slot.d1 = SD_DATA1;
+        slot.d2 = SD_DATA2;
+        slot.d3 = SD_DATA3;
+        slot.width = 4;
+        slot.cd = SDMMC_SLOT_NO_CD;
+        slot.wp = SDMMC_SLOT_NO_WP;
+        slot.flags |= SDMMC_SLOT_FLAG_INTERNAL_PULLUP;
+        sdmmc_card_t* card = nullptr;
+        esp_err_t err = esp_vfs_fat_sdmmc_mount(SD_MOUNT_POINT, &host, &slot, &mount_cfg, &card);
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "SDMMC 4-bit 挂载失败: %s", esp_err_to_name(err));
+            return false;
+        }
+        sdmmc_card_print_info(stdout, card);
+        return true;
+    }
+
+    static bool MountSdSdspi() {
+        spi_bus_config_t bus_cfg = {
+            .mosi_io_num = SD_CMD,
+            .miso_io_num = SD_DATA0,
+            .sclk_io_num = SD_CLK,
+            .quadwp_io_num = -1,
+            .quadhd_io_num = -1,
+            .max_transfer_sz = 400000,
+        };
+        if (spi_bus_initialize(SPI2_HOST, &bus_cfg, SPI_DMA_CH_AUTO) != ESP_OK) {
+            ESP_LOGW(TAG, "SDSPI 总线初始化失败");
+            return false;
+        }
+        esp_vfs_fat_mount_config_t mount_cfg = {
+            .format_if_mount_failed = false,
+            .max_files = 5,
+            .allocation_unit_size = 16 * 1024,
+        };
+        sdmmc_host_t host = SDSPI_HOST_DEFAULT();
+        host.slot = SPI2_HOST;
+        host.max_freq_khz = SDMMC_FREQ_DEFAULT;
+        sdspi_device_config_t slot = SDSPI_DEVICE_CONFIG_DEFAULT();
+        slot.host_id = SPI2_HOST;
+        slot.gpio_cs = SD_DATA3;
+        slot.gpio_cd = SDSPI_SLOT_NO_CD;
+        slot.gpio_wp = GPIO_NUM_NC;
+        slot.gpio_int = GPIO_NUM_NC;
+        sdmmc_card_t* card = nullptr;
+        esp_err_t err = esp_vfs_fat_sdspi_mount(SD_MOUNT_POINT, &host, &slot, &mount_cfg, &card);
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "SDSPI 挂载失败: %s", esp_err_to_name(err));
+            spi_bus_free(SPI2_HOST);
+            return false;
+        }
+        ESP_LOGI(TAG, "TF 卡 SDSPI 模式挂载成功");
+        return true;
+    }
+
+    bool MountSdCard() { return MountSdSdmmc() || MountSdSdspi(); }
+
+    static void OnSdRetry(void* arg) {
+        auto* board = static_cast<FreenoveESP32S3Display*>(arg);
+        if (board->MountSdCard()) {
+            board->StopSdRetryTimer();
+            StrokeStore::GetInstance().Init();
+            ESP_LOGI(TAG, "TF 卡热插拔挂载成功，笔顺数据已加载");
+        }
+    }
+
+    void StopSdRetryTimer() {
+        if (sd_retry_timer_ != nullptr) {
+            esp_timer_stop(sd_retry_timer_);
+        }
+    }
+
+    void InitializeSdCard() {
+        if (MountSdCard()) {
+            StrokeStore::GetInstance().Init();
+            return;
+        }
+        esp_timer_create_args_t timer_args = {
+            .callback = &FreenoveESP32S3Display::OnSdRetry,
+            .arg = this,
+            .dispatch_method = ESP_TIMER_TASK,
+            .name = "sd_retry",
+            .skip_unhandled_events = false,
+        };
+        if (esp_timer_create(&timer_args, &sd_retry_timer_) == ESP_OK) {
+            esp_timer_start_periodic(sd_retry_timer_, 60ULL * 1000 * 1000);
+            ESP_LOGW(TAG, "TF 卡未挂载，60s 后台重试中");
+        }
+    }
 
     void InitializeBatteryMonitor() {
         adc_battery_monitor_ =
@@ -169,7 +279,58 @@ private:
                                      DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY, true);
     }
 
-    void InitializeTools() {}
+    void InitializeTools() {
+        auto* lcd = static_cast<LcdDisplay*>(GetDisplay());
+        auto& mcp = McpServer::GetInstance();
+
+        mcp.AddTool(
+            "self.stroke.show",
+            "在屏幕上演示一个汉字的笔顺：逐笔动画 + 每笔名称 + 拼音，仅支持小学 1-6 年级字表内的"
+            "字。传入要查询的汉字或包含它的句子，取其中最后一个汉字。",
+            PropertyList({Property("char", kPropertyTypeString)}),
+            [lcd](const PropertyList& properties) -> ToolResult {
+                auto& store = StrokeStore::GetInstance();
+                if (!store.Ready()) {
+                    return std::string("字库还没准备好，请确认 TF 卡已插入。");
+                }
+                const std::string input = properties["char"].value<std::string>();
+                const int cp = StrokeStore::Utf8SingleCjk(input);
+                const int idx = cp >= 0 ? store.FindByChar(static_cast<uint16_t>(cp)) : -1;
+                if (idx < 0) {
+                    return std::string("这个字不在小学字表里，换一个 1-6 年级的常用字试试。");
+                }
+                std::string ch;
+                ch += static_cast<char>(0xE0 | (cp >> 12));
+                ch += static_cast<char>(0x80 | ((cp >> 6) & 0x3F));
+                ch += static_cast<char>(0x80 | (cp & 0x3F));
+                Application::GetInstance().Schedule([lcd, idx]() { lcd->ShowStrokeScreen(idx); });
+                return "正在屏幕上演示「" + ch + "」的笔顺：拼音 " + store.PinyinOf(idx) + "，共 " +
+                       std::to_string(store.StrokeCountAt(idx)) + " 笔——" +
+                       store.StrokeNamesText(idx) + "。动画播完会自动跳到下一个字。";
+            });
+
+        mcp.AddTool(
+            "self.stroke.next",
+            "在笔顺演示页翻字：dir 为 -1 切到上一个字，1 切到下一个字，同年级内循环。",
+            PropertyList({Property("dir", kPropertyTypeInteger, -1, 1)}),
+            [lcd](const PropertyList& properties) -> ToolResult {
+                auto& store = StrokeStore::GetInstance();
+                if (!store.Ready()) {
+                    return std::string("字库还没准备好，请确认 TF 卡已插入。");
+                }
+                const int dir = properties["dir"].value<int>() < 0 ? -1 : 1;
+                Application::GetInstance().Schedule([lcd, dir]() { lcd->StrokeChangeChar(dir); });
+                return dir > 0 ? std::string("已切换到下一个字。")
+                               : std::string("已切换到上一个字。");
+            });
+
+        mcp.AddTool(
+            "self.stroke.close", "关闭笔顺演示页，回到正常聊天界面。用户说关掉或退出笔顺时调用。",
+            PropertyList(), [lcd](const PropertyList&) -> ToolResult {
+                Application::GetInstance().Schedule([lcd]() { lcd->ShowStrokeScreen(false); });
+                return std::string("已关闭笔顺演示页。");
+            });
+    }
 
 public:
     FreenoveESP32S3Display() : boot_button_(BOOT_BUTTON_GPIO) {
@@ -184,6 +345,7 @@ public:
         }
         InitializeI2c();
         InitializeBatteryMonitor();
+        InitializeSdCard();
         InitializeSpi();
         InitializeLcdDisplay();
         InitializeTouch();

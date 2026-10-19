@@ -4,12 +4,13 @@
 #include "gif/lvgl_gif.h"
 #include "lvgl_display.h"
 #include "media_ble.h"
+#include "stroke_tool.h"
 
 #include <esp_lcd_panel_io.h>
 #include <esp_lcd_panel_ops.h>
-#include <atomic>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include <atomic>
 #include <cstdint>
 #include <deque>
 #include <memory>
@@ -75,6 +76,43 @@ protected:
     bool media_repeat_active_ = false;
     uint32_t media_repeat_next_ = 0;
     bool media_playing_ = false;
+
+    // 笔顺学习页：TF 卡数据（StrokeStore），入口按钮常驻右下角；仅默认聊天样式分支创建。
+    static constexpr int kStrokeCanvasSide = 176;  // 画布边长
+    static constexpr int kStrokeCanvasMargin = 8;  // 160px 字模在画布内的留白
+    static constexpr int kStrokeGlyphSpan = 160;   // 字模边长
+    static constexpr int kStrokeMaxStrokes = 24;   // 序号圆标上限
+    lv_obj_t* stroke_screen_ = nullptr;
+    lv_obj_t* stroke_canvas_ = nullptr;
+    lv_obj_t* stroke_title_label_ = nullptr;
+    lv_obj_t* stroke_pinyin_label_ = nullptr;
+    lv_obj_t* stroke_info_label_ = nullptr;
+    lv_obj_t* stroke_entry_btn_ = nullptr;
+    lv_obj_t* stroke_badges_[kStrokeMaxStrokes] = {};
+    lv_obj_t* stroke_badge_labels_[kStrokeMaxStrokes] = {};
+    lv_obj_t* stroke_close_icon_ = nullptr;
+    lv_obj_t* stroke_key_icons_[3] = {};
+    lv_obj_t* stroke_entry_label_ = nullptr;
+    void RebindStrokeFonts(const lv_font_t* text_font, const lv_font_t* icon_font,
+                           const lv_font_t* large_icon_font);
+    uint8_t* stroke_canvas_buf_ = nullptr;
+    lv_color_t stroke_color_bg_;
+    lv_color_t stroke_color_dim_;
+    lv_color_t stroke_color_done_;
+    lv_color_t stroke_color_active_;
+    std::vector<StrokeMeta> stroke_metas_;
+    uint8_t stroke_bits_[StrokeStore::kGlyphBytes] = {};
+    int stroke_char_idx_ = -1;
+    int stroke_stroke_idx_ = 0;
+    int stroke_pt_idx_ = 0;
+    float stroke_pos_x_ = 0.0f;
+    float stroke_pos_y_ = 0.0f;
+    float stroke_radius_ = 3.0f;
+    float stroke_speed_ = 2.0f;
+    uint32_t stroke_done_tick_ = 0;
+    bool stroke_screen_visible_ = false;
+    lv_timer_t* stroke_anim_timer_ = nullptr;
+
     float avatar_face_scale_ = 1.0f;  // 1.0 = 80px, 1.875 = 150px idle face
     uint32_t last_activity_tick_ = 0;
     bool avatar_sleeping_ = false;
@@ -169,6 +207,22 @@ protected:
     void ShowBluetoothScreen(bool show);
     void UpdateMediaBarVisibility();
     void UpdateChatViewport();
+    // 笔顺页内部（调用方需已持 LVGL 锁；控件为空/数据未就绪时静默返回）
+    static float StrokeMapFpx(uint8_t v);  // medians 0..255 → 画布坐标
+    void StrokeLoadChar(int idx);
+    void StrokeStartStroke(int s);
+    void StrokeFinishStroke(int s);
+    void StrokeFillCanvas(lv_color_t color);
+    void StrokeBlitGlyph(lv_color_t color);
+    void StrokeStampDot(int cx, int cy, float r, lv_color_t color);
+    void StrokeStampLine(float x0, float y0, float x1, float y1, float r, lv_color_t color);
+    void StrokeAnimTick();
+    static void StrokeAnimTimerCb(lv_timer_t* timer);
+    static void OnStrokeEntryClicked(lv_event_t* e);
+    static void OnStrokeCloseClicked(lv_event_t* e);
+    static void OnStrokeReplayClicked(lv_event_t* e);
+    static void OnStrokePrevClicked(lv_event_t* e);
+    static void OnStrokeNextClicked(lv_event_t* e);
     static void OnAvatarPressed(lv_event_t* e);
     static void OnAvatarReleased(lv_event_t* e);
     static void OnAvatarLongPressed(lv_event_t* e);
@@ -194,6 +248,10 @@ public:
     virtual bool KeepsChatHistory() const override { return true; }
     virtual void SetPreviewImage(std::unique_ptr<LvglImage> image) override;
     virtual void SetupUI() override;
+    // 笔顺学习页：char_idx 显示指定汉字并从头播放；bool 控制显隐（MCP 语音入口）
+    void ShowStrokeScreen(int char_idx);
+    void ShowStrokeScreen(bool show);
+    void StrokeChangeChar(int dir);  // dir = -1/+1，年级内循环
     // Add theme switching function
     virtual void SetTheme(Theme* theme) override;
 

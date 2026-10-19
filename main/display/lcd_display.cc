@@ -23,9 +23,7 @@ LV_FONT_DECLARE(font_zzz_30);
 #include <algorithm>
 #include <cmath>
 #include <cstring>
-#include <cmath>
 #include <mutex>
-#include <vector>
 #include <vector>
 
 #include "board.h"
@@ -350,6 +348,15 @@ LcdDisplay::~LcdDisplay() {
     if (avatar_anim_timer_ != nullptr) {
         lv_timer_delete(avatar_anim_timer_);
         avatar_anim_timer_ = nullptr;
+    }
+
+    if (stroke_anim_timer_ != nullptr) {
+        lv_timer_delete(stroke_anim_timer_);
+        stroke_anim_timer_ = nullptr;
+    }
+    if (stroke_canvas_buf_ != nullptr) {
+        heap_caps_free(stroke_canvas_buf_);
+        stroke_canvas_buf_ = nullptr;
     }
 
     if (preview_image_ != nullptr) {
@@ -1181,7 +1188,6 @@ void LcdDisplay::SetupUI() {
         return arc;
     };
 
-
     avatar_think_dots_ = lv_label_create(screen);
     lv_obj_set_style_text_font(avatar_think_dots_, text_font, 0);
     lv_obj_set_style_text_color(avatar_think_dots_, lvgl_theme->text_color(), 0);
@@ -1352,8 +1358,8 @@ void LcdDisplay::SetupUI() {
     lv_obj_center(media_bt_icon_);
 
     const char* media_icons[6] = {
-        MATERIAL_SYMBOLS_SKIP_PREVIOUS, MATERIAL_SYMBOLS_PLAY_ARROW,  MATERIAL_SYMBOLS_SKIP_NEXT,
-        MATERIAL_SYMBOLS_VOLUME_DOWN,   MATERIAL_SYMBOLS_VOLUME_OFF,  MATERIAL_SYMBOLS_VOLUME_UP,
+        MATERIAL_SYMBOLS_SKIP_PREVIOUS, MATERIAL_SYMBOLS_PLAY_ARROW, MATERIAL_SYMBOLS_SKIP_NEXT,
+        MATERIAL_SYMBOLS_VOLUME_DOWN,   MATERIAL_SYMBOLS_VOLUME_OFF, MATERIAL_SYMBOLS_VOLUME_UP,
     };
     static const char* const kShortcutLabels[10] = {"调度", "切换", "锁屏", "截图", "聚焦",
                                                     "全屏", "关闭", "桌面", "复制", "粘贴"};
@@ -1489,6 +1495,146 @@ void LcdDisplay::SetupUI() {
     lv_label_set_text(bt_empty_, "尚未配对任何设备\n在电脑/手机蓝牙里\n搜索 Xiaozhi-Media 配对");
     lv_obj_align(bt_empty_, LV_ALIGN_CENTER, 0, 10);
 
+    /* Stroke order screen: TF card data, entry fixed at bottom-right */
+    stroke_canvas_buf_ = static_cast<uint8_t*>(heap_caps_malloc(
+        kStrokeCanvasSide * kStrokeCanvasSide * 2, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+    if (stroke_canvas_buf_ == nullptr) {
+        stroke_canvas_buf_ = static_cast<uint8_t*>(
+            heap_caps_malloc(kStrokeCanvasSide * kStrokeCanvasSide * 2, MALLOC_CAP_8BIT));
+    }
+    if (stroke_canvas_buf_ != nullptr) {
+        stroke_screen_ = lv_obj_create(screen);
+        lv_obj_set_size(stroke_screen_, LV_HOR_RES, LV_VER_RES);
+        lv_obj_set_style_radius(stroke_screen_, 0, 0);
+        lv_obj_set_style_bg_color(stroke_screen_, lvgl_theme->background_color(), 0);
+        lv_obj_set_style_bg_opa(stroke_screen_, LV_OPA_COVER, 0);
+        lv_obj_set_style_border_width(stroke_screen_, 0, 0);
+        lv_obj_set_style_pad_all(stroke_screen_, 0, 0);
+        lv_obj_remove_flag(stroke_screen_, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_set_scrollbar_mode(stroke_screen_, LV_SCROLLBAR_MODE_OFF);
+        lv_obj_add_flag(stroke_screen_, LV_OBJ_FLAG_HIDDEN);
+
+        lv_obj_t* stroke_close = lv_button_create(stroke_screen_);
+        lv_obj_set_size(stroke_close, 44, 36);
+        lv_obj_align(stroke_close, LV_ALIGN_TOP_RIGHT, -4, 2);
+        lv_obj_set_style_bg_opa(stroke_close, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_border_width(stroke_close, 0, 0);
+        lv_obj_set_style_shadow_width(stroke_close, 0, 0);
+        lv_obj_set_style_pad_all(stroke_close, 0, 0);
+        lv_obj_add_event_cb(stroke_close, &LcdDisplay::OnStrokeCloseClicked, LV_EVENT_CLICKED,
+                            this);
+        stroke_close_icon_ = lv_label_create(stroke_close);
+        lv_obj_t* close_icon = stroke_close_icon_;
+        lv_obj_set_style_text_font(close_icon, icon_font, 0);
+        lv_obj_set_style_text_color(close_icon, lvgl_theme->text_color(), 0);
+        lv_label_set_text(close_icon, MATERIAL_SYMBOLS_CLOSE);
+        lv_obj_center(close_icon);
+
+        stroke_title_label_ = lv_label_create(stroke_screen_);
+        lv_obj_set_style_text_font(stroke_title_label_, text_font, 0);
+        lv_obj_set_style_text_color(stroke_title_label_, lvgl_theme->text_color(), 0);
+        lv_label_set_text(stroke_title_label_, "笔顺");
+        lv_obj_align(stroke_title_label_, LV_ALIGN_TOP_MID, 0, 8);
+
+        stroke_canvas_ = lv_canvas_create(stroke_screen_);
+        lv_obj_set_size(stroke_canvas_, kStrokeCanvasSide, kStrokeCanvasSide);
+        lv_canvas_set_buffer(stroke_canvas_, stroke_canvas_buf_, kStrokeCanvasSide,
+                             kStrokeCanvasSide, LV_COLOR_FORMAT_RGB565);
+        lv_obj_align(stroke_canvas_, LV_ALIGN_TOP_MID, 0, 34);
+        lv_obj_set_style_radius(stroke_canvas_, 8, 0);
+        lv_obj_set_style_border_width(stroke_canvas_, 1, 0);
+        lv_obj_set_style_border_color(
+            stroke_canvas_,
+            lv_color_mix(lvgl_theme->text_color(), lvgl_theme->background_color(), LV_OPA_40), 0);
+        lv_obj_set_style_clip_corner(stroke_canvas_, true, 0);
+
+        auto create_badge = [this, text_font](int num) {
+            lv_obj_t* b = lv_obj_create(stroke_canvas_);
+            lv_obj_set_size(b, 20, 20);
+            lv_obj_set_style_radius(b, 10, 0);
+            lv_obj_set_style_bg_color(b, lv_color_hex(0x30303C), 0);
+            lv_obj_set_style_bg_opa(b, LV_OPA_COVER, 0);
+            lv_obj_set_style_border_width(b, 0, 0);
+            lv_obj_remove_flag(b, LV_OBJ_FLAG_SCROLLABLE);
+            lv_obj_clear_flag(b, LV_OBJ_FLAG_CLICKABLE);
+            lv_obj_add_flag(b, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_t* t = lv_label_create(b);
+            lv_obj_set_style_text_font(t, text_font, 0);
+            lv_obj_set_style_text_color(t, lv_color_hex(0xE8E8F0), 0);
+            lv_label_set_text_fmt(t, "%d", num);
+            lv_obj_center(t);
+            return b;
+        };
+        for (int i = 0; i < kStrokeMaxStrokes; ++i) {
+            stroke_badges_[i] = create_badge(i + 1);
+            if (stroke_badges_[i] != nullptr) {
+                stroke_badge_labels_[i] = lv_obj_get_child(stroke_badges_[i], 0);
+            }
+        }
+
+        stroke_pinyin_label_ = lv_label_create(stroke_screen_);
+        lv_obj_set_style_text_font(stroke_pinyin_label_, text_font, 0);
+        lv_obj_set_style_text_color(stroke_pinyin_label_, lvgl_theme->text_color(), 0);
+        lv_label_set_text(stroke_pinyin_label_, "");
+        lv_obj_align(stroke_pinyin_label_, LV_ALIGN_TOP_MID, 0, 214);
+
+        stroke_info_label_ = lv_label_create(stroke_screen_);
+        lv_obj_set_style_text_font(stroke_info_label_, text_font, 0);
+        lv_obj_set_style_text_color(
+            stroke_info_label_,
+            lv_color_mix(lvgl_theme->text_color(), lvgl_theme->background_color(), LV_OPA_70), 0);
+        lv_label_set_text(stroke_info_label_, "");
+        lv_obj_align(stroke_info_label_, LV_ALIGN_TOP_MID, 0, 238);
+
+        int stroke_key_slot = 0;
+        auto create_key = [this, large_icon_font, lvgl_theme, &stroke_key_slot](
+                              int x, const char* icon, lv_event_cb_t cb) {
+            lv_obj_t* key = lv_button_create(stroke_screen_);
+            lv_obj_set_size(key, 56, 46);
+            lv_obj_align(key, LV_ALIGN_BOTTOM_MID, x, -10);
+            lv_obj_set_style_bg_opa(key, LV_OPA_TRANSP, 0);
+            lv_obj_set_style_border_width(key, 0, 0);
+            lv_obj_set_style_shadow_width(key, 0, 0);
+            lv_obj_set_style_pad_all(key, 0, 0);
+            lv_obj_set_style_bg_opa(key, LV_OPA_20, LV_STATE_PRESSED);
+            lv_obj_set_style_bg_color(key, lvgl_theme->text_color(), LV_STATE_PRESSED);
+            lv_obj_add_event_cb(key, cb, LV_EVENT_CLICKED, this);
+            lv_obj_t* ik = lv_label_create(key);
+            if (stroke_key_slot < 3) {
+                stroke_key_icons_[stroke_key_slot++] = ik;
+            }
+            lv_obj_set_style_text_font(ik, large_icon_font, 0);
+            lv_obj_set_style_text_color(ik, lvgl_theme->text_color(), 0);
+            lv_label_set_text(ik, icon);
+            lv_obj_center(ik);
+        };
+        create_key(-66, MATERIAL_SYMBOLS_REPEAT, &LcdDisplay::OnStrokeReplayClicked);
+        create_key(0, MATERIAL_SYMBOLS_SKIP_PREVIOUS, &LcdDisplay::OnStrokePrevClicked);
+        create_key(66, MATERIAL_SYMBOLS_SKIP_NEXT, &LcdDisplay::OnStrokeNextClicked);
+
+        stroke_entry_btn_ = lv_button_create(screen);
+        lv_obj_set_size(stroke_entry_btn_, 36, 36);
+        lv_obj_align(stroke_entry_btn_, LV_ALIGN_BOTTOM_RIGHT, -4, -4);
+        lv_obj_set_style_bg_color(stroke_entry_btn_, lv_color_hex(0x30303C), 0);
+        lv_obj_set_style_bg_opa(stroke_entry_btn_, LV_OPA_COVER, 0);
+        lv_obj_set_style_radius(stroke_entry_btn_, 10, 0);
+        lv_obj_set_style_border_width(stroke_entry_btn_, 0, 0);
+        lv_obj_set_style_shadow_width(stroke_entry_btn_, 0, 0);
+        lv_obj_set_style_pad_all(stroke_entry_btn_, 0, 0);
+        lv_obj_add_flag(stroke_entry_btn_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_event_cb(stroke_entry_btn_, &LcdDisplay::OnStrokeEntryClicked, LV_EVENT_CLICKED,
+                            this);
+        lv_obj_t* entry_label = lv_label_create(stroke_entry_btn_);
+        stroke_entry_label_ = entry_label;
+        lv_obj_set_style_text_font(entry_label, text_font, 0);
+        lv_obj_set_style_text_color(entry_label, lv_color_hex(0xE8E8F0), 0);
+        lv_label_set_text(entry_label, "笔");
+        lv_obj_center(entry_label);
+
+        stroke_anim_timer_ = lv_timer_create(&LcdDisplay::StrokeAnimTimerCb, 40, this);
+        lv_timer_pause(stroke_anim_timer_);
+    }
+
     lv_obj_add_event_cb(screen, &LcdDisplay::OnUserActivity, LV_EVENT_PRESSED, this);
     lv_obj_add_event_cb(screen, &LcdDisplay::OnUserActivity, LV_EVENT_CLICKED, this);
 
@@ -1509,7 +1655,6 @@ void LcdDisplay::SetupUI() {
         });
     });
     MediaBle::GetInstance().Start();
-
 
     // 25 fps avatar animation: breathing, blink and state-driven motion.
     avatar_anim_epoch_ = lv_tick_get();
@@ -1756,6 +1901,11 @@ void LcdDisplay::ApplyChatLayout() {
         return;
     }
     const lv_font_t* font = text_font->font();
+    RebindStrokeFonts(font, lvgl_theme->icon_font() != nullptr ? lvgl_theme->icon_font()->font()
+                                                              : nullptr,
+                      lvgl_theme->large_icon_font() != nullptr
+                          ? lvgl_theme->large_icon_font()->font()
+                          : nullptr);
 
     /* Portrait 240x320 canvas: top bar (one line), avatar, then five text lines.
        The avatar sits right under the top bar and the text keeps a readable gap
@@ -1864,6 +2014,34 @@ void LcdDisplay::ApplyChatLayout() {
         lv_label_set_text(chat_message_label_, "");
     }
     UpdateMediaBarVisibility();
+}
+
+void LcdDisplay::RebindStrokeFonts(const lv_font_t* text_font, const lv_font_t* icon_font,
+                                   const lv_font_t* large_icon_font) {
+    // The stroke page is built once in SetupUI with the theme fonts of that
+    // moment.  When assets reload and the old fonts are freed we must move all
+    // of its labels to the new fonts *before* any style change triggers a
+    // label relayout, otherwise LVGL calls through a stale font pointer.
+    lv_obj_t* text_labels[] = {stroke_title_label_, stroke_pinyin_label_, stroke_info_label_,
+                               stroke_entry_label_};
+    for (lv_obj_t* label : text_labels) {
+        if (label != nullptr && text_font != nullptr) {
+            lv_obj_set_style_text_font(label, text_font, 0);
+        }
+    }
+    for (int i = 0; i < kStrokeMaxStrokes; ++i) {
+        if (stroke_badge_labels_[i] != nullptr && text_font != nullptr) {
+            lv_obj_set_style_text_font(stroke_badge_labels_[i], text_font, 0);
+        }
+    }
+    if (stroke_close_icon_ != nullptr && icon_font != nullptr) {
+        lv_obj_set_style_text_font(stroke_close_icon_, icon_font, 0);
+    }
+    for (int i = 0; i < 3; ++i) {
+        if (stroke_key_icons_[i] != nullptr && large_icon_font != nullptr) {
+            lv_obj_set_style_text_font(stroke_key_icons_[i], large_icon_font, 0);
+        }
+    }
 }
 
 void LcdDisplay::ShowPressRing() {
@@ -2027,8 +2205,8 @@ void LcdDisplay::AvatarAnimTimerCb(lv_timer_t* timer) {
         expression = self->avatar_override_;
     }
 
-    constexpr uint32_t kIdleBeforeSleepMs = 20 * 60 * 1000;   // 20 min idle -> doze
-    constexpr uint32_t kSleepDurationMs = 5 * 60 * 1000;      // 5 min doze -> wake
+    constexpr uint32_t kIdleBeforeSleepMs = 20 * 60 * 1000;  // 20 min idle -> doze
+    constexpr uint32_t kSleepDurationMs = 5 * 60 * 1000;     // 5 min doze -> wake
     const uint32_t idle_ms = now - self->last_activity_tick_;
     bool sleeping = self->avatar_sleeping_;
     if (sleeping) {
@@ -2315,12 +2493,12 @@ void LcdDisplay::AvatarAnimTimerCb(lv_timer_t* timer) {
         const lv_coord_t arc_size = static_cast<lv_coord_t>(20 * fs);
         lv_obj_set_size(self->avatar_eye_happy_left_, arc_size, arc_size);
         lv_obj_set_size(self->avatar_eye_happy_right_, arc_size, arc_size);
-        lv_obj_set_style_arc_width(self->avatar_eye_happy_left_,
-                                   LV_MAX(static_cast<lv_coord_t>(2), static_cast<lv_coord_t>(4 * fs)),
-                                   LV_PART_MAIN);
-        lv_obj_set_style_arc_width(self->avatar_eye_happy_right_,
-                                   LV_MAX(static_cast<lv_coord_t>(2), static_cast<lv_coord_t>(4 * fs)),
-                                   LV_PART_MAIN);
+        lv_obj_set_style_arc_width(
+            self->avatar_eye_happy_left_,
+            LV_MAX(static_cast<lv_coord_t>(2), static_cast<lv_coord_t>(4 * fs)), LV_PART_MAIN);
+        lv_obj_set_style_arc_width(
+            self->avatar_eye_happy_right_,
+            LV_MAX(static_cast<lv_coord_t>(2), static_cast<lv_coord_t>(4 * fs)), LV_PART_MAIN);
         const lv_coord_t happy_gap = static_cast<lv_coord_t>(eye_gap * fs);
         lv_obj_align(self->avatar_eye_happy_left_, LV_ALIGN_CENTER, -happy_gap, 0);
         lv_obj_align(self->avatar_eye_happy_right_, LV_ALIGN_CENTER, happy_gap, 0);
@@ -2340,7 +2518,8 @@ void LcdDisplay::AvatarAnimTimerCb(lv_timer_t* timer) {
             lv_obj_set_style_translate_y(
                 self->sleep_zzz_, static_cast<lv_coord_t>(-4.0f * sinf(zt * 2 * kPi / 1.8f)), 0);
             lv_obj_set_style_transform_scale(
-                self->sleep_zzz_, 300 + static_cast<int32_t>(110.0f * sinf(zt * 2 * kPi / 1.3f)), 0);
+                self->sleep_zzz_, 300 + static_cast<int32_t>(110.0f * sinf(zt * 2 * kPi / 1.3f)),
+                0);
             lv_obj_remove_flag(self->sleep_zzz_, LV_OBJ_FLAG_HIDDEN);
         } else {
             lv_obj_add_flag(self->sleep_zzz_, LV_OBJ_FLAG_HIDDEN);
@@ -2420,15 +2599,26 @@ void LcdDisplay::UpdateChatViewport() {
 }
 
 void LcdDisplay::UpdateMediaBarVisibility() {
-    if (media_bar_ == nullptr) {
+    if (media_bar_ != nullptr) {
+        const bool show = chat_lines_per_page_ == 5 && !media_screen_visible_ &&
+                          !bluetooth_screen_visible_ && !stroke_screen_visible_ &&
+                          avatar_mood_ == kAvatarMoodIdle;
+        if (show) {
+            lv_obj_remove_flag(media_bar_, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(media_bar_, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+    if (stroke_entry_btn_ == nullptr) {
         return;
     }
-    const bool show = chat_lines_per_page_ == 5 && !media_screen_visible_ &&
-                      !bluetooth_screen_visible_ && avatar_mood_ == kAvatarMoodIdle;
-    if (show) {
-        lv_obj_remove_flag(media_bar_, LV_OBJ_FLAG_HIDDEN);
+    const bool entry_show = chat_lines_per_page_ == 5 && !media_screen_visible_ &&
+                            !bluetooth_screen_visible_ && !stroke_screen_visible_ &&
+                            StrokeStore::GetInstance().Ready() && avatar_mood_ == kAvatarMoodIdle;
+    if (entry_show) {
+        lv_obj_remove_flag(stroke_entry_btn_, LV_OBJ_FLAG_HIDDEN);
     } else {
-        lv_obj_add_flag(media_bar_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(stroke_entry_btn_, LV_OBJ_FLAG_HIDDEN);
     }
 }
 
@@ -2462,6 +2652,424 @@ void LcdDisplay::ShowBluetoothScreen(bool show) {
         lv_obj_add_flag(bluetooth_screen_, LV_OBJ_FLAG_HIDDEN);
     }
     UpdateMediaBarVisibility();
+}
+
+/* Stroke order learner */
+
+static const char* const kStrokeGradeCn[] = {"",       "",       "一年级", "二年级",
+                                             "三年级", "四年级", "五年级", "六年级"};
+
+static const struct {
+    uint8_t b0, b1;
+    char base;
+} kStrokeToneMap[] = {
+    {0xC4, 0x81, 'a'}, {0xC3, 0xA1, 'a'}, {0xC7, 0x8E, 'a'}, {0xC3, 0xA0, 'a'}, {0xC4, 0x93, 'e'},
+    {0xC3, 0xA9, 'e'}, {0xC4, 0x9B, 'e'}, {0xC3, 0xA8, 'e'}, {0xC4, 0xAB, 'i'}, {0xC3, 0xAD, 'i'},
+    {0xC7, 0x90, 'i'}, {0xC3, 0xAC, 'i'}, {0xC5, 0x8D, 'o'}, {0xC3, 0xB3, 'o'}, {0xC7, 0x92, 'o'},
+    {0xC3, 0xB2, 'o'}, {0xC5, 0xAB, 'u'}, {0xC3, 0xBA, 'u'}, {0xC7, 0x94, 'u'}, {0xC3, 0xB9, 'u'},
+    {0xC7, 0x96, 'u'}, {0xC7, 0x98, 'u'}, {0xC7, 0x9A, 'u'}, {0xC7, 0x9C, 'u'}, {0xC3, 0xBC, 'u'},
+};
+
+static std::string StrokeAsciiPinyin(const std::string& py) {
+    std::string out;
+    out.reserve(py.size());
+    for (size_t i = 0; i < py.size(); ++i) {
+        uint8_t c = static_cast<uint8_t>(py[i]);
+        if (c < 0x80) {
+            out += static_cast<char>(c);
+            continue;
+        }
+        bool hit = false;
+        if (i + 1 < py.size()) {
+            uint8_t c1 = static_cast<uint8_t>(py[i + 1]);
+            for (const auto& t : kStrokeToneMap) {
+                if (t.b0 == c && t.b1 == c1) {
+                    out += t.base;
+                    i++;
+                    hit = true;
+                    break;
+                }
+            }
+        }
+        if (!hit && i + 1 < py.size()) {
+            i++;
+        }
+    }
+    return out;
+}
+
+float LcdDisplay::StrokeMapFpx(uint8_t v) {
+    return kStrokeCanvasMargin + v * kStrokeGlyphSpan / static_cast<float>(StrokeStore::kGridMax);
+}
+
+void LcdDisplay::StrokeStampDot(int cx, int cy, float r, lv_color_t color) {
+    if (stroke_canvas_ == nullptr) {
+        return;
+    }
+    const int ri = static_cast<int>(ceilf(r));
+    const float r2 = r * r;
+    for (int dy = -ri; dy <= ri; ++dy) {
+        int py = cy + dy;
+        if (py < 0 || py >= kStrokeCanvasSide) {
+            continue;
+        }
+        for (int dx = -ri; dx <= ri; ++dx) {
+            int px = cx + dx;
+            if (px < 0 || px >= kStrokeCanvasSide) {
+                continue;
+            }
+            if (dx * dx + dy * dy <= r2) {
+                lv_canvas_set_px(stroke_canvas_, px, py, color, LV_OPA_COVER);
+            }
+        }
+    }
+}
+
+void LcdDisplay::StrokeStampLine(float x0, float y0, float x1, float y1, float r,
+                                 lv_color_t color) {
+    float dx = x1 - x0;
+    float dy = y1 - y0;
+    float dist = sqrtf(dx * dx + dy * dy);
+    if (dist < 0.5f) {
+        StrokeStampDot(static_cast<int>(lroundf(x0)), static_cast<int>(lroundf(y0)), r, color);
+        return;
+    }
+    int steps = static_cast<int>(dist / (r * 0.45f));
+    if (steps < 1) {
+        steps = 1;
+    } else if (steps > 96) {
+        steps = 96;
+    }
+    for (int i = 0; i <= steps; ++i) {
+        float t = static_cast<float>(i) / steps;
+        StrokeStampDot(static_cast<int>(lroundf(x0 + dx * t)),
+                       static_cast<int>(lroundf(y0 + dy * t)), r, color);
+    }
+}
+
+void LcdDisplay::StrokeFillCanvas(lv_color_t color) {
+    if (stroke_canvas_ == nullptr || stroke_canvas_buf_ == nullptr) {
+        return;
+    }
+    lv_canvas_set_px(stroke_canvas_, 0, 0, color, LV_OPA_COVER);
+    auto* raw = reinterpret_cast<uint16_t*>(stroke_canvas_buf_);
+    const uint16_t v = raw[0];
+    for (int i = 0; i < kStrokeCanvasSide * kStrokeCanvasSide; ++i) {
+        raw[i] = v;
+    }
+    lv_obj_invalidate(stroke_canvas_);
+}
+
+void LcdDisplay::StrokeBlitGlyph(lv_color_t color) {
+    if (stroke_canvas_ == nullptr || stroke_char_idx_ < 0) {
+        return;
+    }
+    memset(stroke_bits_, 0, sizeof(stroke_bits_));
+    if (!StrokeStore::GetInstance().DecodeGlyph(stroke_char_idx_, stroke_bits_)) {
+        return;
+    }
+    const int span = StrokeStore::kGlyphSide;
+    for (int p = 0; p < span * span; ++p) {
+        if ((stroke_bits_[p >> 3] >> (7 - (p & 7))) & 1) {
+            lv_canvas_set_px(stroke_canvas_, kStrokeCanvasMargin + p % span,
+                             kStrokeCanvasMargin + p / span, color, LV_OPA_COVER);
+        }
+    }
+    lv_obj_invalidate(stroke_canvas_);
+}
+
+void LcdDisplay::StrokeStartStroke(int s) {
+    if (stroke_canvas_ == nullptr) {
+        return;
+    }
+    if (s < 0 || s >= static_cast<int>(stroke_metas_.size())) {
+        if (stroke_metas_.empty()) {
+            stroke_done_tick_ = lv_tick_get() + 2000;
+        }
+        return;
+    }
+    stroke_stroke_idx_ = s;
+    const StrokeMeta& m = stroke_metas_[s];
+    stroke_pos_x_ = StrokeMapFpx(m.pts[0].x);
+    stroke_pos_y_ = StrokeMapFpx(m.pts[0].y);
+    stroke_pt_idx_ = 1;
+    stroke_radius_ = m.width * kStrokeGlyphSpan / (2.0f * StrokeStore::kGridMax);
+    if (stroke_radius_ < 2.0f) {
+        stroke_radius_ = 2.0f;
+    }
+    float len = 0.0f;
+    for (int i = 1; i < m.npts; ++i) {
+        float dx = StrokeMapFpx(m.pts[i].x) - StrokeMapFpx(m.pts[i - 1].x);
+        float dy = StrokeMapFpx(m.pts[i].y) - StrokeMapFpx(m.pts[i - 1].y);
+        len += sqrtf(dx * dx + dy * dy);
+    }
+    float seconds = 0.35f + len * 0.005f;
+    if (seconds < 0.35f) {
+        seconds = 0.35f;
+    } else if (seconds > 1.1f) {
+        seconds = 1.1f;
+    }
+    stroke_speed_ = len > 0.5f ? len / (25.0f * seconds) : 2.0f;
+
+    StrokeStampDot(static_cast<int>(lroundf(stroke_pos_x_)),
+                   static_cast<int>(lroundf(stroke_pos_y_)), stroke_radius_, stroke_color_active_);
+    if (s < kStrokeMaxStrokes && stroke_badges_[s] != nullptr) {
+        lv_obj_t* b = stroke_badges_[s];
+        lv_obj_clear_flag(b, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_align(b, LV_ALIGN_TOP_LEFT, static_cast<int>(lroundf(stroke_pos_x_)) - 10,
+                     static_cast<int>(lroundf(stroke_pos_y_)) - 10);
+    }
+    if (stroke_info_label_ != nullptr) {
+        lv_label_set_text_fmt(stroke_info_label_, "第 %d 笔 · %s", s + 1,
+                              StrokeStore::GetInstance().StrokeNameCn(m.type));
+    }
+    lv_obj_invalidate(stroke_canvas_);
+}
+
+void LcdDisplay::StrokeFinishStroke(int s) {
+    if (s < 0 || s >= static_cast<int>(stroke_metas_.size())) {
+        return;
+    }
+    const StrokeMeta& m = stroke_metas_[s];
+    for (int i = 1; i < m.npts; ++i) {
+        StrokeStampLine(StrokeMapFpx(m.pts[i - 1].x), StrokeMapFpx(m.pts[i - 1].y),
+                        StrokeMapFpx(m.pts[i].x), StrokeMapFpx(m.pts[i].y), stroke_radius_,
+                        stroke_color_done_);
+    }
+    if (m.npts <= 1) {
+        StrokeStampDot(static_cast<int>(lroundf(StrokeMapFpx(m.pts[0].x))),
+                       static_cast<int>(lroundf(StrokeMapFpx(m.pts[0].y))), stroke_radius_,
+                       stroke_color_done_);
+    }
+}
+
+void LcdDisplay::StrokeLoadChar(int idx) {
+    auto& store = StrokeStore::GetInstance();
+    if (stroke_screen_ == nullptr || stroke_canvas_ == nullptr || !store.Ready() || idx < 0 ||
+        idx >= store.CharCount()) {
+        return;
+    }
+    stroke_char_idx_ = idx;
+    stroke_metas_.clear();
+    store.LoadMedians(idx, stroke_metas_);
+    for (int i = 0; i < kStrokeMaxStrokes; ++i) {
+        if (stroke_badges_[i] != nullptr) {
+            lv_obj_add_flag(stroke_badges_[i], LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+
+    auto* theme = static_cast<LvglTheme*>(current_theme_);
+    stroke_color_bg_ = theme->background_color();
+    stroke_color_dim_ = lv_color_mix(lv_color_hex(0xFFFFFF), stroke_color_bg_, LV_OPA_30);
+    stroke_color_done_ = lv_color_mix(lv_color_hex(0xFFFFFF), stroke_color_bg_, LV_OPA_60);
+    stroke_color_active_ = lv_color_hex(0xFFFFFF);
+
+    lv_label_set_text_fmt(stroke_title_label_, "%s·笔顺", kStrokeGradeCn[store.GradeAt(idx)]);
+    lv_label_set_text(stroke_pinyin_label_, StrokeAsciiPinyin(store.PinyinOf(idx)).c_str());
+    if (stroke_info_label_ != nullptr) {
+        lv_label_set_text(stroke_info_label_, "");
+    }
+
+    StrokeFillCanvas(stroke_color_bg_);
+    StrokeBlitGlyph(stroke_color_dim_);
+    stroke_done_tick_ = 0;
+    StrokeStartStroke(0);
+}
+
+void LcdDisplay::StrokeAnimTick() {
+    auto& store = StrokeStore::GetInstance();
+    if (stroke_canvas_ == nullptr || stroke_char_idx_ < 0 || !store.Ready()) {
+        return;
+    }
+    if (stroke_done_tick_ != 0) {
+        if (static_cast<int32_t>(lv_tick_get() - stroke_done_tick_) >= 0) {
+            int grade = store.GradeAt(stroke_char_idx_);
+            int next = stroke_char_idx_ + 1;
+            if (next < store.GradeStart(grade) || next >= store.GradeEnd(grade)) {
+                next = store.GradeStart(grade);
+            }
+            StrokeLoadChar(next);
+        }
+        return;
+    }
+    if (stroke_stroke_idx_ >= static_cast<int>(stroke_metas_.size())) {
+        stroke_done_tick_ = lv_tick_get() + 2000;
+        return;
+    }
+    const StrokeMeta& m = stroke_metas_[stroke_stroke_idx_];
+    float budget = stroke_speed_;
+    while (budget > 0.0f && stroke_pt_idx_ < m.npts) {
+        float tx = StrokeMapFpx(m.pts[stroke_pt_idx_].x);
+        float ty = StrokeMapFpx(m.pts[stroke_pt_idx_].y);
+        float dx = tx - stroke_pos_x_;
+        float dy = ty - stroke_pos_y_;
+        float dist = sqrtf(dx * dx + dy * dy);
+        if (dist < 0.01f) {
+            stroke_pos_x_ = tx;
+            stroke_pos_y_ = ty;
+            stroke_pt_idx_++;
+            continue;
+        }
+        if (dist <= budget) {
+            StrokeStampLine(stroke_pos_x_, stroke_pos_y_, tx, ty, stroke_radius_,
+                            stroke_color_active_);
+            stroke_pos_x_ = tx;
+            stroke_pos_y_ = ty;
+            stroke_pt_idx_++;
+            budget -= dist;
+        } else {
+            float nx = stroke_pos_x_ + dx * (budget / dist);
+            float ny = stroke_pos_y_ + dy * (budget / dist);
+            StrokeStampLine(stroke_pos_x_, stroke_pos_y_, nx, ny, stroke_radius_,
+                            stroke_color_active_);
+            stroke_pos_x_ = nx;
+            stroke_pos_y_ = ny;
+            budget = 0.0f;
+        }
+    }
+    lv_obj_invalidate(stroke_canvas_);
+    if (stroke_pt_idx_ >= m.npts) {
+        StrokeFinishStroke(stroke_stroke_idx_);
+        int s = stroke_stroke_idx_ + 1;
+        if (s >= static_cast<int>(stroke_metas_.size()) || s >= kStrokeMaxStrokes) {
+            StrokeBlitGlyph(stroke_color_active_);
+            stroke_done_tick_ = lv_tick_get() + 4000;
+            lv_obj_invalidate(stroke_canvas_);
+        } else {
+            StrokeStartStroke(s);
+        }
+    }
+}
+
+void LcdDisplay::StrokeAnimTimerCb(lv_timer_t* timer) {
+    auto* self = static_cast<LcdDisplay*>(lv_timer_get_user_data(timer));
+    if (self != nullptr) {
+        self->StrokeAnimTick();
+    }
+}
+
+void LcdDisplay::ShowStrokeScreen(int char_idx) {
+    if (stroke_screen_ == nullptr) {
+        return;
+    }
+    auto& store = StrokeStore::GetInstance();
+    if (!store.Ready() || char_idx < 0 || char_idx >= store.CharCount()) {
+        return;
+    }
+    DisplayLockGuard lock(this);
+    stroke_screen_visible_ = true;
+    media_screen_visible_ = false;
+    bluetooth_screen_visible_ = false;
+    if (media_screen_ != nullptr) {
+        lv_obj_add_flag(media_screen_, LV_OBJ_FLAG_HIDDEN);
+    }
+    if (bluetooth_screen_ != nullptr) {
+        lv_obj_add_flag(bluetooth_screen_, LV_OBJ_FLAG_HIDDEN);
+    }
+    lv_obj_remove_flag(stroke_screen_, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_move_foreground(stroke_screen_);
+    StrokeLoadChar(char_idx);
+    if (stroke_anim_timer_ != nullptr) {
+        lv_timer_resume(stroke_anim_timer_);
+    }
+    UpdateMediaBarVisibility();
+}
+
+void LcdDisplay::ShowStrokeScreen(bool show) {
+    if (stroke_screen_ == nullptr) {
+        return;
+    }
+    DisplayLockGuard lock(this);
+    stroke_screen_visible_ = show;
+    if (show) {
+        auto& store = StrokeStore::GetInstance();
+        if (store.Ready()) {
+            int idx = stroke_char_idx_ >= 0 ? stroke_char_idx_ : store.GradeStart(1);
+            if (idx >= 0) {
+                StrokeLoadChar(idx);
+            }
+        }
+        lv_obj_remove_flag(stroke_screen_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_move_foreground(stroke_screen_);
+        if (stroke_anim_timer_ != nullptr) {
+            lv_timer_resume(stroke_anim_timer_);
+        }
+    } else {
+        lv_obj_add_flag(stroke_screen_, LV_OBJ_FLAG_HIDDEN);
+        if (stroke_anim_timer_ != nullptr) {
+            lv_timer_pause(stroke_anim_timer_);
+        }
+    }
+    UpdateMediaBarVisibility();
+}
+
+void LcdDisplay::StrokeChangeChar(int dir) {
+    if (stroke_screen_ == nullptr) {
+        return;
+    }
+    auto& store = StrokeStore::GetInstance();
+    if (!store.Ready()) {
+        return;
+    }
+    int target = -1;
+    {
+        DisplayLockGuard lock(this);
+        if (stroke_char_idx_ < 0) {
+            target = store.GradeStart(1);
+        } else {
+            int grade = store.GradeAt(stroke_char_idx_);
+            target = stroke_char_idx_ + dir;
+            if (target < store.GradeStart(grade) || target >= store.GradeEnd(grade)) {
+                target = dir > 0 ? store.GradeStart(grade) : store.GradeEnd(grade) - 1;
+            }
+            if (target == stroke_char_idx_) {
+                return;
+            }
+        }
+    }
+    if (target >= 0) {
+        ShowStrokeScreen(target);
+    }
+}
+
+void LcdDisplay::OnStrokeEntryClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self == nullptr) {
+        return;
+    }
+    auto& store = StrokeStore::GetInstance();
+    int idx = self->stroke_char_idx_ >= 0 ? self->stroke_char_idx_ : store.GradeStart(1);
+    if (store.Ready() && idx >= 0) {
+        self->ShowStrokeScreen(idx);
+    }
+}
+
+void LcdDisplay::OnStrokeCloseClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self != nullptr) {
+        self->ShowStrokeScreen(false);
+    }
+}
+
+void LcdDisplay::OnStrokeReplayClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self != nullptr && self->stroke_char_idx_ >= 0) {
+        self->ShowStrokeScreen(self->stroke_char_idx_);
+    }
+}
+
+void LcdDisplay::OnStrokePrevClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self != nullptr) {
+        self->StrokeChangeChar(-1);
+    }
+}
+
+void LcdDisplay::OnStrokeNextClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self != nullptr) {
+        self->StrokeChangeChar(1);
+    }
 }
 
 void LcdDisplay::OnMediaBarClicked(lv_event_t* e) {
@@ -2839,6 +3447,10 @@ void LcdDisplay::SetTheme(Theme* theme) {
     auto text_font = lvgl_theme->text_font()->font();
     auto icon_font = lvgl_theme->icon_font()->font();
     auto large_icon_font = lvgl_theme->large_icon_font()->font();
+
+    // Rebind the stroke page immediately: its labels are not part of the
+    // chat layout and would still point at the freed previous theme fonts.
+    RebindStrokeFonts(text_font, icon_font, large_icon_font);
 
     if (text_font->line_height >= 40) {
         lv_obj_set_style_text_font(mute_label_, large_icon_font, 0);

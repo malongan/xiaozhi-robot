@@ -27,6 +27,15 @@
 // 屏幕显示部分
 #define DISPLAY_BACKLIGHT_PIN GPIO_NUM_45
 
+// TF 卡卡座（SDMMC 4-bit 引脚映射；SD_D3 兼作 SPI 模式 CS）
+#define SD_CLK GPIO_NUM_38
+#define SD_CMD GPIO_NUM_40
+#define SD_DATA0 GPIO_NUM_39
+#define SD_DATA1 GPIO_NUM_41
+#define SD_DATA2 GPIO_NUM_48
+#define SD_DATA3 GPIO_NUM_47  // = SD_CS for SDSPI fallback
+#define SD_MOUNT_POINT "/sdcard"
+
 #define DISPLAY_RST_PIN GPIO_NUM_NC
 #define DISPLAY_SCK_PIN GPIO_NUM_12
 #define DISPLAY_DC_PIN GPIO_NUM_46
