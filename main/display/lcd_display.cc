@@ -2479,11 +2479,14 @@ void LcdDisplay::SetAvatarMood(AvatarMood mood) {
         // screens so the user sees the dialog immediately.
         ShowMediaScreen(false);
         ShowBluetoothScreen(false);
-        if (stroke_screen_visible_) {
-            ShowStrokeScreen(false);
-        }
         if (settings_screen_visible_) {
             ShowSettingsScreen(false);
+        }
+        // The stroke page is opened by the assistant while it is answering a
+        // "write ... for me" question, so only close it when the *user* starts
+        // talking (Listening). Closing it on Speaking cut the demo short.
+        if (mood == kAvatarMoodListening && stroke_screen_visible_) {
+            ShowStrokeScreen(false);
         }
     }
     UpdateChatViewport();
@@ -3197,7 +3200,9 @@ void LcdDisplay::StrokeLoadChar(int idx) {
     stroke_color_active_ = lv_color_hex(0xFFFFFF);
 
     lv_label_set_text_fmt(stroke_title_label_, "%s·笔顺", kStrokeGradeCn[store.GradeAt(idx)]);
-    lv_label_set_text(stroke_pinyin_label_, StrokeAsciiPinyin(store.PinyinOf(idx)).c_str());
+    lv_label_set_text_fmt(stroke_pinyin_label_, "%s · 共%d笔",
+                          StrokeAsciiPinyin(store.PinyinOf(idx)).c_str(),
+                          store.StrokeCountAt(idx));
     if (stroke_info_label_ != nullptr) {
         lv_label_set_text(stroke_info_label_, "");
     }
