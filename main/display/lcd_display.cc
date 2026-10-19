@@ -1718,9 +1718,9 @@ void LcdDisplay::SetupUI() {
     settings_wifi_label_ = make_text_label(settings_screen_, "WiFi");
     lv_obj_set_pos(settings_wifi_label_, 12, 184);
     settings_wifi_status_ = make_text_label(settings_screen_, "");
-    lv_obj_set_width(settings_wifi_status_, 118);
-    lv_obj_set_style_text_align(settings_wifi_status_, LV_TEXT_ALIGN_RIGHT, 0);
-    lv_obj_set_pos(settings_wifi_status_, 36, 184);
+    lv_obj_set_width(settings_wifi_status_, 100);
+    lv_obj_set_style_text_align(settings_wifi_status_, LV_TEXT_ALIGN_LEFT, 0);
+    lv_obj_set_pos(settings_wifi_status_, 58, 184);
     settings_wifi_btn_label_ = make_wide_button(settings_screen_, 166, 176, 62, "配网",
                                                 &LcdDisplay::OnWifiConfigClicked);
 
@@ -1728,9 +1728,9 @@ void LcdDisplay::SetupUI() {
     settings_bt_label_ = make_text_label(settings_screen_, "蓝牙");
     lv_obj_set_pos(settings_bt_label_, 12, 244);
     settings_bt_status_ = make_text_label(settings_screen_, "");
-    lv_obj_set_width(settings_bt_status_, 78);
-    lv_obj_set_style_text_align(settings_bt_status_, LV_TEXT_ALIGN_RIGHT, 0);
-    lv_obj_set_pos(settings_bt_status_, 40, 244);
+    lv_obj_set_width(settings_bt_status_, 66);
+    lv_obj_set_style_text_align(settings_bt_status_, LV_TEXT_ALIGN_LEFT, 0);
+    lv_obj_set_pos(settings_bt_status_, 58, 244);
     settings_bt_disconnect_label_ = make_wide_button(settings_screen_, 126, 236, 50, "断开",
                                                      &LcdDisplay::OnSettingsBtDisconnectClicked);
     settings_bt_forget_label_ = make_wide_button(settings_screen_, 182, 236, 46, "清空",
