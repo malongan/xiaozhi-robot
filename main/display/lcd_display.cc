@@ -2347,6 +2347,8 @@ void LcdDisplay::OnRebootClicked(lv_event_t* e) {
 
 void LcdDisplay::OnWakeWordDetected() {
     DisplayLockGuard lock(this);
+    ESP_LOGI(TAG, "wake/new-turn hook: stroke=%d settings=%d", stroke_screen_visible_,
+             settings_screen_visible_);
     if (stroke_screen_visible_) {
         ShowStrokeScreen(false);
     }
@@ -3327,6 +3329,7 @@ void LcdDisplay::ShowStrokeScreen(bool show) {
         return;
     }
     DisplayLockGuard lock(this);
+    ESP_LOGI(TAG, "ShowStrokeScreen(%d)", show);
     stroke_screen_visible_ = show;
     if (show) {
         auto& store = StrokeStore::GetInstance();

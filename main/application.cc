@@ -692,6 +692,9 @@ void Application::InitializeProtocol() {
                 ESP_LOGI(TAG, ">> %s", text->valuestring);
                 Schedule([display, message = std::string(text->valuestring),
                           glyphs = std::move(glyphs), bpp]() {
+                    // A new user utterance starts a new turn: overlay pages
+                    // (stroke demo, settings) belong to the previous turn.
+                    display->OnWakeWordDetected();
                     display->AddTextGlyphs(glyphs, bpp);
                     display->SetChatMessage("user", message.c_str());
                 });
@@ -799,7 +802,15 @@ void Application::DismissAlert() {
     }
 }
 
-void Application::ToggleChatState() { xEventGroupSetBits(event_group_, MAIN_EVENT_TOGGLE_CHAT); }
+void Application::ToggleChatState() {
+    // A physical key/touch starts a fresh turn: let overlay pages (stroke demo,
+    // settings) close before the conversation takes over the screen.
+    ESP_LOGI(TAG, "ToggleChatState: notify display");
+    if (auto display = Board::GetInstance().GetDisplay()) {
+        display->OnWakeWordDetected();
+    }
+    xEventGroupSetBits(event_group_, MAIN_EVENT_TOGGLE_CHAT);
+}
 
 void Application::StartNewSession() {
     auto state = GetDeviceState();
