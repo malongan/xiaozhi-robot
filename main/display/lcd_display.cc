@@ -1550,27 +1550,13 @@ void LcdDisplay::SetupUI() {
         lv_obj_set_size(stroke_canvas_, kStrokeCanvasSide, kStrokeCanvasSide);
         lv_canvas_set_buffer(stroke_canvas_, stroke_canvas_buf_, kStrokeCanvasSide,
                              kStrokeCanvasSide, LV_COLOR_FORMAT_RGB565);
-        lv_obj_align(stroke_canvas_, LV_ALIGN_TOP_MID, 0, 34);
+        lv_obj_align(stroke_canvas_, LV_ALIGN_TOP_MID, 0, 56);
         lv_obj_set_style_radius(stroke_canvas_, 8, 0);
         lv_obj_set_style_border_width(stroke_canvas_, 1, 0);
         lv_obj_set_style_border_color(
             stroke_canvas_,
             lv_color_mix(lvgl_theme->text_color(), lvgl_theme->background_color(), LV_OPA_40), 0);
         lv_obj_set_style_clip_corner(stroke_canvas_, true, 0);
-
-        stroke_pinyin_label_ = lv_label_create(stroke_screen_);
-        lv_obj_set_style_text_font(stroke_pinyin_label_, text_font, 0);
-        lv_obj_set_style_text_color(stroke_pinyin_label_, lvgl_theme->text_color(), 0);
-        lv_label_set_text(stroke_pinyin_label_, "");
-        lv_obj_align(stroke_pinyin_label_, LV_ALIGN_TOP_MID, 0, 214);
-
-        stroke_info_label_ = lv_label_create(stroke_screen_);
-        lv_obj_set_style_text_font(stroke_info_label_, text_font, 0);
-        lv_obj_set_style_text_color(
-            stroke_info_label_,
-            lv_color_mix(lvgl_theme->text_color(), lvgl_theme->background_color(), LV_OPA_70), 0);
-        lv_label_set_text(stroke_info_label_, "");
-        lv_obj_align(stroke_info_label_, LV_ALIGN_TOP_MID, 0, 238);
 
         int stroke_key_slot = 0;
         auto create_key = [this, large_icon_font, lvgl_theme, &stroke_key_slot](
@@ -3154,10 +3140,6 @@ void LcdDisplay::StrokeStartStroke(int s) {
         lv_obj_align(b, LV_ALIGN_TOP_LEFT, static_cast<int>(lroundf(stroke_pos_x_)) - 10,
                      static_cast<int>(lroundf(stroke_pos_y_)) - 10);
     }
-    if (stroke_info_label_ != nullptr) {
-        lv_label_set_text_fmt(stroke_info_label_, "第 %d 笔 · %s", s + 1,
-                              StrokeStore::GetInstance().StrokeNameCn(m.type));
-    }
     lv_obj_invalidate(stroke_canvas_);
 }
 
@@ -3199,13 +3181,7 @@ void LcdDisplay::StrokeLoadChar(int idx) {
     stroke_color_done_ = lv_color_mix(lv_color_hex(0xFFFFFF), stroke_color_bg_, LV_OPA_60);
     stroke_color_active_ = lv_color_hex(0xFFFFFF);
 
-    lv_label_set_text_fmt(stroke_title_label_, "%s·笔顺", kStrokeGradeCn[store.GradeAt(idx)]);
-    lv_label_set_text_fmt(stroke_pinyin_label_, "%s · 共%d笔",
-                          StrokeAsciiPinyin(store.PinyinOf(idx)).c_str(),
-                          store.StrokeCountAt(idx));
-    if (stroke_info_label_ != nullptr) {
-        lv_label_set_text(stroke_info_label_, "");
-    }
+    lv_label_set_text(stroke_title_label_, StrokeAsciiPinyin(store.PinyinOf(idx)).c_str());
 
     StrokeFillCanvas(stroke_color_bg_);
     StrokeBlitGlyph(stroke_color_dim_);
