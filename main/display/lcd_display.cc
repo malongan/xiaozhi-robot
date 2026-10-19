@@ -2473,6 +2473,8 @@ void LcdDisplay::SetAvatarMood(AvatarMood mood) {
         return;
     }
     const AvatarMood previous_mood = avatar_mood_;
+    ESP_LOGI(TAG, "avatar mood %d -> %d (stroke=%d settings=%d)", (int)previous_mood, (int)mood,
+             stroke_screen_visible_, settings_screen_visible_);
     MarkUserActivity();
     avatar_mood_ = mood;
     avatar_anim_epoch_ = lv_tick_get();
@@ -3141,9 +3143,10 @@ void LcdDisplay::StrokeStartStroke(int s) {
     stroke_pos_x_ = StrokeMapFpx(m.pts[0].x);
     stroke_pos_y_ = StrokeMapFpx(m.pts[0].y);
     stroke_pt_idx_ = 1;
-    stroke_radius_ = m.width * kStrokeGlyphSpan / (2.0f * StrokeStore::kGridMax);
-    if (stroke_radius_ < 2.0f) {
-        stroke_radius_ = 2.0f;
+    // Pen width: the raw medians are quite bold; draw at half thickness.
+    stroke_radius_ = m.width * kStrokeGlyphSpan / (2.0f * StrokeStore::kGridMax) * 0.5f;
+    if (stroke_radius_ < 1.5f) {
+        stroke_radius_ = 1.5f;
     }
     float len = 0.0f;
     for (int i = 1; i < m.npts; ++i) {
