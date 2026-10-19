@@ -109,6 +109,8 @@ protected:
     float stroke_pos_y_ = 0.0f;
     float stroke_radius_ = 3.0f;
     float stroke_speed_ = 2.0f;
+    uint32_t stroke_reveal_tick_ = 0;
+    int stroke_revealed_ = 0;
     uint32_t stroke_done_tick_ = 0;
     bool stroke_screen_visible_ = false;
     lv_timer_t* stroke_anim_timer_ = nullptr;
@@ -253,6 +255,7 @@ protected:
     void StrokeLoadChar(int idx);
     void StrokeStartStroke(int s);
     void StrokeFinishStroke(int s);
+    void StrokeDrawStroke(int s, lv_color_t color);
     void StrokeFillCanvas(lv_color_t color);
     void StrokeBlitGlyph(lv_color_t color);
     void StrokeStampDot(int cx, int cy, float r, lv_color_t color);

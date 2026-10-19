@@ -1605,7 +1605,7 @@ void LcdDisplay::SetupUI() {
         lv_label_set_text(entry_label, "笔");
         lv_obj_center(entry_label);
 
-        stroke_anim_timer_ = lv_timer_create(&LcdDisplay::StrokeAnimTimerCb, 40, this);
+        stroke_anim_timer_ = lv_timer_create(&LcdDisplay::StrokeAnimTimerCb, 60, this);
         lv_timer_pause(stroke_anim_timer_);
     }
 
@@ -3223,21 +3223,23 @@ void LcdDisplay::StrokeStartStroke(int s) {
     lv_obj_invalidate(stroke_canvas_);
 }
 
-void LcdDisplay::StrokeFinishStroke(int s) {
+void LcdDisplay::StrokeDrawStroke(int s, lv_color_t color) {
     if (s < 0 || s >= static_cast<int>(stroke_metas_.size())) {
         return;
     }
     const StrokeMeta& m = stroke_metas_[s];
     for (int i = 1; i < m.npts; ++i) {
         StrokeStampLine(StrokeMapFpx(m.pts[i - 1].x), StrokeMapFpx(m.pts[i - 1].y),
-                        StrokeMapFpx(m.pts[i].x), StrokeMapFpx(m.pts[i].y), stroke_radius_,
-                        stroke_color_done_);
+                        StrokeMapFpx(m.pts[i].x), StrokeMapFpx(m.pts[i].y), stroke_radius_, color);
     }
     if (m.npts <= 1) {
         StrokeStampDot(static_cast<int>(lroundf(StrokeMapFpx(m.pts[0].x))),
-                       static_cast<int>(lroundf(StrokeMapFpx(m.pts[0].y))), stroke_radius_,
-                       stroke_color_done_);
+                       static_cast<int>(lroundf(StrokeMapFpx(m.pts[0].y))), stroke_radius_, color);
     }
+}
+
+void LcdDisplay::StrokeFinishStroke(int s) {
+    StrokeDrawStroke(s, stroke_color_done_);
 }
 
 void LcdDisplay::StrokeLoadChar(int idx) {
@@ -3266,7 +3268,8 @@ void LcdDisplay::StrokeLoadChar(int idx) {
     StrokeFillCanvas(stroke_color_bg_);
     StrokeBlitGlyph(stroke_color_dim_);
     stroke_done_tick_ = 0;
-    StrokeStartStroke(0);
+    stroke_revealed_ = 0;
+    stroke_reveal_tick_ = lv_tick_get() + 400;
 }
 
 void LcdDisplay::StrokeAnimTick() {
@@ -3274,68 +3277,39 @@ void LcdDisplay::StrokeAnimTick() {
     if (stroke_canvas_ == nullptr || stroke_char_idx_ < 0 || !store.Ready()) {
         return;
     }
-    // Do not leave a demo looping on screen forever: after a minute without
-    // any touch/voice activity return to the normal screen. A wake word also
-    // exits immediately (SetAvatarMood hides the page on conversation start).
-    if (stroke_screen_visible_ && lv_tick_get() - last_activity_tick_ > 300000) {
+    const uint32_t now = lv_tick_get();
+    // Do not leave a demo looping on screen forever: after five minutes without
+    // any touch/voice activity return to the normal screen.
+    if (stroke_screen_visible_ && now - last_activity_tick_ > 300000) {
         ShowStrokeScreen(false);
         return;
     }
     if (stroke_done_tick_ != 0) {
-        if (static_cast<int32_t>(lv_tick_get() - stroke_done_tick_) >= 0) {
-            // Keep demonstrating the character the user asked for; switching
-            // characters only happens from the prev/next keys.
+        if (static_cast<int32_t>(now - stroke_done_tick_) >= 0) {
+            // Play the requested character again; switching characters only
+            // happens from the prev/next keys.
             StrokeLoadChar(stroke_char_idx_);
         }
         return;
     }
-    if (stroke_stroke_idx_ >= static_cast<int>(stroke_metas_.size())) {
-        stroke_done_tick_ = lv_tick_get() + 2000;
+    const int total = static_cast<int>(stroke_metas_.size());
+    if (stroke_revealed_ >= total) {
+        // Everything is shown: show the complete glyph for a moment, then loop.
+        StrokeBlitGlyph(stroke_color_active_);
+        lv_obj_invalidate(stroke_canvas_);
+        stroke_done_tick_ = now + 2500;
         return;
     }
-    const StrokeMeta& m = stroke_metas_[stroke_stroke_idx_];
-    float budget = stroke_speed_;
-    while (budget > 0.0f && stroke_pt_idx_ < m.npts) {
-        float tx = StrokeMapFpx(m.pts[stroke_pt_idx_].x);
-        float ty = StrokeMapFpx(m.pts[stroke_pt_idx_].y);
-        float dx = tx - stroke_pos_x_;
-        float dy = ty - stroke_pos_y_;
-        float dist = sqrtf(dx * dx + dy * dy);
-        if (dist < 0.01f) {
-            stroke_pos_x_ = tx;
-            stroke_pos_y_ = ty;
-            stroke_pt_idx_++;
-            continue;
-        }
-        if (dist <= budget) {
-            StrokeStampLine(stroke_pos_x_, stroke_pos_y_, tx, ty, stroke_radius_,
-                            stroke_color_active_);
-            stroke_pos_x_ = tx;
-            stroke_pos_y_ = ty;
-            stroke_pt_idx_++;
-            budget -= dist;
-        } else {
-            float nx = stroke_pos_x_ + dx * (budget / dist);
-            float ny = stroke_pos_y_ + dy * (budget / dist);
-            StrokeStampLine(stroke_pos_x_, stroke_pos_y_, nx, ny, stroke_radius_,
-                            stroke_color_active_);
-            stroke_pos_x_ = nx;
-            stroke_pos_y_ = ny;
-            budget = 0.0f;
-        }
+    if (static_cast<int32_t>(now - stroke_reveal_tick_) < 0) {
+        return;
     }
+    // Light up one complete stroke at a time. Redrawing the canvas only once
+    // per stroke keeps the SPI/LVGL load low enough for streamed TTS audio to
+    // stay smooth (the previous pen-drawing animation ran every 40 ms).
+    StrokeDrawStroke(stroke_revealed_, stroke_color_active_);
+    stroke_revealed_++;
+    stroke_reveal_tick_ = now + 260;
     lv_obj_invalidate(stroke_canvas_);
-    if (stroke_pt_idx_ >= m.npts) {
-        StrokeFinishStroke(stroke_stroke_idx_);
-        int s = stroke_stroke_idx_ + 1;
-        if (s >= static_cast<int>(stroke_metas_.size()) || s >= kStrokeMaxStrokes) {
-            StrokeBlitGlyph(stroke_color_active_);
-            stroke_done_tick_ = lv_tick_get() + 2500;
-            lv_obj_invalidate(stroke_canvas_);
-        } else {
-            StrokeStartStroke(s);
-        }
-    }
 }
 
 void LcdDisplay::StrokeAnimTimerCb(lv_timer_t* timer) {
