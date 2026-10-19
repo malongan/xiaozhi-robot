@@ -6,6 +6,9 @@
 #include "lvgl_font.h"
 #include "lvgl_theme.h"
 #include "media_ble.h"
+#include "wifi_board.h"
+#include <wifi_manager.h>
+#include <esp_system.h>
 
 LV_FONT_DECLARE(font_zzz_30);
 
@@ -27,6 +30,7 @@ LV_FONT_DECLARE(font_zzz_30);
 #include <vector>
 
 #include "board.h"
+#include "backlight.h"
 
 #define TAG "LcdDisplay"
 
@@ -1635,6 +1639,153 @@ void LcdDisplay::SetupUI() {
         lv_timer_pause(stroke_anim_timer_);
     }
 
+    /* Settings screen: volume / brightness / WiFi / Bluetooth / reboot */
+    settings_screen_ = lv_obj_create(screen);
+    lv_obj_set_size(settings_screen_, LV_HOR_RES, LV_VER_RES);
+    lv_obj_set_style_radius(settings_screen_, 0, 0);
+    lv_obj_set_style_bg_color(settings_screen_, lvgl_theme->background_color(), 0);
+    lv_obj_set_style_bg_opa(settings_screen_, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(settings_screen_, 0, 0);
+    lv_obj_set_style_pad_all(settings_screen_, 0, 0);
+    lv_obj_remove_flag(settings_screen_, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollbar_mode(settings_screen_, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_add_flag(settings_screen_, LV_OBJ_FLAG_HIDDEN);
+
+    auto settings_back = lv_button_create(settings_screen_);
+    lv_obj_set_size(settings_back, 44, 36);
+    lv_obj_align(settings_back, LV_ALIGN_TOP_LEFT, 4, 2);
+    lv_obj_set_style_bg_opa(settings_back, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(settings_back, 0, 0);
+    lv_obj_set_style_shadow_width(settings_back, 0, 0);
+    lv_obj_set_style_pad_all(settings_back, 0, 0);
+    lv_obj_add_event_cb(settings_back, &LcdDisplay::OnSettingsBackClicked, LV_EVENT_CLICKED, this);
+    settings_back_icon_ = lv_label_create(settings_back);
+    lv_obj_set_style_text_font(settings_back_icon_, icon_font, 0);
+    lv_obj_set_style_text_color(settings_back_icon_, lvgl_theme->text_color(), 0);
+    lv_label_set_text(settings_back_icon_, MATERIAL_SYMBOLS_ARROW_BACK);
+    lv_obj_center(settings_back_icon_);
+
+    settings_title_ = lv_label_create(settings_screen_);
+    lv_obj_set_style_text_font(settings_title_, text_font, 0);
+    lv_obj_set_style_text_color(settings_title_, lvgl_theme->text_color(), 0);
+    lv_label_set_text(settings_title_, "设置");
+    lv_obj_align(settings_title_, LV_ALIGN_TOP_MID, 0, 10);
+
+    auto make_text_label = [this, text_font, lvgl_theme](lv_obj_t* parent, const char* text) {
+        lv_obj_t* label = lv_label_create(parent);
+        lv_obj_set_style_text_font(label, text_font, 0);
+        lv_obj_set_style_text_color(label, lvgl_theme->text_color(), 0);
+        lv_label_set_text(label, text);
+        return label;
+    };
+    auto make_adjust_button = [this, lvgl_theme](lv_obj_t* parent, lv_coord_t x, lv_coord_t y,
+                                                 const char* text, lv_event_cb_t cb) {
+        lv_obj_t* btn = lv_button_create(parent);
+        lv_obj_set_size(btn, 40, 36);
+        lv_obj_set_pos(btn, x, y);
+        lv_obj_set_style_radius(btn, 8, 0);
+        lv_obj_set_style_bg_color(btn, lv_color_hex(0x2A2A34), 0);
+        lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
+        lv_obj_set_style_border_width(btn, 0, 0);
+        lv_obj_set_style_shadow_width(btn, 0, 0);
+        lv_obj_set_style_pad_all(btn, 0, 0);
+        lv_obj_add_event_cb(btn, cb, LV_EVENT_CLICKED, this);
+        lv_obj_t* label = lv_label_create(btn);
+        lv_obj_set_style_text_font(label, lvgl_theme->text_font()->font(), 0);
+        lv_obj_set_style_text_color(label, lvgl_theme->text_color(), 0);
+        lv_label_set_text(label, text);
+        lv_obj_center(label);
+        return label;
+    };
+    auto make_wide_button = [this, lvgl_theme](lv_obj_t* parent, lv_coord_t x, lv_coord_t y,
+                                               lv_coord_t w, const char* text, lv_event_cb_t cb) {
+        lv_obj_t* btn = lv_button_create(parent);
+        lv_obj_set_size(btn, w, 36);
+        lv_obj_set_pos(btn, x, y);
+        lv_obj_set_style_radius(btn, 8, 0);
+        lv_obj_set_style_bg_color(btn, lv_color_hex(0x2A2A34), 0);
+        lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
+        lv_obj_set_style_border_width(btn, 0, 0);
+        lv_obj_set_style_shadow_width(btn, 0, 0);
+        lv_obj_set_style_pad_all(btn, 0, 0);
+        lv_obj_add_event_cb(btn, cb, LV_EVENT_CLICKED, this);
+        lv_obj_t* label = lv_label_create(btn);
+        lv_obj_set_style_text_font(label, lvgl_theme->text_font()->font(), 0);
+        lv_obj_set_style_text_color(label, lvgl_theme->text_color(), 0);
+        lv_label_set_text(label, text);
+        lv_obj_center(label);
+        return label;
+    };
+
+    // Volume
+    settings_volume_label_ = make_text_label(settings_screen_, "音量");
+    lv_obj_set_pos(settings_volume_label_, 12, 58);
+    settings_volume_value_ = make_text_label(settings_screen_, "70");
+    lv_obj_set_width(settings_volume_value_, 52);
+    lv_obj_set_style_text_align(settings_volume_value_, LV_TEXT_ALIGN_RIGHT, 0);
+    lv_obj_set_pos(settings_volume_value_, 64, 58);
+    settings_vol_minus_icon_ =
+        make_adjust_button(settings_screen_, 122, 50, "-", &LcdDisplay::OnVolumeDownClicked);
+    settings_vol_plus_icon_ =
+        make_adjust_button(settings_screen_, 170, 50, "+", &LcdDisplay::OnVolumeUpClicked);
+
+    // Brightness
+    settings_bright_label_ = make_text_label(settings_screen_, "亮度");
+    lv_obj_set_pos(settings_bright_label_, 12, 118);
+    settings_bright_value_ = make_text_label(settings_screen_, "100");
+    lv_obj_set_width(settings_bright_value_, 52);
+    lv_obj_set_style_text_align(settings_bright_value_, LV_TEXT_ALIGN_RIGHT, 0);
+    lv_obj_set_pos(settings_bright_value_, 64, 118);
+    settings_bright_minus_icon_ =
+        make_adjust_button(settings_screen_, 122, 110, "-", &LcdDisplay::OnBrightnessDownClicked);
+    settings_bright_plus_icon_ =
+        make_adjust_button(settings_screen_, 170, 110, "+", &LcdDisplay::OnBrightnessUpClicked);
+
+    // WiFi
+    settings_wifi_label_ = make_text_label(settings_screen_, "WiFi");
+    lv_obj_set_pos(settings_wifi_label_, 12, 184);
+    settings_wifi_status_ = make_text_label(settings_screen_, "");
+    lv_obj_set_width(settings_wifi_status_, 118);
+    lv_obj_set_style_text_align(settings_wifi_status_, LV_TEXT_ALIGN_RIGHT, 0);
+    lv_obj_set_pos(settings_wifi_status_, 36, 184);
+    settings_wifi_btn_label_ = make_wide_button(settings_screen_, 166, 176, 62, "配网",
+                                                &LcdDisplay::OnWifiConfigClicked);
+
+    // Bluetooth
+    settings_bt_label_ = make_text_label(settings_screen_, "蓝牙");
+    lv_obj_set_pos(settings_bt_label_, 12, 244);
+    settings_bt_status_ = make_text_label(settings_screen_, "");
+    lv_obj_set_width(settings_bt_status_, 78);
+    lv_obj_set_style_text_align(settings_bt_status_, LV_TEXT_ALIGN_RIGHT, 0);
+    lv_obj_set_pos(settings_bt_status_, 40, 244);
+    settings_bt_disconnect_label_ = make_wide_button(settings_screen_, 126, 236, 50, "断开",
+                                                     &LcdDisplay::OnSettingsBtDisconnectClicked);
+    settings_bt_forget_label_ = make_wide_button(settings_screen_, 182, 236, 46, "清空",
+                                                 &LcdDisplay::OnSettingsBtForgetClicked);
+
+    // Reboot
+    settings_reboot_label_ = make_wide_button(settings_screen_, 60, 282, 120, "重启设备",
+                                              &LcdDisplay::OnRebootClicked);
+
+    // Gear entry (bottom-left, idle only)
+    settings_entry_btn_ = lv_button_create(screen);
+    lv_obj_set_size(settings_entry_btn_, 36, 36);
+    lv_obj_align(settings_entry_btn_, LV_ALIGN_BOTTOM_LEFT, 4, -4);
+    lv_obj_set_style_bg_color(settings_entry_btn_, lv_color_hex(0x30303C), 0);
+    lv_obj_set_style_bg_opa(settings_entry_btn_, LV_OPA_COVER, 0);
+    lv_obj_set_style_radius(settings_entry_btn_, 10, 0);
+    lv_obj_set_style_border_width(settings_entry_btn_, 0, 0);
+    lv_obj_set_style_shadow_width(settings_entry_btn_, 0, 0);
+    lv_obj_set_style_pad_all(settings_entry_btn_, 0, 0);
+    lv_obj_add_flag(settings_entry_btn_, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_event_cb(settings_entry_btn_, &LcdDisplay::OnSettingsEntryClicked, LV_EVENT_CLICKED,
+                        this);
+    settings_entry_icon_ = lv_label_create(settings_entry_btn_);
+    lv_obj_set_style_text_font(settings_entry_icon_, icon_font, 0);
+    lv_obj_set_style_text_color(settings_entry_icon_, lv_color_hex(0xE8E8F0), 0);
+    lv_label_set_text(settings_entry_icon_, MATERIAL_SYMBOLS_SETTINGS);
+    lv_obj_center(settings_entry_icon_);
+
     lv_obj_add_event_cb(screen, &LcdDisplay::OnUserActivity, LV_EVENT_PRESSED, this);
     lv_obj_add_event_cb(screen, &LcdDisplay::OnUserActivity, LV_EVENT_CLICKED, this);
 
@@ -1906,6 +2057,9 @@ void LcdDisplay::ApplyChatLayout() {
                       lvgl_theme->large_icon_font() != nullptr
                           ? lvgl_theme->large_icon_font()->font()
                           : nullptr);
+    RebindSettingsFonts(font, lvgl_theme->icon_font() != nullptr
+                                    ? lvgl_theme->icon_font()->font()
+                                    : nullptr);
 
     /* Portrait 240x320 canvas: top bar (one line), avatar, then five text lines.
        The avatar sits right under the top bar and the text keeps a readable gap
@@ -2044,6 +2198,179 @@ void LcdDisplay::RebindStrokeFonts(const lv_font_t* text_font, const lv_font_t* 
     }
 }
 
+void LcdDisplay::ShowSettingsScreen(bool show) {
+    if (settings_screen_ == nullptr) {
+        return;
+    }
+    DisplayLockGuard lock(this);
+    settings_screen_visible_ = show;
+    if (show) {
+        UpdateSettingsValues();
+        lv_obj_remove_flag(settings_screen_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_move_foreground(settings_screen_);
+    } else {
+        lv_obj_add_flag(settings_screen_, LV_OBJ_FLAG_HIDDEN);
+    }
+    UpdateMediaBarVisibility();
+}
+
+void LcdDisplay::UpdateSettingsValues() {
+    auto* codec = Board::GetInstance().GetAudioCodec();
+    if (codec != nullptr && settings_volume_value_ != nullptr) {
+        lv_label_set_text_fmt(settings_volume_value_, "%d", codec->output_volume());
+    }
+    auto* backlight = Board::GetInstance().GetBacklight();
+    if (backlight != nullptr && settings_bright_value_ != nullptr) {
+        lv_label_set_text_fmt(settings_bright_value_, "%d", backlight->brightness());
+    }
+    if (settings_wifi_status_ != nullptr) {
+        auto& wifi = WifiManager::GetInstance();
+        if (wifi.IsConnected()) {
+            lv_label_set_text(settings_wifi_status_, wifi.GetSsid().c_str());
+        } else if (wifi.IsConfigMode()) {
+            lv_label_set_text(settings_wifi_status_, "配网模式");
+        } else {
+            lv_label_set_text(settings_wifi_status_, "未连接");
+        }
+    }
+    if (settings_bt_status_ != nullptr) {
+        lv_label_set_text(settings_bt_status_,
+                          MediaBle::GetInstance().IsConnected() ? "已连接" : "未连接");
+    }
+}
+
+void LcdDisplay::RebindSettingsFonts(const lv_font_t* text_font, const lv_font_t* icon_font) {
+    lv_obj_t* text_labels[] = {settings_title_,
+                               settings_volume_label_,
+                               settings_volume_value_,
+                               settings_bright_label_,
+                               settings_bright_value_,
+                               settings_wifi_label_,
+                               settings_wifi_status_,
+                               settings_bt_label_,
+                               settings_bt_status_,
+                               settings_vol_minus_icon_,
+                               settings_vol_plus_icon_,
+                               settings_bright_minus_icon_,
+                               settings_bright_plus_icon_,
+                               settings_wifi_btn_label_,
+                               settings_bt_disconnect_label_,
+                               settings_bt_forget_label_,
+                               settings_reboot_label_};
+    for (lv_obj_t* label : text_labels) {
+        if (label != nullptr && text_font != nullptr) {
+            lv_obj_set_style_text_font(label, text_font, 0);
+        }
+    }
+    lv_obj_t* icon_labels[] = {settings_back_icon_, settings_entry_icon_};
+    for (lv_obj_t* label : icon_labels) {
+        if (label != nullptr && icon_font != nullptr) {
+            lv_obj_set_style_text_font(label, icon_font, 0);
+        }
+    }
+}
+
+void LcdDisplay::OnSettingsEntryClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self != nullptr) {
+        self->ShowSettingsScreen(true);
+    }
+}
+
+void LcdDisplay::OnSettingsBackClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self != nullptr) {
+        self->ShowSettingsScreen(false);
+    }
+}
+
+void LcdDisplay::OnVolumeDownClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    auto* codec = Board::GetInstance().GetAudioCodec();
+    if (self != nullptr && codec != nullptr) {
+        int volume = codec->output_volume() - 5;
+        if (volume < 0) {
+            volume = 0;
+        }
+        codec->SetOutputVolume(volume);
+        self->UpdateSettingsValues();
+    }
+}
+
+void LcdDisplay::OnVolumeUpClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    auto* codec = Board::GetInstance().GetAudioCodec();
+    if (self != nullptr && codec != nullptr) {
+        int volume = codec->output_volume() + 5;
+        if (volume > 100) {
+            volume = 100;
+        }
+        codec->SetOutputVolume(volume);
+        self->UpdateSettingsValues();
+    }
+}
+
+void LcdDisplay::OnBrightnessDownClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    auto* backlight = Board::GetInstance().GetBacklight();
+    if (self != nullptr && backlight != nullptr) {
+        int brightness = static_cast<int>(backlight->brightness()) - 10;
+        if (brightness < 10) {
+            brightness = 10;
+        }
+        backlight->SetBrightness(static_cast<uint8_t>(brightness), true);
+        self->UpdateSettingsValues();
+    }
+}
+
+void LcdDisplay::OnBrightnessUpClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    auto* backlight = Board::GetInstance().GetBacklight();
+    if (self != nullptr && backlight != nullptr) {
+        int brightness = static_cast<int>(backlight->brightness()) + 10;
+        if (brightness > 100) {
+            brightness = 100;
+        }
+        backlight->SetBrightness(static_cast<uint8_t>(brightness), true);
+        self->UpdateSettingsValues();
+    }
+}
+
+void LcdDisplay::OnWifiConfigClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self == nullptr) {
+        return;
+    }
+    self->ShowSettingsScreen(false);
+    auto* wifi_board = static_cast<WifiBoard*>(&Board::GetInstance());
+    wifi_board->EnterWifiConfigMode();
+}
+
+void LcdDisplay::OnSettingsBtDisconnectClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    MediaBle::GetInstance().Disconnect();
+    if (self != nullptr) {
+        self->UpdateSettingsValues();
+    }
+}
+
+void LcdDisplay::OnSettingsBtForgetClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    MediaBlePeer peers[8];
+    const int count = MediaBle::GetInstance().GetBondedPeers(peers, 8);
+    for (int i = 0; i < count; ++i) {
+        MediaBle::GetInstance().Unpair(peers[i]);
+    }
+    if (self != nullptr) {
+        self->UpdateSettingsValues();
+    }
+}
+
+void LcdDisplay::OnRebootClicked(lv_event_t* e) {
+    (void)e;
+    esp_restart();
+}
+
 void LcdDisplay::ShowPressRing() {
     if (page_progress_ == nullptr) {
         return;
@@ -2177,7 +2504,8 @@ void LcdDisplay::AvatarAnimTimerCb(lv_timer_t* timer) {
     if (lv_obj_has_flag(self->emoji_box_, LV_OBJ_FLAG_HIDDEN)) {
         return;
     }
-    if (self->media_screen_visible_ || self->bluetooth_screen_visible_) {
+    if (self->media_screen_visible_ || self->bluetooth_screen_visible_ ||
+        self->settings_screen_visible_ || self->stroke_screen_visible_) {
         return;  // Overlay covers the AI screen; no need to animate.
     }
 
@@ -2619,6 +2947,16 @@ void LcdDisplay::UpdateMediaBarVisibility() {
         lv_obj_remove_flag(stroke_entry_btn_, LV_OBJ_FLAG_HIDDEN);
     } else {
         lv_obj_add_flag(stroke_entry_btn_, LV_OBJ_FLAG_HIDDEN);
+    }
+    if (settings_entry_btn_ != nullptr) {
+        const bool settings_show = chat_lines_per_page_ == 5 && !media_screen_visible_ &&
+                                   !bluetooth_screen_visible_ && !stroke_screen_visible_ &&
+                                   !settings_screen_visible_ && avatar_mood_ == kAvatarMoodIdle;
+        if (settings_show) {
+            lv_obj_remove_flag(settings_entry_btn_, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(settings_entry_btn_, LV_OBJ_FLAG_HIDDEN);
+        }
     }
 }
 
@@ -3448,9 +3786,10 @@ void LcdDisplay::SetTheme(Theme* theme) {
     auto icon_font = lvgl_theme->icon_font()->font();
     auto large_icon_font = lvgl_theme->large_icon_font()->font();
 
-    // Rebind the stroke page immediately: its labels are not part of the
-    // chat layout and would still point at the freed previous theme fonts.
+    // Rebind the stroke and settings pages immediately: their labels are not
+    // part of the chat layout and would still point at freed previous fonts.
     RebindStrokeFonts(text_font, icon_font, large_icon_font);
+    RebindSettingsFonts(text_font, icon_font);
 
     if (text_font->line_height >= 40) {
         lv_obj_set_style_text_font(mute_label_, large_icon_font, 0);
