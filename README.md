@@ -1,5 +1,18 @@
 # An MCP-based Chatbot
 
+> **本项目是基于上游 xiaozhi-esp32 的定制版本（分支 `avatar-5line`）**
+>
+> 主要改动：竖屏 240×320 白色程序化圆脸（眨眼/视线/表情/睡眠）、6 行分页聊天、
+> BLE HID 媒体键 + 10 个 macOS 快捷键、设置页（音量/亮度/WiFi/蓝牙/重启）、
+> TF 卡笔顺学习（9470 字，语音"写一下学字"）。
+>
+> - 定制说明与复盘：[docs/custom/lessons-20261020.md](docs/custom/lessons-20261020.md)
+> - 笔顺数据生成：[tools/stroke-pipeline/README.md](tools/stroke-pipeline/README.md)
+> - 界面预览：[docs/custom/](docs/custom/)
+>
+> 上游与许可证：本项目基于 MIT 协议的 [78/xiaozhi-esp32](https://github.com/78/xiaozhi-esp32)，
+> 保留原始 LICENSE 与署名；笔顺数据遵循 Arphic Public License（见 tools/stroke-pipeline/NOTICE.txt）。
+
 (English | [中文](README_zh.md) | [日本語](README_ja.md))
 
 ## Introduction

@@ -18,3 +18,11 @@ main/mmap_generate_emoji.h
 *.bin
 mmap_generate_*.h
 .clangd
+
+# stroke pipeline generated data (regenerate with fetch.py/build.py)
+tools/stroke-pipeline/raw/
+tools/stroke-pipeline/output/
+tools/stroke-pipeline/sdcard/
+tools/stroke-pipeline/.deps/
+tools/stroke-pipeline/__pycache__/
+tools/stroke-pipeline/sdcard-data.zip
