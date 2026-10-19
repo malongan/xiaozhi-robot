@@ -81,7 +81,7 @@ protected:
     static constexpr int kStrokeCanvasSide = 176;  // 画布边长
     static constexpr int kStrokeCanvasMargin = 8;  // 160px 字模在画布内的留白
     static constexpr int kStrokeGlyphSpan = 160;   // 字模边长
-    static constexpr int kStrokeMaxStrokes = 24;   // 序号圆标上限
+    static constexpr int kStrokeMaxStrokes = 48;   // 单字最大笔画数（字库最大 33，留余量）
     lv_obj_t* stroke_screen_ = nullptr;
     lv_obj_t* stroke_canvas_ = nullptr;
     lv_obj_t* stroke_title_label_ = nullptr;

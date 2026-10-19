@@ -3338,7 +3338,10 @@ void LcdDisplay::StrokeAnimTick() {
         }
         return;
     }
-    const int total = static_cast<int>(stroke_metas_.size());
+    int total = static_cast<int>(stroke_metas_.size());
+    if (total > kStrokeMaxStrokes) {
+        total = kStrokeMaxStrokes;
+    }
     if (stroke_revealed_ >= total) {
         stroke_done_tick_ = now + 2500;
         return;
@@ -3348,7 +3351,8 @@ void LcdDisplay::StrokeAnimTick() {
     }
     // Showing a pre-built line object only repaints that stroke's area; the
     // canvas with the dim glyph is not touched, so TTS audio stays smooth.
-    if (stroke_lines_[stroke_revealed_] != nullptr) {
+    if (stroke_revealed_ >= 0 && stroke_revealed_ < kStrokeMaxStrokes &&
+        stroke_lines_[stroke_revealed_] != nullptr) {
         lv_obj_remove_flag(stroke_lines_[stroke_revealed_], LV_OBJ_FLAG_HIDDEN);
     }
     stroke_revealed_++;
