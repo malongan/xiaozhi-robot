@@ -2491,7 +2491,10 @@ void LcdDisplay::SetAvatarMood(AvatarMood mood) {
         // Speaking->Listening, so the demo keeps running for normal answers.
         const bool new_turn = previous_mood == kAvatarMoodIdle &&
                               (mood == kAvatarMoodListening || mood == kAvatarMoodThinking);
-        const bool session_end = mood == kAvatarMoodIdle && previous_mood == kAvatarMoodSpeaking;
+        // Any active turn falling back to Idle ends the session: goodbye
+        // (Speaking -> Idle) and the automatic silence timeout
+        // (Listening/Thinking -> Idle) both close the stroke page.
+        const bool session_end = mood == kAvatarMoodIdle && previous_mood != kAvatarMoodIdle;
         if (new_turn || session_end) {
             ShowStrokeScreen(false);
         }
