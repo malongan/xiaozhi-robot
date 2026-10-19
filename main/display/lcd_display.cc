@@ -1692,52 +1692,64 @@ void LcdDisplay::SetupUI() {
 
     // Volume
     settings_volume_label_ = make_text_label(settings_screen_, "音量");
-    lv_obj_set_pos(settings_volume_label_, 12, 58);
+    lv_obj_set_pos(settings_volume_label_, 12, 48);
     settings_volume_value_ = make_text_label(settings_screen_, "70");
     lv_obj_set_width(settings_volume_value_, 52);
     lv_obj_set_style_text_align(settings_volume_value_, LV_TEXT_ALIGN_RIGHT, 0);
-    lv_obj_set_pos(settings_volume_value_, 64, 58);
+    lv_obj_set_pos(settings_volume_value_, 64, 48);
     settings_vol_minus_icon_ =
-        make_adjust_button(settings_screen_, 122, 50, "-", &LcdDisplay::OnVolumeDownClicked);
+        make_adjust_button(settings_screen_, 122, 42, "-", &LcdDisplay::OnVolumeDownClicked);
     settings_vol_plus_icon_ =
-        make_adjust_button(settings_screen_, 170, 50, "+", &LcdDisplay::OnVolumeUpClicked);
+        make_adjust_button(settings_screen_, 170, 42, "+", &LcdDisplay::OnVolumeUpClicked);
 
     // Brightness
     settings_bright_label_ = make_text_label(settings_screen_, "亮度");
-    lv_obj_set_pos(settings_bright_label_, 12, 118);
+    lv_obj_set_pos(settings_bright_label_, 12, 94);
     settings_bright_value_ = make_text_label(settings_screen_, "100");
     lv_obj_set_width(settings_bright_value_, 52);
     lv_obj_set_style_text_align(settings_bright_value_, LV_TEXT_ALIGN_RIGHT, 0);
-    lv_obj_set_pos(settings_bright_value_, 64, 118);
+    lv_obj_set_pos(settings_bright_value_, 64, 94);
     settings_bright_minus_icon_ =
-        make_adjust_button(settings_screen_, 122, 110, "-", &LcdDisplay::OnBrightnessDownClicked);
+        make_adjust_button(settings_screen_, 122, 88, "-", &LcdDisplay::OnBrightnessDownClicked);
     settings_bright_plus_icon_ =
-        make_adjust_button(settings_screen_, 170, 110, "+", &LcdDisplay::OnBrightnessUpClicked);
+        make_adjust_button(settings_screen_, 170, 88, "+", &LcdDisplay::OnBrightnessUpClicked);
+
+    // Microphone gain (ES8311 ADC gain, 0..36 dB in 6 dB steps)
+    settings_mic_label_ = make_text_label(settings_screen_, "麦克风");
+    lv_obj_set_pos(settings_mic_label_, 12, 140);
+    settings_mic_value_ = make_text_label(settings_screen_, "30");
+    lv_obj_set_width(settings_mic_value_, 52);
+    lv_obj_set_style_text_align(settings_mic_value_, LV_TEXT_ALIGN_RIGHT, 0);
+    lv_obj_set_pos(settings_mic_value_, 64, 140);
+    settings_mic_minus_icon_ =
+        make_adjust_button(settings_screen_, 122, 134, "-", &LcdDisplay::OnMicGainDownClicked);
+    settings_mic_plus_icon_ =
+        make_adjust_button(settings_screen_, 170, 134, "+", &LcdDisplay::OnMicGainUpClicked);
 
     // WiFi
     settings_wifi_label_ = make_text_label(settings_screen_, "WiFi");
-    lv_obj_set_pos(settings_wifi_label_, 12, 184);
+    lv_obj_set_pos(settings_wifi_label_, 12, 186);
     settings_wifi_status_ = make_text_label(settings_screen_, "");
     lv_obj_set_width(settings_wifi_status_, 100);
     lv_obj_set_style_text_align(settings_wifi_status_, LV_TEXT_ALIGN_LEFT, 0);
-    lv_obj_set_pos(settings_wifi_status_, 58, 184);
-    settings_wifi_btn_label_ = make_wide_button(settings_screen_, 166, 176, 62, "配网",
+    lv_obj_set_pos(settings_wifi_status_, 58, 186);
+    settings_wifi_btn_label_ = make_wide_button(settings_screen_, 166, 180, 62, "配网",
                                                 &LcdDisplay::OnWifiConfigClicked);
 
     // Bluetooth
     settings_bt_label_ = make_text_label(settings_screen_, "蓝牙");
-    lv_obj_set_pos(settings_bt_label_, 12, 244);
+    lv_obj_set_pos(settings_bt_label_, 12, 232);
     settings_bt_status_ = make_text_label(settings_screen_, "");
     lv_obj_set_width(settings_bt_status_, 66);
     lv_obj_set_style_text_align(settings_bt_status_, LV_TEXT_ALIGN_LEFT, 0);
-    lv_obj_set_pos(settings_bt_status_, 58, 244);
-    settings_bt_disconnect_label_ = make_wide_button(settings_screen_, 126, 236, 50, "断开",
+    lv_obj_set_pos(settings_bt_status_, 58, 232);
+    settings_bt_disconnect_label_ = make_wide_button(settings_screen_, 126, 226, 50, "断开",
                                                      &LcdDisplay::OnSettingsBtDisconnectClicked);
-    settings_bt_forget_label_ = make_wide_button(settings_screen_, 182, 236, 46, "清空",
+    settings_bt_forget_label_ = make_wide_button(settings_screen_, 182, 226, 46, "清空",
                                                  &LcdDisplay::OnSettingsBtForgetClicked);
 
     // Reboot
-    settings_reboot_label_ = make_wide_button(settings_screen_, 60, 282, 120, "重启设备",
+    settings_reboot_label_ = make_wide_button(settings_screen_, 60, 272, 120, "重启设备",
                                               &LcdDisplay::OnRebootClicked);
 
     // Gear entry (bottom-left, idle only)
@@ -2197,6 +2209,9 @@ void LcdDisplay::UpdateSettingsValues() {
     if (backlight != nullptr && settings_bright_value_ != nullptr) {
         lv_label_set_text_fmt(settings_bright_value_, "%d", backlight->brightness());
     }
+    if (codec != nullptr && settings_mic_value_ != nullptr) {
+        lv_label_set_text_fmt(settings_mic_value_, "%d", static_cast<int>(codec->input_gain()));
+    }
     if (settings_wifi_status_ != nullptr) {
         auto& wifi = WifiManager::GetInstance();
         if (wifi.IsConnected()) {
@@ -2219,6 +2234,8 @@ void LcdDisplay::RebindSettingsFonts(const lv_font_t* text_font, const lv_font_t
                                settings_volume_value_,
                                settings_bright_label_,
                                settings_bright_value_,
+                               settings_mic_label_,
+                               settings_mic_value_,
                                settings_wifi_label_,
                                settings_wifi_status_,
                                settings_bt_label_,
@@ -2227,6 +2244,8 @@ void LcdDisplay::RebindSettingsFonts(const lv_font_t* text_font, const lv_font_t
                                settings_vol_plus_icon_,
                                settings_bright_minus_icon_,
                                settings_bright_plus_icon_,
+                               settings_mic_minus_icon_,
+                               settings_mic_plus_icon_,
                                settings_wifi_btn_label_,
                                settings_bt_disconnect_label_,
                                settings_bt_forget_label_,
@@ -2306,6 +2325,32 @@ void LcdDisplay::OnBrightnessUpClicked(lv_event_t* e) {
             brightness = 100;
         }
         backlight->SetBrightness(static_cast<uint8_t>(brightness), true);
+        self->UpdateSettingsValues();
+    }
+}
+
+void LcdDisplay::OnMicGainDownClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    auto* codec = Board::GetInstance().GetAudioCodec();
+    if (self != nullptr && codec != nullptr) {
+        int gain = static_cast<int>(codec->input_gain()) - 6;
+        if (gain < 0) {
+            gain = 0;
+        }
+        codec->SetInputGain(static_cast<float>(gain));
+        self->UpdateSettingsValues();
+    }
+}
+
+void LcdDisplay::OnMicGainUpClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    auto* codec = Board::GetInstance().GetAudioCodec();
+    if (self != nullptr && codec != nullptr) {
+        int gain = static_cast<int>(codec->input_gain()) + 6;
+        if (gain > 36) {
+            gain = 36;
+        }
+        codec->SetInputGain(static_cast<float>(gain));
         self->UpdateSettingsValues();
     }
 }

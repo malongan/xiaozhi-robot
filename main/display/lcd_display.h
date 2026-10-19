@@ -126,6 +126,10 @@ protected:
     lv_obj_t* settings_volume_value_ = nullptr;
     lv_obj_t* settings_bright_label_ = nullptr;
     lv_obj_t* settings_bright_value_ = nullptr;
+    lv_obj_t* settings_mic_label_ = nullptr;
+    lv_obj_t* settings_mic_value_ = nullptr;
+    lv_obj_t* settings_mic_minus_icon_ = nullptr;
+    lv_obj_t* settings_mic_plus_icon_ = nullptr;
     lv_obj_t* settings_wifi_label_ = nullptr;
     lv_obj_t* settings_wifi_status_ = nullptr;
     lv_obj_t* settings_bt_label_ = nullptr;
@@ -205,6 +209,8 @@ protected:
     static void OnVolumeUpClicked(lv_event_t* e);
     static void OnBrightnessDownClicked(lv_event_t* e);
     static void OnBrightnessUpClicked(lv_event_t* e);
+    static void OnMicGainDownClicked(lv_event_t* e);
+    static void OnMicGainUpClicked(lv_event_t* e);
     static void OnWifiConfigClicked(lv_event_t* e);
     static void OnSettingsBtDisconnectClicked(lv_event_t* e);
     static void OnSettingsBtForgetClicked(lv_event_t* e);

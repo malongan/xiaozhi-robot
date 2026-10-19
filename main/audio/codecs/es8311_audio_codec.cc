@@ -1,6 +1,8 @@
 #include "es8311_audio_codec.h"
 
 #include <esp_log.h>
+
+#include "settings.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
@@ -17,6 +19,16 @@ Es8311AudioCodec::Es8311AudioCodec(void* i2c_master_handle, i2c_port_t i2c_port,
     pa_pin_ = pa_pin;
     pa_inverted_ = pa_inverted;
     input_gain_ = 30;
+    {
+        // Restore the microphone gain chosen in the settings page.
+        Settings audio_settings("audio", false);
+        input_gain_ = static_cast<float>(audio_settings.GetInt("input_gain", 30));
+        if (input_gain_ < 0) {
+            input_gain_ = 0;
+        } else if (input_gain_ > 36) {
+            input_gain_ = 36;
+        }
+    }
 
     assert(input_sample_rate_ == output_sample_rate_);
     CreateDuplexChannels(mclk, bclk, ws, dout, din);
@@ -168,6 +180,21 @@ void Es8311AudioCodec::CreateDuplexChannels(gpio_num_t mclk, gpio_num_t bclk, gp
     ESP_ERROR_CHECK(i2s_channel_enable(tx_handle_));
     ESP_ERROR_CHECK(i2s_channel_enable(rx_handle_));
     ESP_LOGI(TAG, "Duplex channels created");
+}
+
+void Es8311AudioCodec::SetInputGain(float gain) {
+    if (gain < 0.0f) {
+        gain = 0.0f;
+    } else if (gain > 36.0f) {
+        gain = 36.0f;
+    }
+    std::lock_guard<std::mutex> lock(data_if_mutex_);
+    AudioCodec::SetInputGain(gain);
+    if (dev_ != nullptr) {
+        esp_codec_dev_set_in_gain(dev_, gain);
+    }
+    Settings audio_settings("audio", true);
+    audio_settings.SetInt("input_gain", static_cast<int>(gain));
 }
 
 void Es8311AudioCodec::SetOutputVolume(int volume) {
