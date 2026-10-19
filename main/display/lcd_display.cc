@@ -1287,7 +1287,8 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_scrollbar_mode(media_bar_, LV_SCROLLBAR_MODE_OFF);
     lv_obj_add_flag(media_bar_, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_ext_click_area(media_bar_, 4);
-    lv_obj_add_event_cb(media_bar_, &LcdDisplay::OnMediaBarClicked, LV_EVENT_CLICKED, this);
+    lv_obj_set_ext_click_area(media_bar_, 12);
+    lv_obj_add_event_cb(media_bar_, &LcdDisplay::OnMediaBarClicked, LV_EVENT_PRESSED, this);
 
     // Minimal media-entry glyph: two rows of four light-grey dots, no frame.
     lv_obj_t* keyboard = lv_obj_create(media_bar_);
@@ -1334,7 +1335,8 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_border_width(media_back, 0, 0);
     lv_obj_set_style_shadow_width(media_back, 0, 0);
     lv_obj_set_style_pad_all(media_back, 0, 0);
-    lv_obj_add_event_cb(media_back, &LcdDisplay::OnMediaBackClicked, LV_EVENT_CLICKED, this);
+    lv_obj_set_ext_click_area(media_back, 8);
+    lv_obj_add_event_cb(media_back, &LcdDisplay::OnMediaBackClicked, LV_EVENT_PRESSED, this);
     lv_obj_t* media_back_icon = lv_label_create(media_back);
     lv_obj_set_style_text_font(media_back_icon, icon_font, 0);
     lv_obj_set_style_text_color(media_back_icon, lvgl_theme->text_color(), 0);
@@ -1354,7 +1356,8 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_border_width(bt_entry, 0, 0);
     lv_obj_set_style_shadow_width(bt_entry, 0, 0);
     lv_obj_set_style_pad_all(bt_entry, 0, 0);
-    lv_obj_add_event_cb(bt_entry, &LcdDisplay::OnBluetoothEntryClicked, LV_EVENT_CLICKED, this);
+    lv_obj_set_ext_click_area(bt_entry, 8);
+    lv_obj_add_event_cb(bt_entry, &LcdDisplay::OnBluetoothEntryClicked, LV_EVENT_PRESSED, this);
     media_bt_icon_ = lv_label_create(bt_entry);
     lv_obj_set_style_text_font(media_bt_icon_, icon_font, 0);
     lv_obj_set_style_text_color(media_bt_icon_, lv_color_hex(0x777777), 0);
@@ -1444,7 +1447,8 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_border_width(bt_back, 0, 0);
     lv_obj_set_style_shadow_width(bt_back, 0, 0);
     lv_obj_set_style_pad_all(bt_back, 0, 0);
-    lv_obj_add_event_cb(bt_back, &LcdDisplay::OnBluetoothBackClicked, LV_EVENT_CLICKED, this);
+    lv_obj_set_ext_click_area(bt_back, 8);
+    lv_obj_add_event_cb(bt_back, &LcdDisplay::OnBluetoothBackClicked, LV_EVENT_PRESSED, this);
     lv_obj_t* bt_back_icon = lv_label_create(bt_back);
     lv_obj_set_style_text_font(bt_back_icon, icon_font, 0);
     lv_obj_set_style_text_color(bt_back_icon, lvgl_theme->text_color(), 0);
@@ -1483,7 +1487,8 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_shadow_width(bt_disconnect_btn_, 0, 0);
     lv_obj_set_style_pad_all(bt_disconnect_btn_, 0, 0);
     lv_obj_add_flag(bt_disconnect_btn_, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_add_event_cb(bt_disconnect_btn_, &LcdDisplay::OnBtDisconnectClicked, LV_EVENT_CLICKED,
+    lv_obj_set_ext_click_area(bt_disconnect_btn_, 8);
+    lv_obj_add_event_cb(bt_disconnect_btn_, &LcdDisplay::OnBtDisconnectClicked, LV_EVENT_PRESSED,
                         this);
     bt_disconnect_label_ = lv_label_create(bt_disconnect_btn_);
     lv_obj_set_style_text_font(bt_disconnect_label_, text_font, 0);
@@ -1525,7 +1530,8 @@ void LcdDisplay::SetupUI() {
         lv_obj_set_style_border_width(stroke_close, 0, 0);
         lv_obj_set_style_shadow_width(stroke_close, 0, 0);
         lv_obj_set_style_pad_all(stroke_close, 0, 0);
-        lv_obj_add_event_cb(stroke_close, &LcdDisplay::OnStrokeCloseClicked, LV_EVENT_CLICKED,
+        lv_obj_set_ext_click_area(stroke_close, 8);
+        lv_obj_add_event_cb(stroke_close, &LcdDisplay::OnStrokeCloseClicked, LV_EVENT_PRESSED,
                             this);
         stroke_close_icon_ = lv_label_create(stroke_close);
         lv_obj_t* close_icon = stroke_close_icon_;
@@ -1578,7 +1584,8 @@ void LcdDisplay::SetupUI() {
             lv_obj_set_style_pad_all(key, 0, 0);
             lv_obj_set_style_bg_opa(key, LV_OPA_20, LV_STATE_PRESSED);
             lv_obj_set_style_bg_color(key, lvgl_theme->text_color(), LV_STATE_PRESSED);
-            lv_obj_add_event_cb(key, cb, LV_EVENT_CLICKED, this);
+            lv_obj_set_ext_click_area(key, 8);
+            lv_obj_add_event_cb(key, cb, LV_EVENT_PRESSED, this);
             lv_obj_t* ik = lv_label_create(key);
             if (stroke_key_slot < 3) {
                 stroke_key_icons_[stroke_key_slot++] = ik;
@@ -1602,7 +1609,8 @@ void LcdDisplay::SetupUI() {
         lv_obj_set_style_shadow_width(stroke_entry_btn_, 0, 0);
         lv_obj_set_style_pad_all(stroke_entry_btn_, 0, 0);
         lv_obj_add_flag(stroke_entry_btn_, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_event_cb(stroke_entry_btn_, &LcdDisplay::OnStrokeEntryClicked, LV_EVENT_CLICKED,
+        lv_obj_set_ext_click_area(stroke_entry_btn_, 10);
+        lv_obj_add_event_cb(stroke_entry_btn_, &LcdDisplay::OnStrokeEntryClicked, LV_EVENT_PRESSED,
                             this);
         lv_obj_t* entry_label = lv_label_create(stroke_entry_btn_);
         stroke_entry_label_ = entry_label;
@@ -1634,7 +1642,8 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_border_width(settings_back, 0, 0);
     lv_obj_set_style_shadow_width(settings_back, 0, 0);
     lv_obj_set_style_pad_all(settings_back, 0, 0);
-    lv_obj_add_event_cb(settings_back, &LcdDisplay::OnSettingsBackClicked, LV_EVENT_CLICKED, this);
+    lv_obj_set_ext_click_area(settings_back, 8);
+    lv_obj_add_event_cb(settings_back, &LcdDisplay::OnSettingsBackClicked, LV_EVENT_PRESSED, this);
     settings_back_icon_ = lv_label_create(settings_back);
     lv_obj_set_style_text_font(settings_back_icon_, icon_font, 0);
     lv_obj_set_style_text_color(settings_back_icon_, lvgl_theme->text_color(), 0);
@@ -1665,7 +1674,8 @@ void LcdDisplay::SetupUI() {
         lv_obj_set_style_border_width(btn, 0, 0);
         lv_obj_set_style_shadow_width(btn, 0, 0);
         lv_obj_set_style_pad_all(btn, 0, 0);
-        lv_obj_add_event_cb(btn, cb, LV_EVENT_CLICKED, this);
+        lv_obj_set_ext_click_area(btn, 8);
+        lv_obj_add_event_cb(btn, cb, LV_EVENT_PRESSED, this);
         lv_obj_t* label = lv_label_create(btn);
         lv_obj_set_style_text_font(label, lvgl_theme->text_font()->font(), 0);
         lv_obj_set_style_text_color(label, lvgl_theme->text_color(), 0);
@@ -1684,7 +1694,8 @@ void LcdDisplay::SetupUI() {
         lv_obj_set_style_border_width(btn, 0, 0);
         lv_obj_set_style_shadow_width(btn, 0, 0);
         lv_obj_set_style_pad_all(btn, 0, 0);
-        lv_obj_add_event_cb(btn, cb, LV_EVENT_CLICKED, this);
+        lv_obj_set_ext_click_area(btn, 8);
+        lv_obj_add_event_cb(btn, cb, LV_EVENT_PRESSED, this);
         lv_obj_t* label = lv_label_create(btn);
         lv_obj_set_style_text_font(label, lvgl_theme->text_font()->font(), 0);
         lv_obj_set_style_text_color(label, lvgl_theme->text_color(), 0);
@@ -1754,7 +1765,8 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_shadow_width(settings_entry_btn_, 0, 0);
     lv_obj_set_style_pad_all(settings_entry_btn_, 0, 0);
     lv_obj_add_flag(settings_entry_btn_, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_add_event_cb(settings_entry_btn_, &LcdDisplay::OnSettingsEntryClicked, LV_EVENT_CLICKED,
+    lv_obj_set_ext_click_area(settings_entry_btn_, 10);
+    lv_obj_add_event_cb(settings_entry_btn_, &LcdDisplay::OnSettingsEntryClicked, LV_EVENT_PRESSED,
                         this);
     settings_entry_icon_ = lv_label_create(settings_entry_btn_);
     lv_obj_set_style_text_font(settings_entry_icon_, icon_font, 0);
@@ -3614,7 +3626,8 @@ void LcdDisplay::RefreshBluetoothList() {
         lv_obj_set_style_border_width(forget, 0, 0);
         lv_obj_set_style_shadow_width(forget, 0, 0);
         lv_obj_set_style_pad_all(forget, 0, 0);
-        lv_obj_add_event_cb(forget, &LcdDisplay::OnBtForgetClicked, LV_EVENT_CLICKED, this);
+        lv_obj_set_ext_click_area(forget, 8);
+        lv_obj_add_event_cb(forget, &LcdDisplay::OnBtForgetClicked, LV_EVENT_PRESSED, this);
         lv_obj_t* icon = lv_label_create(forget);
         lv_obj_set_style_text_font(icon, theme->icon_font()->font(), 0);
         lv_obj_set_style_text_color(icon, theme->text_color(), 0);
