@@ -297,8 +297,8 @@ private:
 
         mcp.AddTool(
             "self.stroke.show",
-            "在屏幕上演示一个汉字的笔顺：逐笔动画 + 每笔名称 + 拼音，仅支持小学 1-6 年级字表内的"
-            "字。传入要查询的汉字或包含它的句子，取其中最后一个汉字。",
+            "在屏幕上演示一个汉字的笔顺：逐笔动画 + 拼音，支持约 9500 个常用汉字（含小学 1-6 "
+            "年级字表）。传入要查询的汉字或包含它的句子，取其中最后一个汉字。",
             PropertyList({Property("char", kPropertyTypeString)}),
             [lcd](const PropertyList& properties) -> ToolResult {
                 auto& store = StrokeStore::GetInstance();
@@ -309,7 +309,7 @@ private:
                 const int cp = StrokeStore::Utf8SingleCjk(input);
                 const int idx = cp >= 0 ? store.FindByChar(static_cast<uint16_t>(cp)) : -1;
                 if (idx < 0) {
-                    return std::string("这个字不在小学字表里，换一个 1-6 年级的常用字试试。");
+                    return std::string("这个字暂时没有笔顺数据，换一个常用汉字试试。");
                 }
                 std::string ch;
                 ch += static_cast<char>(0xE0 | (cp >> 12));
