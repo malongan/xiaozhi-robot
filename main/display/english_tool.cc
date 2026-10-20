@@ -330,6 +330,38 @@ std::string EnglishStore::UnitName(int unit) const {
     }
 }
 
+int EnglishStore::ChineseCount() const {
+    int n = 0;
+    for (const Entry& e : entries_) {
+        if (e.cn_audio_size > 0) {
+            n++;
+        }
+    }
+    return n;
+}
+
+int EnglishStore::CheckAudio(int sample) const {
+    int bad = 0;
+    const int n = count_ < sample ? count_ : sample;
+    std::vector<uint8_t> buf;
+    for (int i = 0; i < n; ++i) {
+        if (!ReadAudio(i, buf) || buf.empty()) {
+            ESP_LOGW(TAG, "音频缺失或损坏：第 %d 词", i);
+            bad++;
+            continue;
+        }
+        // 简单校验：Ogg 头
+        if (buf.size() < 4 || memcmp(buf.data(), "OggS", 4) != 0) {
+            ESP_LOGW(TAG, "音频格式不对：第 %d 词", i);
+            bad++;
+        }
+    }
+    if (n > 0) {
+        ESP_LOGI(TAG, "音频自检：抽查 %d 词，%d 个有问题", n, bad);
+    }
+    return bad;
+}
+
 int EnglishStore::UnitCount(int unit) const {
     const int s = UnitStart(unit);
     const int e = UnitEnd(unit);

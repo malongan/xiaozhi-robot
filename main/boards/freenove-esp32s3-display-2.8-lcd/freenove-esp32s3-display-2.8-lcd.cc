@@ -135,7 +135,10 @@ private:
         if (board->MountSdCard()) {
             board->StopSdRetryTimer();
             StrokeStore::GetInstance().Init();
-            EnglishStore::GetInstance().Init();
+            auto& english = EnglishStore::GetInstance();
+            if (english.Init()) {
+                english.CheckAudio(20);
+            }
             ESP_LOGI(TAG, "TF 卡热插拔挂载成功，笔顺与英语词库已加载");
         }
     }
@@ -149,7 +152,10 @@ private:
     void InitializeSdCard() {
         if (MountSdCard()) {
             StrokeStore::GetInstance().Init();
-            EnglishStore::GetInstance().Init();
+            auto& english = EnglishStore::GetInstance();
+            if (english.Init()) {
+                english.CheckAudio(20);
+            }
             return;
         }
         esp_timer_create_args_t timer_args = {
