@@ -33,15 +33,62 @@ VOICES = {
     "Karen": "澳音 (en_AU)",
 }
 
+def clean_chinese(text: str) -> str:
+    """把中文释义整理成适合朗读的形式。
 
-def synthesize_ogg(word: str, voice: str, out_path: Path) -> bool:
+    - 只取第一个义项（按第一个标点切分），避免读出一长串
+    - 去掉括号内容（"(体育)" 之类）与其余标点
+    - "it's=it is ..." 这类只保留等号前
+    """
+    text = text.strip()
+    # 等号形式的缩写：只保留左边
+    if "=" in text:
+        text = text.split("=", 1)[0].strip()
+    # 去掉括号及其内容
+    out = []
+    depth = 0
+    for ch in text:
+        if ch in "（(":
+            depth += 1
+            continue
+        if ch in "）)":
+            depth = max(0, depth - 1)
+            continue
+        if depth:
+            continue
+        out.append(ch)
+    text = "".join(out)
+    # 只取第一个义项（中文标点优先；英文句点只在句尾出现时才切）
+    for sep in ("，", "；", ";", "、", "…", ","):
+        if sep in text:
+            text = text.split(sep, 1)[0]
+            break
+    else:
+        # 纯英文缩写如 "P.E."：保留整体，只去掉结尾的句点
+        if text.endswith(".") and not text[:-1].endswith("."):
+            text = text[:-1]
+    # 去掉残留标点和空白
+    text = text.strip(" 　,.;、，。；：:！!？?")
+    return text
+
+
+# 中文音色（macOS 内置）
+CN_VOICES = {
+    "Tingting": "中文女声 (zh_CN)",
+    "Flo": "中文女声 (zh_CN)",
+    "Eddy": "中文男声 (zh_CN)",
+    "Grandma": "中文女声 (zh_CN)",
+}
+
+
+def synthesize_ogg(text: str, voice: str, out_path: Path) -> bool:
     """say -> aiff -> wav(16k mono) -> ogg(Opus)。失败返回 False。"""
     with tempfile.TemporaryDirectory() as tmp:
         aiff = Path(tmp) / "a.aiff"
         wav = Path(tmp) / "a.wav"
         try:
             subprocess.run(
-                ["say", "-v", voice, "-o", str(aiff), word],
+                ["say", "-v", voice, "-o", str(aiff), text],
                 check=True, capture_output=True, timeout=60,
             )
             subprocess.run(
@@ -108,7 +155,11 @@ def main():
     ap.add_argument("--csv", required=True, help="词库 CSV 路径")
     ap.add_argument("--out", required=True, help="输出目录（卡上的 english 目录）")
     ap.add_argument("--voice", default="Samantha", choices=sorted(VOICES),
-                    help=f"发音音色，默认 Samantha（{VOICES['Samantha']}）")
+                    help=f"英文发音音色，默认 Samantha（{VOICES['Samantha']}）")
+    ap.add_argument("--cn-voice", default="Tingting", choices=sorted(CN_VOICES),
+                    help=f"中文发音音色，默认 Tingting（{CN_VOICES['Tingting']}）")
+    ap.add_argument("--no-chinese", action="store_true",
+                    help="不生成中文音频（只保留英文发音）")
     ap.add_argument("--name", default="", help="词库名（默认取 CSV 文件名）")
     ap.add_argument("--jobs", type=int, default=8, help="并发合成数")
     ap.add_argument("--limit", type=int, default=0, help="只取前 N 个词（调试用）")
@@ -138,16 +189,28 @@ def main():
         i, (word, *_rest) = i_word
         target = audio_dir / f"w{i + 1:04d}.ogg"
         if args.keep_existing and target.exists() and target.stat().st_size > 0:
-            return (i, word, target.stat().st_size, True)
-        if synthesize_ogg(word, args.voice, target):
-            return (i, word, target.stat().st_size, True)
-        return (i, word, 0, False)
+            size = target.stat().st_size
+        elif synthesize_ogg(word, args.voice, target):
+            size = target.stat().st_size
+        else:
+            return (i, word, 0, 0, False)
+        # 中文释义音频
+        cn_size = 0
+        if not args.no_chinese:
+            meaning = clean_chinese(rows[i][2])
+            cn_target = audio_dir / f"c{i + 1:04d}.ogg"
+            if meaning:
+                if args.keep_existing and cn_target.exists() and cn_target.stat().st_size > 0:
+                    cn_size = cn_target.stat().st_size
+                elif synthesize_ogg(meaning, args.cn_voice, cn_target):
+                    cn_size = cn_target.stat().st_size
+        return (i, word, size, cn_size, True)
 
     with ThreadPoolExecutor(max_workers=max(1, args.jobs)) as pool:
-        for i, word, size, success in pool.map(make, enumerate(rows)):
+        for i, word, size, cn_size, success in pool.map(make, enumerate(rows)):
             done += 1
             if success:
-                ok_words.append((i, word, size))
+                ok_words.append((i, word, size, cn_size))
                 sizes.append(size)
             else:
                 failed.append(word)
@@ -171,14 +234,14 @@ def main():
     index += b"ENGL"
     index += struct.pack("<HHI", 1, len(ok_words), 0)  # magic/ver/count/rsv = 12 字节
     index += b"\x00" * 4  # 保留字段，头部对齐到 16 字节
-    for i, word, size in ok_words:
+    for i, word, size, cn_size in ok_words:
         unit = rows[i][3]
         flags = 0
         if " " in word:
             flags |= 0x01
         if rows[i][1]:
             flags |= 0x02
-        index += struct.pack("<IIBBH", 0, size, unit, flags, 0)
+        index += struct.pack("<IIBBHI", 0, size, unit, flags, 0, cn_size)
 
     (out_dir / "index.bin").write_bytes(bytes(index))
 
@@ -186,11 +249,11 @@ def main():
     with (out_dir / "words.csv").open("w", encoding="utf-8", newline="") as f:
         w = csv.writer(f)
         w.writerow(["word", "phonetic", "meaning", "unit"])
-        for i, word, _size in ok_words:
+        for i, word, _size, _cn in ok_words:
             w.writerow([word, rows[i][1], rows[i][2], rows[i][3]])
 
     # 4) 写 meta.txt
-    units = sorted({rows[i][3] for i, _w, _s in ok_words})
+    units = sorted({rows[i][3] for i, _w, _s, _c in ok_words})
     (out_dir / "meta.txt").write_text(
         f"name={name}\nversion=1\ncount={len(ok_words)}\nunits={','.join(str(u) for u in units)}\n",
         encoding="utf-8",

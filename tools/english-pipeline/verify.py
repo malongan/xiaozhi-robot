@@ -34,7 +34,8 @@ def main():
         errors.append(f"magic 不匹配：{magic!r}")
     if version != 1:
         errors.append(f"版本不支持：{version}")
-    expected = 16 + count * 12
+    entry_size = 16
+    expected = 16 + count * entry_size
     if len(data) != expected:
         errors.append(f"index.bin 长度 {len(data)}，应为 {expected}")
     print(f"index.bin: version={version} count={count} size={len(data)}")
@@ -60,9 +61,11 @@ def main():
         errors.append(f"缺少目录 {audio_dir}")
     else:
         total = 0
+        cn_total = 0
+        cn_count = 0
         for i in range(count):
-            entry = data[16 + i * 12: 16 + (i + 1) * 12]
-            _off, size, unit, flags, _r = struct.unpack("<IIBBH", entry)
+            entry = data[16 + i * entry_size: 16 + (i + 1) * entry_size]
+            _off, size, unit, flags, _r, cn = struct.unpack("<IIBBHI", entry)
             p = audio_dir / f"w{i + 1:04d}.ogg"
             if not p.exists():
                 errors.append(f"缺音频：{p.name}")
@@ -85,8 +88,20 @@ def main():
             if rate not in (16000, 24000, 48000):
                 errors.append(f"{p.name} 采样率 {rate}，固件支持 16k/24k/48k")
             total += actual
-        print(f"音频: {count} 个文件，合计 {total / 1024:.1f} KB"
+            # 中文音频
+            if cn > 0:
+                cp = audio_dir / f"c{i + 1:04d}.ogg"
+                if not cp.exists():
+                    errors.append(f"缺中文音频：{cp.name}")
+                elif cp.stat().st_size != cn:
+                    errors.append(f"{cp.name} 大小 {cp.stat().st_size}，索引声明 {cn}")
+                else:
+                    cn_total += cp.stat().st_size
+                    cn_count += 1
+        print(f"音频: {count} 个英文文件，合计 {total / 1024:.1f} KB"
               f"（平均 {total / max(1, count) / 1024:.2f} KB/词）")
+        if cn_count:
+            print(f"中文音频: {cn_count} 个，合计 {cn_total / 1024:.1f} KB")
 
         # 多余文件
         extra = [p.name for p in audio_dir.glob("*.ogg")
