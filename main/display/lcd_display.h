@@ -88,6 +88,18 @@ protected:
     lv_obj_t* english_meaning_label_ = nullptr;
     lv_obj_t* english_progress_label_ = nullptr;
     lv_obj_t* english_countdown_label_ = nullptr;
+    lv_obj_t* english_mode_label_ = nullptr;
+    lv_obj_t* english_interval_label_ = nullptr;
+    // 启动选择面板
+    lv_obj_t* english_setup_panel_ = nullptr;
+    lv_obj_t* english_setup_unit_label_ = nullptr;
+    lv_obj_t* english_setup_count_label_ = nullptr;
+    lv_obj_t* english_setup_interval_label_ = nullptr;
+    lv_obj_t* english_setup_mode_label_ = nullptr;
+    int english_setup_unit_ = 1;
+    int english_setup_count_ = 10;
+    int english_setup_interval_ = 10;
+    int english_setup_mode_ = 0;  // 0=报听写 1=单词卡
     lv_obj_t* english_close_icon_ = nullptr;
     lv_obj_t* english_entry_label_ = nullptr;
     lv_obj_t* english_entry_btn_ = nullptr;
@@ -127,6 +139,7 @@ protected:
     uint32_t stroke_done_tick_ = 0;
     bool stroke_screen_visible_ = false;
     bool english_screen_visible_ = false;
+    bool english_setup_visible_ = false;
     lv_timer_t* stroke_anim_timer_ = nullptr;
 
     float avatar_face_scale_ = 1.0f;  // 1.0 = 80px, 1.875 = 150px idle face
@@ -286,6 +299,16 @@ protected:
     static void OnEnglishRepeatClicked(lv_event_t* e);
     static void OnEnglishPrevClicked(lv_event_t* e);
     static void OnEnglishNextClicked(lv_event_t* e);
+    static void OnEnglishModeClicked(lv_event_t* e);
+    static void OnEnglishIntervalClicked(lv_event_t* e);
+    static void OnEnglishSetupModeClicked(lv_event_t* e);
+    static void OnEnglishSetupUnitClicked(lv_event_t* e);
+    static void OnEnglishSetupCountClicked(lv_event_t* e);
+    static void OnEnglishSetupIntervalClicked(lv_event_t* e);
+    static void OnEnglishSetupStartClicked(lv_event_t* e);
+    static void OnEnglishSetupCloseClicked(lv_event_t* e);
+    void ShowEnglishSetup(bool show);
+    void UpdateEnglishSetup();
     static void OnAvatarPressed(lv_event_t* e);
     static void OnAvatarReleased(lv_event_t* e);
     static void OnAvatarLongPressed(lv_event_t* e);

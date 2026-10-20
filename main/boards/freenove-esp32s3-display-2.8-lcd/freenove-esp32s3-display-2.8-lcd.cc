@@ -369,6 +369,36 @@ private:
                        " 个词，每 " + std::to_string(interval > 0 ? interval : 10) + " 秒一个，屏幕上会显示进度。";
             });
 
+
+        mcp.AddTool(
+            "self.english.cards",
+            "打开英语单词卡：屏幕上显示单词、音标和中文释义并朗读发音，"
+            "每隔几秒自动翻到下一张，适合预习单词。"
+            "unit 为单元号（1-6 课本单元，7 戏剧板块，8 食物水果，9 数字颜色时间，"
+            "10 动物场所物品，11 日常动作形容，0 表示全部），count 为词数（0 表示全部），"
+            "interval 为每张卡停留的秒数（默认 10）。",
+            PropertyList({Property("unit", kPropertyTypeInteger, 0, 11),
+                          Property("count", kPropertyTypeInteger, 0, 100),
+                          Property("interval", kPropertyTypeInteger, 1, 120)}),
+            [lcd](const PropertyList& properties) -> ToolResult {
+                auto& store = EnglishStore::GetInstance();
+                if (!store.Ready() || store.WordCount() == 0) {
+                    return std::string("英语词库还没准备好，请确认 TF 卡已插入并包含 english 目录。");
+                }
+                const int unit = properties["unit"].value<int>();
+                const int count = properties["count"].value<int>();
+                const int interval = properties["interval"].value<int>();
+                Application::GetInstance().Schedule([lcd, unit, count, interval]() {
+                    lcd->ShowEnglishScreen(true);
+                    EnglishPlayer::GetInstance().Start(unit, count, interval, true,
+                                                       EnglishPlayer::kCards);
+                    lcd->UpdateEnglishScreen();
+                });
+                const int total = unit > 0 ? store.UnitCount(unit) : store.WordCount();
+                return "开始单词卡：" + std::to_string(count > 0 && count < total ? count : total) +
+                       " 个词，每 " + std::to_string(interval > 0 ? interval : 10) + " 秒翻一张。";
+            });
+
         mcp.AddTool(
             "self.english.next", "听写页翻到下一个词。", PropertyList(),
             [lcd](const PropertyList&) -> ToolResult {
