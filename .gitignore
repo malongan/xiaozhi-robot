@@ -26,3 +26,7 @@ tools/stroke-pipeline/sdcard/
 tools/stroke-pipeline/.deps/
 tools/stroke-pipeline/__pycache__/
 tools/stroke-pipeline/sdcard-data.zip
+
+# english pipeline generated data (regenerate with build.py)
+tools/english-pipeline/dist/
+tools/english-pipeline/__pycache__/
