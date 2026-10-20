@@ -28,6 +28,8 @@ public:
     bool Active() const { return active_; }
     bool Paused() const { return paused_; }
     int CurrentIndex() const { return current_; }
+    // 当前是第几个词（1 起）
+    int Position() const { return current_ - start_ + 1; }
     int Total() const { return total_; }
     int Interval() const { return interval_; }
     bool ShowWord() const { return show_word_; }

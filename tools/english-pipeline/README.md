@@ -2,16 +2,41 @@
 
 把 CSV 词表编译成 TF 卡上的词库（单词发音用 macOS 内置 `say` 离线合成）。
 
+## 词表来源
+
+| 文件 | 说明 |
+|---|---|
+| `data/wy4a_textbook.csv` | 外研版四年级上册课本词（从用户的 vocabulary.md 解析） |
+| `data/wy4a_words.csv` | 课本词 + 手工标注音标（`add_phonetics.py` 生成） |
+| `data/extra_words.csv` | 分类补充词（食物水果/数字颜色时间/动物场所物品/日常动作形容） |
+| `data/merged_words.csv` | 最终合并词表（课本优先，补充去重后追加） |
+| `data/pep4a_words.csv` | 人教 PEP 四年级上册词表（备选） |
+
+单元编号：
+
+```
+1..6  课本 Unit 1..6
+7     课本板块（Plays 戏剧）
+8     食物水果        9   数字颜色时间
+10    动物场所物品    11  日常动作形容
+```
+
 ## 用法
 
 ```bash
-# 生成四年级上册词库到 TF 卡
-python3 build.py --csv data/pep4a_words.csv --out /Volumes/TF/english \
-    --voice Samantha --name "人教版PEP四年级上册" --jobs 8
+# 1) 合并课本词与分类补充词
+python3 merge_wordlibs.py --textbook data/wy4a_words.csv \
+    --extra data/extra_words.csv --out data/merged_words.csv
 
-# 校验
+# 2) 生成到 TF 卡
+python3 build.py --csv data/merged_words.csv --out /Volumes/TF/english \
+    --voice Samantha --name "外研版四年级上册+分类补充" --jobs 8
+
+# 3) 校验
 python3 verify.py --out /Volumes/TF/english
 ```
+
+`add_phonetics.py` 用于给课本词表补音标（新词表需手工维护 PHONETICS 字典）。
 
 ## 产物
 

@@ -39,6 +39,8 @@ public:
     int UnitStart(int unit) const;  // 该单元首个 idx（无则 -1）
     int UnitEnd(int unit) const;    // 该单元末个 idx + 1（无则 -1）
     int UnitCount(int unit) const;  // 该单元词数
+    // 单元显示名（如 "Unit 3"、"食物水果"）；未知单元返回 "Unit N"
+    std::string UnitName(int unit) const;
 
 private:
     struct Entry {

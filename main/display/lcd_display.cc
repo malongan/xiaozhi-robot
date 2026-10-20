@@ -3540,10 +3540,13 @@ void LcdDisplay::UpdateEnglishScreen() {
     }
     const int idx = player.CurrentIndex();
     const int total = player.Total();
-    const int pos = total > 0 ? (idx - (idx >= 0 ? 0 : 0)) : 0;
+    const int pos = player.Position();
 
-    char buf[64];
-    snprintf(buf, sizeof(buf), "%d / %d", pos < 0 ? 0 : pos, total);
+    // 进度：单元名 + 第几个/共几个
+    char buf[80];
+    const int unit = store.UnitAt(idx);
+    snprintf(buf, sizeof(buf), "%s  %d / %d", store.UnitName(unit).c_str(),
+             pos < 0 ? 0 : pos, total);
     lv_label_set_text(english_progress_label_, buf);
 
     // 听写模式默认不显示拼写（show_word 为真才显示）

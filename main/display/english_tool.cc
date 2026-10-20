@@ -253,6 +253,24 @@ int EnglishStore::UnitEnd(int unit) const {
     return -1;
 }
 
+std::string EnglishStore::UnitName(int unit) const {
+    switch (unit) {
+        case 0: return "复习";
+        case 1: return "Unit 1";
+        case 2: return "Unit 2";
+        case 3: return "Unit 3";
+        case 4: return "Unit 4";
+        case 5: return "Unit 5";
+        case 6: return "Unit 6";
+        case 7: return "戏剧";
+        case 8: return "食物水果";
+        case 9: return "数字颜色时间";
+        case 10: return "动物场所物品";
+        case 11: return "日常动作形容";
+        default: return "Unit " + std::to_string(unit);
+    }
+}
+
 int EnglishStore::UnitCount(int unit) const {
     const int s = UnitStart(unit);
     const int e = UnitEnd(unit);
