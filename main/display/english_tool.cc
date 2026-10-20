@@ -179,6 +179,10 @@ bool EnglishStore::LoadWords() {
         meaning_offsets_.push_back(static_cast<uint32_t>(text_pool_.size()));
         text_pool_.insert(text_pool_.end(), fields[2].begin(), fields[2].end());
         text_pool_.push_back('\0');
+
+        title_offsets_.push_back(static_cast<uint32_t>(text_pool_.size()));
+        text_pool_.insert(text_pool_.end(), fields[3].begin(), fields[3].end());
+        text_pool_.push_back('\0');
     }
     fclose(f);
     ESP_LOGI(TAG, "词表文本：%u 条，字符池 %u B", (unsigned)word_offsets_.size(),
@@ -297,6 +301,13 @@ int EnglishStore::UnitEnd(int unit) const {
         }
     }
     return -1;
+}
+
+std::string_view EnglishStore::UnitTitle(int unit) const {
+    if (unit <= 0 || unit >= (int)title_offsets_.size()) {
+        return std::string_view();
+    }
+    return std::string_view(text_pool_.data() + title_offsets_[unit]);
 }
 
 std::string EnglishStore::UnitName(int unit) const {

@@ -1640,6 +1640,12 @@ void LcdDisplay::SetupUI() {
         lv_label_set_text(english_score_label_, "");
         lv_obj_align(english_score_label_, LV_ALIGN_TOP_RIGHT, -8, 8);
 
+        english_title_label_ = lv_label_create(english_screen_);
+        lv_obj_set_style_text_font(english_title_label_, text_font, 0);
+        lv_obj_set_style_text_color(english_title_label_, lv_color_hex(0x6A6A78), 0);
+        lv_label_set_text(english_title_label_, "");
+        lv_obj_align(english_title_label_, LV_ALIGN_TOP_MID, 0, 30);
+
         english_word_label_ = lv_label_create(english_screen_);
         lv_obj_set_style_text_font(english_word_label_, text_font, 0);
         lv_obj_set_style_text_color(english_word_label_, lvgl_theme->text_color(), 0);
@@ -3767,11 +3773,21 @@ void LcdDisplay::UpdateEnglishScreen() {
     const int pos = player.Position();
 
     // 进度：单元名 + 第几个/共几个
-    char buf[80];
+    char buf[96];
     const int unit = store.UnitAt(idx);
     snprintf(buf, sizeof(buf), "%s  %d / %d", store.UnitName(unit).c_str(),
              pos < 0 ? 0 : pos, total);
     lv_label_set_text(english_progress_label_, buf);
+
+    // 课本单元标题（如 "What's on your plate"），有就显示在进度下方
+    if (english_title_label_ != nullptr) {
+        const auto title = store.UnitTitle(unit);
+        if (title.empty()) {
+            lv_label_set_text(english_title_label_, "");
+        } else {
+            lv_label_set_text(english_title_label_, title.data());
+        }
+    }
 
     // 单词卡模式始终显示；听写模式默认只显示问号（真听写）
     if (player.CurrentMode() == EnglishPlayer::kCards || player.ShowWord()) {
@@ -3827,7 +3843,7 @@ void LcdDisplay::RebindEnglishFonts(const lv_font_t* text_font, const lv_font_t*
                                english_setup_unit_label_, english_setup_count_label_,
                                english_setup_interval_label_, english_setup_mode_label_,
                                english_score_label_, english_speak_label_,
-                               english_setup_speak_label_};
+                               english_setup_speak_label_, english_title_label_};
     for (lv_obj_t* label : text_labels) {
         if (label != nullptr && text_font != nullptr) {
             lv_obj_set_style_text_font(label, text_font, 0);
@@ -3897,8 +3913,8 @@ void LcdDisplay::OnEnglishSetupUnitClicked(lv_event_t* e) {
     if (self == nullptr) {
         return;
     }
-    // 0=全部，1..13 各单元
-    self->english_setup_unit_ = (self->english_setup_unit_ + 1) % 14;
+    // 0=全部，1..34 各单元
+    self->english_setup_unit_ = (self->english_setup_unit_ + 1) % 35;
     self->UpdateEnglishSetup();
 }
 

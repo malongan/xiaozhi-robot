@@ -1,0 +1,3628 @@
+[
+  {
+    "word": "plate",
+    "phonetic": "/pleɪt/",
+    "meaning": "盘子（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "chopsticks",
+    "phonetic": "/ˈtʃɒpstɪks/",
+    "meaning": "筷子（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "fork",
+    "phonetic": "/fɔːk/",
+    "meaning": "叉子（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "knife",
+    "phonetic": "/naɪf/",
+    "meaning": "刀子（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "spoon",
+    "phonetic": "/spuːn/",
+    "meaning": "勺子（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "bowl",
+    "phonetic": "/bəʊl/",
+    "meaning": "碗（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "rice",
+    "phonetic": "/raɪs/",
+    "meaning": "米饭（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "noodles",
+    "phonetic": "/ˈnuːdəlz/",
+    "meaning": "面条（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "soup",
+    "phonetic": "/suːp/",
+    "meaning": "汤（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "meat",
+    "phonetic": "/miːt/",
+    "meaning": "肉（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "fish",
+    "phonetic": "/fɪʃ/",
+    "meaning": "鱼（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "vegetables",
+    "phonetic": "/ˈvedʒɪtəblz/",
+    "meaning": "蔬菜（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "fruit",
+    "phonetic": "/fruːt/",
+    "meaning": "水果（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "bread",
+    "phonetic": "/bred/",
+    "meaning": "面包（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "milk",
+    "phonetic": "/mɪlk/",
+    "meaning": "牛奶（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "water",
+    "phonetic": "/ˈwɔːtər/",
+    "meaning": "水（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "what's on your plate?",
+    "phonetic": "/wɒts ɒn jɔː pleɪt/",
+    "meaning": "你盘子里有什么？（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "use chopsticks",
+    "phonetic": "/juːz ˈtʃɒpstɪks/",
+    "meaning": "使用筷子（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "group",
+    "phonetic": "/ɡruːp/",
+    "meaning": "群体；组（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "food group",
+    "phonetic": "/fuːd ɡruːp/",
+    "meaning": "食物类别（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "candy",
+    "phonetic": "/k ndi/",
+    "meaning": "糖果（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "chocolate",
+    "phonetic": "/t  kl t/",
+    "meaning": "巧克力，朱古力（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "cola",
+    "phonetic": "/k  l/",
+    "meaning": "可乐（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "chips",
+    "phonetic": "/t  ps/",
+    "meaning": "炸薯条；炸薯片（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "potato",
+    "phonetic": "/p  te t/",
+    "meaning": "马铃薯，土豆（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "choose",
+    "phonetic": "/t u z/",
+    "meaning": "挑选，选择（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "letter",
+    "phonetic": "/ˈletər/",
+    "meaning": "信，函（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "stomach",
+    "phonetic": "/st m k/",
+    "meaning": "胃（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "enough",
+    "phonetic": "/ɪˈnʌf/",
+    "meaning": "足够的（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "that's enough",
+    "phonetic": "/ðæts ɪˈnʌf/",
+    "meaning": "够了（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "bad",
+    "phonetic": "/bæd/",
+    "meaning": "不好的，糟糕的，坏的（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "a few",
+    "phonetic": "/ə fjuː/",
+    "meaning": "一些，几个（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "biscuit",
+    "phonetic": "/b sk t/",
+    "meaning": "饼干（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "heavy",
+    "phonetic": "/ˈhevi/",
+    "meaning": "沉重的（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "sleepy",
+    "phonetic": "/sli pi/",
+    "meaning": "困倦的，瞌睡的（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "always",
+    "phonetic": "/lwe z/",
+    "meaning": "总是，一直（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "change",
+    "phonetic": "/tʃeɪndʒ/",
+    "meaning": "变化，改变（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "healthy",
+    "phonetic": "/ˈhelθi/",
+    "meaning": "健康的，有益健康的（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "problem",
+    "phonetic": "/ˈprɒbləm/",
+    "meaning": "问题，难题；困难（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "slow",
+    "phonetic": "/sləʊ/",
+    "meaning": "缓慢的；慢下来（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "whoa",
+    "phonetic": "/wəʊ/",
+    "meaning": "冷静，慢些（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "oats",
+    "phonetic": "/ts/",
+    "meaning": "燕麦（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "nut",
+    "phonetic": "/n t/",
+    "meaning": "坚果；果仁（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "bar",
+    "phonetic": "/bɑ (r)/",
+    "meaning": "块，条，棒，根（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "teaspoon",
+    "phonetic": "/ti spu n/",
+    "meaning": "茶匙；一茶匙之量（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "sugar",
+    "phonetic": "/ˈʃʊɡər/",
+    "meaning": "糖（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "bottle",
+    "phonetic": "/b tl/",
+    "meaning": "瓶子；一瓶之量（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "oil",
+    "phonetic": "/ɔɪl/",
+    "meaning": "植物油，动物油（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "snack",
+    "phonetic": "/sn k/",
+    "meaning": "小吃，点心（What's on your plate Unit 1）",
+    "unit": 1,
+    "book": "5a"
+  },
+  {
+    "word": "waste",
+    "phonetic": "/weɪst/",
+    "meaning": "废料，废弃物（A green life Unit 2）",
+    "unit": 2,
+    "book": "5a"
+  },
+  {
+    "word": "plastic",
+    "phonetic": "/ˈplæstɪk/",
+    "meaning": "塑料制的（A green life Unit 2）",
+    "unit": 2,
+    "book": "5a"
+  },
+  {
+    "word": "throw",
+    "phonetic": "/θrəʊ/",
+    "meaning": "扔（A green life Unit 2）",
+    "unit": 2,
+    "book": "5a"
+  },
+  {
+    "word": "useful",
+    "phonetic": "/ˈjuːsfl/",
+    "meaning": "有用的，有益的（A green life Unit 2）",
+    "unit": 2,
+    "book": "5a"
+  },
+  {
+    "word": "yours",
+    "phonetic": "/jɔːz/",
+    "meaning": "你的，诚挚的（A green life Unit 2）",
+    "unit": 2,
+    "book": "5a"
+  },
+  {
+    "word": "recycle",
+    "phonetic": "/ˌriːˈsaɪkl/",
+    "meaning": "再利用，回收利用（A green life Unit 2）",
+    "unit": 2,
+    "book": "5a"
+  },
+  {
+    "word": "each",
+    "phonetic": "/iːtʃ/",
+    "meaning": "每个，各（A green life Unit 2）",
+    "unit": 2,
+    "book": "5a"
+  },
+  {
+    "word": "over",
+    "phonetic": "/ˈəʊvər/",
+    "meaning": "大于，高于，超出（A green life Unit 2）",
+    "unit": 2,
+    "book": "5a"
+  },
+  {
+    "word": "metal",
+    "phonetic": "/ˈmetl/",
+    "meaning": "金属（A green life Unit 2）",
+    "unit": 2,
+    "book": "5a"
+  },
+  {
+    "word": "into",
+    "phonetic": "/ˈɪntuː/",
+    "meaning": "到...⋯.里（A green life Unit 2）",
+    "unit": 2,
+    "book": "5a"
+  },
+  {
+    "word": "turn into",
+    "phonetic": "/tɜːn ˈɪntuː/",
+    "meaning": "变成（A green life Unit 2）",
+    "unit": 2,
+    "book": "5a"
+  },
+  {
+    "word": "newspaper",
+    "phonetic": "/ˈnjuːzpeɪpə/",
+    "meaning": "报纸（A green life Unit 2）",
+    "unit": 2,
+    "book": "5a"
+  },
+  {
+    "word": "flat",
+    "phonetic": "/flæt/",
+    "meaning": "平的（A green life Unit 2）",
+    "unit": 2,
+    "book": "5a"
+  },
+  {
+    "word": "beginning",
+    "phonetic": "/bɪˈɡɪnɪŋ/",
+    "meaning": "开始，开端（A green life Unit 2）",
+    "unit": 2,
+    "book": "5a"
+  },
+  {
+    "word": "off",
+    "phonetic": "/ɒf/",
+    "meaning": "从（某物）上移开（A green life Unit 2）",
+    "unit": 2,
+    "book": "5a"
+  },
+  {
+    "word": "take off",
+    "phonetic": "/teɪk ˈɒf/",
+    "meaning": "脱下（A green life Unit 2）",
+    "unit": 2,
+    "book": "5a"
+  },
+  {
+    "word": "environment",
+    "phonetic": "/ɪnˈvaɪrənmənt/",
+    "meaning": "环境（A green life Unit 2）",
+    "unit": 2,
+    "book": "5a"
+  },
+  {
+    "word": "green",
+    "phonetic": "/ɡriːn/",
+    "meaning": "绿色的（A green life Unit 2）",
+    "unit": 2,
+    "book": "5a"
+  },
+  {
+    "word": "life",
+    "phonetic": "/laɪf/",
+    "meaning": "生活（A green life Unit 2）",
+    "unit": 2,
+    "book": "5a"
+  },
+  {
+    "word": "seat",
+    "phonetic": "/si t/",
+    "meaning": "座，座位（A green life Unit 2）",
+    "unit": 2,
+    "book": "5a"
+  },
+  {
+    "word": "land",
+    "phonetic": "/l nd/",
+    "meaning": "陆地（A green life Unit 2）",
+    "unit": 2,
+    "book": "5a"
+  },
+  {
+    "word": "shop",
+    "phonetic": "/ʃɒp/",
+    "meaning": "商店（A green life Unit 2）",
+    "unit": 2,
+    "book": "5a"
+  },
+  {
+    "word": "friendship",
+    "phonetic": "/ˈfrendʃɪp/",
+    "meaning": "友谊，朋友关系（Happy together Unit 3）",
+    "unit": 3,
+    "book": "5a"
+  },
+  {
+    "word": "unhappy",
+    "phonetic": "/ʌnˈhæpi/",
+    "meaning": "伤心的，不开心的（Happy together Unit 3）",
+    "unit": 3,
+    "book": "5a"
+  },
+  {
+    "word": "both",
+    "phonetic": "/bəʊθ/",
+    "meaning": "两个都（Happy together Unit 3）",
+    "unit": 3,
+    "book": "5a"
+  },
+  {
+    "word": "funny",
+    "phonetic": "/ˈfʌni/",
+    "meaning": "有趣的（Happy together Unit 3）",
+    "unit": 3,
+    "book": "5a"
+  },
+  {
+    "word": "musical",
+    "phonetic": "/ˈmjuːzɪkl/",
+    "meaning": "擅长音乐的（Happy together Unit 3）",
+    "unit": 3,
+    "book": "5a"
+  },
+  {
+    "word": "difference",
+    "phonetic": "/ˈdɪfrəns/",
+    "meaning": "差别，差异（Happy together Unit 3）",
+    "unit": 3,
+    "book": "5a"
+  },
+  {
+    "word": "er",
+    "phonetic": "/ɜː(r)/",
+    "meaning": "int.（Happy together Unit 3）",
+    "unit": 3,
+    "book": "5a"
+  },
+  {
+    "word": "rabbit",
+    "phonetic": "/ˈræbɪt/",
+    "meaning": "兔（Happy together Unit 3）",
+    "unit": 3,
+    "book": "5a"
+  },
+  {
+    "word": "key",
+    "phonetic": "/kiː/",
+    "meaning": "关键（Happy together Unit 3）",
+    "unit": 3,
+    "book": "5a"
+  },
+  {
+    "word": "parent",
+    "phonetic": "/ˈpeərənt/",
+    "meaning": "1.（Happy together Unit 3）",
+    "unit": 3,
+    "book": "5a"
+  },
+  {
+    "word": "tip",
+    "phonetic": "/tɪp/",
+    "meaning": "窍门，忠告，建议（Happy together Unit 3）",
+    "unit": 3,
+    "book": "5a"
+  },
+  {
+    "word": "similar",
+    "phonetic": "/ˈsɪmələr/",
+    "meaning": "相似的（Happy together Unit 3）",
+    "unit": 3,
+    "book": "5a"
+  },
+  {
+    "word": "openly",
+    "phonetic": "/ˈəʊpənli/",
+    "meaning": "坦诚地（Happy together Unit 3）",
+    "unit": 3,
+    "book": "5a"
+  },
+  {
+    "word": "plan",
+    "phonetic": "/plæn/",
+    "meaning": "计划（Happy together Unit 3）",
+    "unit": 3,
+    "book": "5a"
+  },
+  {
+    "word": "complete",
+    "phonetic": "/kəmˈpliːt/",
+    "meaning": "用叉子吃（A better me Unit 4）",
+    "unit": 4,
+    "book": "5a"
+  },
+  {
+    "word": "goal",
+    "phonetic": "/ɡəʊl/",
+    "meaning": "目标，目的（A better me Unit 4）",
+    "unit": 4,
+    "book": "5a"
+  },
+  {
+    "word": "drink",
+    "phonetic": "/drɪŋk/",
+    "meaning": "喝（A better me Unit 4）",
+    "unit": 4,
+    "book": "5a"
+  },
+  {
+    "word": "healthily",
+    "phonetic": "/ˈhelθɪli/",
+    "meaning": "健康地（A better me Unit 4）",
+    "unit": 4,
+    "book": "5a"
+  },
+  {
+    "word": "exercise",
+    "phonetic": "/ˈeksəsaɪz/",
+    "meaning": "运动，锻炼（A better me Unit 4）",
+    "unit": 4,
+    "book": "5a"
+  },
+  {
+    "word": "top",
+    "phonetic": "/tɒp/",
+    "meaning": "最高的（A better me Unit 4）",
+    "unit": 4,
+    "book": "5a"
+  },
+  {
+    "word": "test",
+    "phonetic": "/test/",
+    "meaning": "测验，测试（A better me Unit 4）",
+    "unit": 4,
+    "book": "5a"
+  },
+  {
+    "word": "october",
+    "phonetic": "/ɒkˈtəʊbər/",
+    "meaning": "十月（A better me Unit 4）",
+    "unit": 4,
+    "book": "5a"
+  },
+  {
+    "word": "sentence",
+    "phonetic": "/ˈsentəns/",
+    "meaning": "句子（A better me Unit 4）",
+    "unit": 4,
+    "book": "5a"
+  },
+  {
+    "word": "november",
+    "phonetic": "/n   vemb (r)/",
+    "meaning": "十一月（A better me Unit 4）",
+    "unit": 4,
+    "book": "5a"
+  },
+  {
+    "word": "match",
+    "phonetic": "/mætʃ/",
+    "meaning": "体育比赛，竞赛（A better me Unit 4）",
+    "unit": 4,
+    "book": "5a"
+  },
+  {
+    "word": "late",
+    "phonetic": "/leɪt/",
+    "meaning": "迟到的（A better me Unit 4）",
+    "unit": 4,
+    "book": "5a"
+  },
+  {
+    "word": "be late for school",
+    "phonetic": "/biː leɪt fə skuːl/",
+    "meaning": "上学迟到（A better me Unit 4）",
+    "unit": 4,
+    "book": "5a"
+  },
+  {
+    "word": "before",
+    "phonetic": "/bɪˈfɔːr/",
+    "meaning": "在.…以前（A better me Unit 4）",
+    "unit": 4,
+    "book": "5a"
+  },
+  {
+    "word": "sell",
+    "phonetic": "/sel/",
+    "meaning": "卖（A better me Unit 4）",
+    "unit": 4,
+    "book": "5a"
+  },
+  {
+    "word": "buy",
+    "phonetic": "/baɪ/",
+    "meaning": "V.（A better me Unit 4）",
+    "unit": 4,
+    "book": "5a"
+  },
+  {
+    "word": "medicine",
+    "phonetic": "/ˈmedɪsn/",
+    "meaning": "药，药物（A better me Unit 4）",
+    "unit": 4,
+    "book": "5a"
+  },
+  {
+    "word": "survey",
+    "phonetic": "/s  ve/",
+    "meaning": "调查（A better me Unit 4）",
+    "unit": 4,
+    "book": "5a"
+  },
+  {
+    "word": "hurry",
+    "phonetic": "/h ri/",
+    "meaning": "赶紧，匆忙（地走）（A better me Unit 4）",
+    "unit": 4,
+    "book": "5a"
+  },
+  {
+    "word": "classroom",
+    "phonetic": "/klɑ sru m/",
+    "meaning": "教室，课堂（A better me Unit 4）",
+    "unit": 4,
+    "book": "5a"
+  },
+  {
+    "word": "afraid",
+    "phonetic": "/fre d/",
+    "meaning": "害怕的，恐惧的（A better me Unit 4）",
+    "unit": 4,
+    "book": "5a"
+  },
+  {
+    "word": "set",
+    "phonetic": "/set/",
+    "meaning": "创造（纪录）；设置（A better me Unit 4）",
+    "unit": 4,
+    "book": "5a"
+  },
+  {
+    "word": "record",
+    "phonetic": "/ˈrekɔːd/",
+    "meaning": "（尤指体育运动的）纪录（A better me Unit 4）",
+    "unit": 4,
+    "book": "5a"
+  },
+  {
+    "word": "metre",
+    "phonetic": "/ˈmiːtər/",
+    "meaning": "米（A better me Unit 4）",
+    "unit": 4,
+    "book": "5a"
+  },
+  {
+    "word": "future",
+    "phonetic": "/ˈfjuːtʃə/",
+    "meaning": "将来，未来（Look into the future Unit 5）",
+    "unit": 5,
+    "book": "5a"
+  },
+  {
+    "word": "drive",
+    "phonetic": "/dra v/",
+    "meaning": "开车，驾驶（Look into the future Unit 5）",
+    "unit": 5,
+    "book": "5a"
+  },
+  {
+    "word": "pet",
+    "phonetic": "/pet/",
+    "meaning": "宠物（Look into the future Unit 5）",
+    "unit": 5,
+    "book": "5a"
+  },
+  {
+    "word": "space",
+    "phonetic": "/speɪs/",
+    "meaning": "太空（Look into the future Unit 5）",
+    "unit": 5,
+    "book": "5a"
+  },
+  {
+    "word": "danger",
+    "phonetic": "/de nd  (r)/",
+    "meaning": "危险（Look into the future Unit 5）",
+    "unit": 5,
+    "book": "5a"
+  },
+  {
+    "word": "glass",
+    "phonetic": "/ɡlɑ s/",
+    "meaning": "玻璃（Look into the future Unit 5）",
+    "unit": 5,
+    "book": "5a"
+  },
+  {
+    "word": "celebrate",
+    "phonetic": "/ˈselɪbreɪt/",
+    "meaning": "庆祝（Look into the future Unit 5）",
+    "unit": 5,
+    "book": "5a"
+  },
+  {
+    "word": "hundred",
+    "phonetic": "/h ndr d/",
+    "meaning": "一百（Look into the future Unit 5）",
+    "unit": 5,
+    "book": "5a"
+  },
+  {
+    "word": "pie",
+    "phonetic": "/pa/",
+    "meaning": "馅饼，派（Look into the future Unit 5）",
+    "unit": 5,
+    "book": "5a"
+  },
+  {
+    "word": "fries",
+    "phonetic": "/fra z/",
+    "meaning": "炸薯条（Look into the future Unit 5）",
+    "unit": 5,
+    "book": "5a"
+  },
+  {
+    "word": "bright",
+    "phonetic": "/braɪt/",
+    "meaning": "（前途）光明的；明亮的（Look into the future Unit 5）",
+    "unit": 5,
+    "book": "5a"
+  },
+  {
+    "word": "shape",
+    "phonetic": "/e p/",
+    "meaning": "形，形状，外形（Look into the future Unit 5）",
+    "unit": 5,
+    "book": "5a"
+  },
+  {
+    "word": "pill",
+    "phonetic": "/p l/",
+    "meaning": "药丸，药片（Look into the future Unit 5）",
+    "unit": 5,
+    "book": "5a"
+  },
+  {
+    "word": "mooncake",
+    "phonetic": "/ˈmuːnkeɪk/",
+    "meaning": "月饼（Enjoy the festivals Unit 6）",
+    "unit": 6,
+    "book": "5a"
+  },
+  {
+    "word": "september",
+    "phonetic": "/sepˈtembər/",
+    "meaning": "九月（Enjoy the festivals Unit 6）",
+    "unit": 6,
+    "book": "5a"
+  },
+  {
+    "word": "zookeeper",
+    "phonetic": "/ˈzuːkiːpə/",
+    "meaning": "动物饲养员（Enjoy the festivals Unit 6）",
+    "unit": 6,
+    "book": "5a"
+  },
+  {
+    "word": "candle",
+    "phonetic": "/ˈkændl/",
+    "meaning": "蜡烛（Enjoy the festivals Unit 6）",
+    "unit": 6,
+    "book": "5a"
+  },
+  {
+    "word": "merry",
+    "phonetic": "/ˈmeri/",
+    "meaning": "快乐的（Enjoy the festivals Unit 6）",
+    "unit": 6,
+    "book": "5a"
+  },
+  {
+    "word": "merry christmas",
+    "phonetic": "/ˈmeri ˈkrɪsməs/",
+    "meaning": "圣诞快乐！（Enjoy the festivals Unit 6）",
+    "unit": 6,
+    "book": "5a"
+  },
+  {
+    "word": "celebration",
+    "phonetic": "/ˌselɪˈbreɪʃən/",
+    "meaning": "庆祝；庆祝活动（Enjoy the festivals Unit 6）",
+    "unit": 6,
+    "book": "5a"
+  },
+  {
+    "word": "bell",
+    "phonetic": "/bel/",
+    "meaning": "钟；铃（Enjoy the festivals Unit 6）",
+    "unit": 6,
+    "book": "5a"
+  },
+  {
+    "word": "put up",
+    "phonetic": "/pʊt ʌp/",
+    "meaning": "短语（Enjoy the festivals Unit 6）",
+    "unit": 6,
+    "book": "5a"
+  },
+  {
+    "word": "celebrate festivals",
+    "phonetic": "/ˈselɪbreɪt ˈfestɪvlz/",
+    "meaning": "庆祝节日（Enjoy the festivals Unit 6）",
+    "unit": 6,
+    "book": "5a"
+  },
+  {
+    "word": "dragon boat festival",
+    "phonetic": "/ˈdræɡən bəʊt ˈfestɪvl/",
+    "meaning": "端午节（Enjoy the festivals Unit 6）",
+    "unit": 6,
+    "book": "5a"
+  },
+  {
+    "word": "mid-autumn festival",
+    "phonetic": "/ˌmɪd ˈɔːtəm ˈfestɪvl/",
+    "meaning": "中秋节（Enjoy the festivals Unit 6）",
+    "unit": 6,
+    "book": "5a"
+  },
+  {
+    "word": "spring festival",
+    "phonetic": "/sprɪŋ ˈfestɪvl/",
+    "meaning": "春节（Enjoy the festivals Unit 6）",
+    "unit": 6,
+    "book": "5a"
+  },
+  {
+    "word": "festival",
+    "phonetic": "/ˈfestɪvl/",
+    "meaning": "节日（Enjoy the festivals Unit 6）",
+    "unit": 6,
+    "book": "5a"
+  },
+  {
+    "word": "grow up",
+    "phonetic": "/ɡrəʊ ʌp/",
+    "meaning": "长大（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "height",
+    "phonetic": "/haɪt/",
+    "meaning": "身高（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "weight",
+    "phonetic": "/weɪt/",
+    "meaning": "体重（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "tall",
+    "phonetic": "/tɔːl/",
+    "meaning": "高的（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "short",
+    "phonetic": "/ʃɔːt/",
+    "meaning": "矮的（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "light",
+    "phonetic": "/laɪt/",
+    "meaning": "轻的（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "born",
+    "phonetic": "/bɔːn/",
+    "meaning": "出生（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "age",
+    "phonetic": "/eɪdʒ/",
+    "meaning": "年龄（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "year",
+    "phonetic": "/jɪə/",
+    "meaning": "年（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "month",
+    "phonetic": "/mʌnθ/",
+    "meaning": "月（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "cm",
+    "phonetic": "/siː em/",
+    "meaning": "厘米（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "kg",
+    "phonetic": "/keɪ dʒiː/",
+    "meaning": "千克（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "different",
+    "phonetic": "/ˈdɪfrənt/",
+    "meaning": "不同的（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "same",
+    "phonetic": "/seɪm/",
+    "meaning": "相同的（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "child",
+    "phonetic": "/tʃaɪld/",
+    "meaning": "孩子（单数）（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "children",
+    "phonetic": "/ˈtʃɪldrən/",
+    "meaning": "孩子（复数）（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "young",
+    "phonetic": "/jʌŋ/",
+    "meaning": "年轻的（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "old",
+    "phonetic": "/əʊld/",
+    "meaning": "年老的（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "measure",
+    "phonetic": "/ˈmeʒə(r)/",
+    "meaning": "测量（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "id",
+    "phonetic": "/ˌaɪ ˈdiː/",
+    "meaning": "身份证（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "primary school",
+    "phonetic": "/ˈpraɪməri skuːl/",
+    "meaning": "小学（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "pay",
+    "phonetic": "/peɪ/",
+    "meaning": "付款（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "ride",
+    "phonetic": "/raɪd/",
+    "meaning": "骑（自行车）（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "noisy",
+    "phonetic": "/ˈnɔɪzi/",
+    "meaning": "吵闹的（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "naughty",
+    "phonetic": "/ˈnɔːti/",
+    "meaning": "淘气的（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "could",
+    "phonetic": "/kʊd/",
+    "meaning": "能、会（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "last",
+    "phonetic": "/lɑːst/",
+    "meaning": "最近的（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "holiday",
+    "phonetic": "/ˈhɒlədeɪ/",
+    "meaning": "假期（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "skier",
+    "phonetic": "/ˈskiːə/",
+    "meaning": "滑雪者（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "clap",
+    "phonetic": "/klæp/",
+    "meaning": "鼓（掌）（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "hurt",
+    "phonetic": "/hɜːt/",
+    "meaning": "痛苦的（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "exciting",
+    "phonetic": "/ɪkˈsaɪtɪŋ/",
+    "meaning": "令人兴奋的（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "follow",
+    "phonetic": "/ˈfɒləʊ/",
+    "meaning": "跟随（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "heart",
+    "phonetic": "/hɑːt/",
+    "meaning": "心（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "film",
+    "phonetic": "/fɪlm/",
+    "meaning": "电影，影片（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "king",
+    "phonetic": "/kɪŋ/",
+    "meaning": "国王（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "dead",
+    "phonetic": "/ded/",
+    "meaning": "死亡的（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "brave",
+    "phonetic": "/breɪv/",
+    "meaning": "勇敢的（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "beat",
+    "phonetic": "/biːt/",
+    "meaning": "击败（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "difficulty",
+    "phonetic": "/ˈdɪfɪkəlti/",
+    "meaning": "困难（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "able",
+    "phonetic": "/ˈeɪbl/",
+    "meaning": "可以去做某事的（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "challenge",
+    "phonetic": "/ˈtʃælɪndʒ/",
+    "meaning": "挑战（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "myself",
+    "phonetic": "/maɪˈself/",
+    "meaning": "我自己（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "ago",
+    "phonetic": "/əˈɡəʊ/",
+    "meaning": "以前（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "camp",
+    "phonetic": "/kæmp/",
+    "meaning": "活动营地（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "training",
+    "phonetic": "/ˈtreɪnɪŋ/",
+    "meaning": "训练（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "nervous",
+    "phonetic": "/ˈnɜːvəs/",
+    "meaning": "神经紧张的（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "third",
+    "phonetic": "/θɜːd/",
+    "meaning": "第三的（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "ourselves",
+    "phonetic": "/ˌaʊəˈselvz/",
+    "meaning": "我们自己（Growing up Unit 1）",
+    "unit": 7,
+    "book": "5b"
+  },
+  {
+    "word": "help",
+    "phonetic": "/help/",
+    "meaning": "帮助（You can make a difference Unit 2）",
+    "unit": 8,
+    "book": "5b"
+  },
+  {
+    "word": "helpful",
+    "phonetic": "/ˈhelpfl/",
+    "meaning": "有帮助的（You can make a difference Unit 2）",
+    "unit": 8,
+    "book": "5b"
+  },
+  {
+    "word": "kind",
+    "phonetic": "/kaɪnd/",
+    "meaning": "善良的（You can make a difference Unit 2）",
+    "unit": 8,
+    "book": "5b"
+  },
+  {
+    "word": "share",
+    "phonetic": "/ʃeə/",
+    "meaning": "分享（You can make a difference Unit 2）",
+    "unit": 8,
+    "book": "5b"
+  },
+  {
+    "word": "give",
+    "phonetic": "/ɡɪv/",
+    "meaning": "给予（You can make a difference Unit 2）",
+    "unit": 8,
+    "book": "5b"
+  },
+  {
+    "word": "poor",
+    "phonetic": "/pɔː/",
+    "meaning": "贫穷的（You can make a difference Unit 2）",
+    "unit": 8,
+    "book": "5b"
+  },
+  {
+    "word": "donate",
+    "phonetic": "/dəʊˈneɪt/",
+    "meaning": "捐赠（You can make a difference Unit 2）",
+    "unit": 8,
+    "book": "5b"
+  },
+  {
+    "word": "volunteer",
+    "phonetic": "/ˌvɒlənˈtɪər/",
+    "meaning": "志愿者（You can make a difference Unit 2）",
+    "unit": 8,
+    "book": "5b"
+  },
+  {
+    "word": "hope",
+    "phonetic": "/həʊp/",
+    "meaning": "希望（You can make a difference Unit 2）",
+    "unit": 8,
+    "book": "5b"
+  },
+  {
+    "word": "happy",
+    "phonetic": "/ˈhæpi/",
+    "meaning": "快乐的（You can make a difference Unit 2）",
+    "unit": 8,
+    "book": "5b"
+  },
+  {
+    "word": "sad",
+    "phonetic": "/sæd/",
+    "meaning": "难过的（You can make a difference Unit 2）",
+    "unit": 8,
+    "book": "5b"
+  },
+  {
+    "word": "charity",
+    "phonetic": "/ˈtʃærəti/",
+    "meaning": "慈善（You can make a difference Unit 2）",
+    "unit": 8,
+    "book": "5b"
+  },
+  {
+    "word": "project",
+    "phonetic": "/ˈprɒdʒekt/",
+    "meaning": "项目（You can make a difference Unit 2）",
+    "unit": 8,
+    "book": "5b"
+  },
+  {
+    "word": "love",
+    "phonetic": "/lʌv/",
+    "meaning": "爱（You can make a difference Unit 2）",
+    "unit": 8,
+    "book": "5b"
+  },
+  {
+    "word": "care",
+    "phonetic": "/keə/",
+    "meaning": "关心（You can make a difference Unit 2）",
+    "unit": 8,
+    "book": "5b"
+  },
+  {
+    "word": "together",
+    "phonetic": "/təˈɡeðər/",
+    "meaning": "一起（You can make a difference Unit 2）",
+    "unit": 8,
+    "book": "5b"
+  },
+  {
+    "word": "difficult",
+    "phonetic": "/ˈdɪfɪkəlt/",
+    "meaning": "困难的（You can make a difference Unit 2）",
+    "unit": 8,
+    "book": "5b"
+  },
+  {
+    "word": "puppy",
+    "phonetic": "/ˈpʌpi/",
+    "meaning": "小狗（You can make a difference Unit 2）",
+    "unit": 8,
+    "book": "5b"
+  },
+  {
+    "word": "playful",
+    "phonetic": "/ˈpleɪfl/",
+    "meaning": "活泼的（You can make a difference Unit 2）",
+    "unit": 8,
+    "book": "5b"
+  },
+  {
+    "word": "someone",
+    "phonetic": "/ˈsʌmwʌn/",
+    "meaning": "某人，有人（You can make a difference Unit 2）",
+    "unit": 8,
+    "book": "5b"
+  },
+  {
+    "word": "eighty",
+    "phonetic": "/ˈeɪti/",
+    "meaning": "八十（You can make a difference Unit 2）",
+    "unit": 8,
+    "book": "5b"
+  },
+  {
+    "word": "ukulele",
+    "phonetic": "/ˌjuːkəˈleɪli/",
+    "meaning": "尤克里里琴（You can make a difference Unit 2）",
+    "unit": 8,
+    "book": "5b"
+  },
+  {
+    "word": "guitar",
+    "phonetic": "/ɡɪˈtɑːr/",
+    "meaning": "吉他（You can make a difference Unit 2）",
+    "unit": 8,
+    "book": "5b"
+  },
+  {
+    "word": "band",
+    "phonetic": "/bænd/",
+    "meaning": "乐队（You can make a difference Unit 2）",
+    "unit": 8,
+    "book": "5b"
+  },
+  {
+    "word": "lunchtime",
+    "phonetic": "/ˈlʌntʃtaɪm/",
+    "meaning": "午餐时间（You can make a difference Unit 2）",
+    "unit": 8,
+    "book": "5b"
+  },
+  {
+    "word": "alone",
+    "phonetic": "/əˈləʊn/",
+    "meaning": "独自（You can make a difference Unit 2）",
+    "unit": 8,
+    "book": "5b"
+  },
+  {
+    "word": "become",
+    "phonetic": "/bɪˈkʌm/",
+    "meaning": "成为（You can make a difference Unit 2）",
+    "unit": 8,
+    "book": "5b"
+  },
+  {
+    "word": "second",
+    "phonetic": "/ˈsekənd/",
+    "meaning": "第二的（You can make a difference Unit 2）",
+    "unit": 8,
+    "book": "5b"
+  },
+  {
+    "word": "son",
+    "phonetic": "/sʌn/",
+    "meaning": "儿子（You can make a difference Unit 2）",
+    "unit": 8,
+    "book": "5b"
+  },
+  {
+    "word": "star",
+    "phonetic": "/stɑː/",
+    "meaning": "星星（You can make a difference Unit 2）",
+    "unit": 8,
+    "book": "5b"
+  },
+  {
+    "word": "inspire",
+    "phonetic": "/ɪnˈspaɪə(r)/",
+    "meaning": "鼓舞（You can make a difference Unit 2）",
+    "unit": 8,
+    "book": "5b"
+  },
+  {
+    "word": "power",
+    "phonetic": "/ˈpaʊə(r)/",
+    "meaning": "力量（You can make a difference Unit 2）",
+    "unit": 8,
+    "book": "5b"
+  },
+  {
+    "word": "kindness",
+    "phonetic": "/ˈkaɪndnəs/",
+    "meaning": "好意，体贴（You can make a difference Unit 2）",
+    "unit": 8,
+    "book": "5b"
+  },
+  {
+    "word": "spirit",
+    "phonetic": "/ˈspɪrɪt/",
+    "meaning": "精神（You can make a difference Unit 2）",
+    "unit": 8,
+    "book": "5b"
+  },
+  {
+    "word": "action",
+    "phonetic": "/ˈækʃn/",
+    "meaning": "行动（You can make a difference Unit 2）",
+    "unit": 8,
+    "book": "5b"
+  },
+  {
+    "word": "speak",
+    "phonetic": "/spiːk/",
+    "meaning": "说（You can make a difference Unit 2）",
+    "unit": 8,
+    "book": "5b"
+  },
+  {
+    "word": "loud",
+    "phonetic": "/laʊd/",
+    "meaning": "大声的（You can make a difference Unit 2）",
+    "unit": 8,
+    "book": "5b"
+  },
+  {
+    "word": "than",
+    "phonetic": "/ðæn/",
+    "meaning": "比（You can make a difference Unit 2）",
+    "unit": 8,
+    "book": "5b"
+  },
+  {
+    "word": "elderly",
+    "phonetic": "/ˈeldəli/",
+    "meaning": "年老的（You can make a difference Unit 2）",
+    "unit": 8,
+    "book": "5b"
+  },
+  {
+    "word": "organisation",
+    "phonetic": "/ˌɔːɡənaɪˈzeɪʃn/",
+    "meaning": "组织（You can make a difference Unit 2）",
+    "unit": 8,
+    "book": "5b"
+  },
+  {
+    "word": "non-profit",
+    "phonetic": "/ˌnɒn ˈprɒfɪt/",
+    "meaning": "非营利的（You can make a difference Unit 2）",
+    "unit": 8,
+    "book": "5b"
+  },
+  {
+    "word": "endangered",
+    "phonetic": "/ɪnˈdeɪndʒəd/",
+    "meaning": "濒危的（You can make a difference Unit 2）",
+    "unit": 8,
+    "book": "5b"
+  },
+  {
+    "word": "read",
+    "phonetic": "/riːd/",
+    "meaning": "读（We love reading Unit 3）",
+    "unit": 9,
+    "book": "5b"
+  },
+  {
+    "word": "book",
+    "phonetic": "/bʊk/",
+    "meaning": "书（We love reading Unit 3）",
+    "unit": 9,
+    "book": "5b"
+  },
+  {
+    "word": "story",
+    "phonetic": "/ˈstɔːri/",
+    "meaning": "故事（We love reading Unit 3）",
+    "unit": 9,
+    "book": "5b"
+  },
+  {
+    "word": "storybook",
+    "phonetic": "/ˈstɔːribʊk/",
+    "meaning": "故事书（We love reading Unit 3）",
+    "unit": 9,
+    "book": "5b"
+  },
+  {
+    "word": "novel",
+    "phonetic": "/ˈnɒvl/",
+    "meaning": "小说（We love reading Unit 3）",
+    "unit": 9,
+    "book": "5b"
+  },
+  {
+    "word": "magazine",
+    "phonetic": "/ˌmæɡəˈziːn/",
+    "meaning": "杂志（We love reading Unit 3）",
+    "unit": 9,
+    "book": "5b"
+  },
+  {
+    "word": "writer",
+    "phonetic": "/ˈraɪtər/",
+    "meaning": "作家（We love reading Unit 3）",
+    "unit": 9,
+    "book": "5b"
+  },
+  {
+    "word": "favourite",
+    "phonetic": "/ˈfeɪvərɪt/",
+    "meaning": "最喜欢的（We love reading Unit 3）",
+    "unit": 9,
+    "book": "5b"
+  },
+  {
+    "word": "interesting",
+    "phonetic": "/ˈɪntrəstɪŋ/",
+    "meaning": "有趣的（We love reading Unit 3）",
+    "unit": 9,
+    "book": "5b"
+  },
+  {
+    "word": "boring",
+    "phonetic": "/ˈbɔːrɪŋ/",
+    "meaning": "无聊的（We love reading Unit 3）",
+    "unit": 9,
+    "book": "5b"
+  },
+  {
+    "word": "read a book",
+    "phonetic": "/riːd ə bʊk/",
+    "meaning": "看书（We love reading Unit 3）",
+    "unit": 9,
+    "book": "5b"
+  },
+  {
+    "word": "tell a story",
+    "phonetic": "/tel ə ˈstɔːri/",
+    "meaning": "讲故事（We love reading Unit 3）",
+    "unit": 9,
+    "book": "5b"
+  },
+  {
+    "word": "library",
+    "phonetic": "/ˈlaɪbrəri/",
+    "meaning": "图书馆（We love reading Unit 3）",
+    "unit": 9,
+    "book": "5b"
+  },
+  {
+    "word": "borrow",
+    "phonetic": "/ˈbɒrəʊ/",
+    "meaning": "借（We love reading Unit 3）",
+    "unit": 9,
+    "book": "5b"
+  },
+  {
+    "word": "return",
+    "phonetic": "/rɪˈtɜːn/",
+    "meaning": "归还（We love reading Unit 3）",
+    "unit": 9,
+    "book": "5b"
+  },
+  {
+    "word": "page",
+    "phonetic": "/peɪdʒ/",
+    "meaning": "页（We love reading Unit 3）",
+    "unit": 9,
+    "book": "5b"
+  },
+  {
+    "word": "character",
+    "phonetic": "/ˈkærəktər/",
+    "meaning": "人物（We love reading Unit 3）",
+    "unit": 9,
+    "book": "5b"
+  },
+  {
+    "word": "plot",
+    "phonetic": "/plɒt/",
+    "meaning": "情节（We love reading Unit 3）",
+    "unit": 9,
+    "book": "5b"
+  },
+  {
+    "word": "time",
+    "phonetic": "/taɪm/",
+    "meaning": "时间（Back in time Unit 4）",
+    "unit": 10,
+    "book": "5b"
+  },
+  {
+    "word": "past",
+    "phonetic": "/pɑːst/",
+    "meaning": "过去（Back in time Unit 4）",
+    "unit": 10,
+    "book": "5b"
+  },
+  {
+    "word": "yesterday",
+    "phonetic": "/ˈjestədeɪ/",
+    "meaning": "昨天（Back in time Unit 4）",
+    "unit": 10,
+    "book": "5b"
+  },
+  {
+    "word": "week",
+    "phonetic": "/wiːk/",
+    "meaning": "星期（Back in time Unit 4）",
+    "unit": 10,
+    "book": "5b"
+  },
+  {
+    "word": "visit",
+    "phonetic": "/ˈvɪzɪt/",
+    "meaning": "拜访（Back in time Unit 4）",
+    "unit": 10,
+    "book": "5b"
+  },
+  {
+    "word": "play",
+    "phonetic": "/pleɪ/",
+    "meaning": "玩（Back in time Unit 4）",
+    "unit": 10,
+    "book": "5b"
+  },
+  {
+    "word": "go",
+    "phonetic": "/ɡəʊ/",
+    "meaning": "去（Back in time Unit 4）",
+    "unit": 10,
+    "book": "5b"
+  },
+  {
+    "word": "do",
+    "phonetic": "/duː/",
+    "meaning": "做（Back in time Unit 4）",
+    "unit": 10,
+    "book": "5b"
+  },
+  {
+    "word": "eat",
+    "phonetic": "/iːt/",
+    "meaning": "吃（Back in time Unit 4）",
+    "unit": 10,
+    "book": "5b"
+  },
+  {
+    "word": "yesterday morning",
+    "phonetic": "/ˈjestədeɪ ˈmɔːnɪŋ/",
+    "meaning": "昨天早上（Back in time Unit 4）",
+    "unit": 10,
+    "book": "5b"
+  },
+  {
+    "word": "last week",
+    "phonetic": "/lɑːst wiːk/",
+    "meaning": "上周（Back in time Unit 4）",
+    "unit": 10,
+    "book": "5b"
+  },
+  {
+    "word": "last year",
+    "phonetic": "/lɑːst jɪə(r)/",
+    "meaning": "去年（Back in time Unit 4）",
+    "unit": 10,
+    "book": "5b"
+  },
+  {
+    "word": "trip",
+    "phonetic": "/trɪp/",
+    "meaning": "旅行（Back in time Unit 4）",
+    "unit": 10,
+    "book": "5b"
+  },
+  {
+    "word": "family",
+    "phonetic": "/ˈfæməli/",
+    "meaning": "家人（Back in time Unit 4）",
+    "unit": 10,
+    "book": "5b"
+  },
+  {
+    "word": "friend",
+    "phonetic": "/frend/",
+    "meaning": "朋友（Back in time Unit 4）",
+    "unit": 10,
+    "book": "5b"
+  },
+  {
+    "word": "work it out",
+    "phonetic": "/wɜːk ɪt aʊt/",
+    "meaning": "解决（Work it out Unit 5）",
+    "unit": 11,
+    "book": "5b"
+  },
+  {
+    "word": "easy",
+    "phonetic": "/ˈiːzi/",
+    "meaning": "容易的（Work it out Unit 5）",
+    "unit": 11,
+    "book": "5b"
+  },
+  {
+    "word": "try",
+    "phonetic": "/traɪ/",
+    "meaning": "尝试（Work it out Unit 5）",
+    "unit": 11,
+    "book": "5b"
+  },
+  {
+    "word": "think",
+    "phonetic": "/θɪŋk/",
+    "meaning": "思考（Work it out Unit 5）",
+    "unit": 11,
+    "book": "5b"
+  },
+  {
+    "word": "idea",
+    "phonetic": "/aɪˈdɪə/",
+    "meaning": "主意（Work it out Unit 5）",
+    "unit": 11,
+    "book": "5b"
+  },
+  {
+    "word": "ask",
+    "phonetic": "/ɑːsk/",
+    "meaning": "询问（Work it out Unit 5）",
+    "unit": 11,
+    "book": "5b"
+  },
+  {
+    "word": "answer",
+    "phonetic": "/ˈɑːnsər/",
+    "meaning": "答案（Work it out Unit 5）",
+    "unit": 11,
+    "book": "5b"
+  },
+  {
+    "word": "clever",
+    "phonetic": "/ˈklevər/",
+    "meaning": "聪明的（Work it out Unit 5）",
+    "unit": 11,
+    "book": "5b"
+  },
+  {
+    "word": "patient",
+    "phonetic": "/ˈpeɪʃənt/",
+    "meaning": "有耐心的（Work it out Unit 5）",
+    "unit": 11,
+    "book": "5b"
+  },
+  {
+    "word": "maths problem",
+    "phonetic": "/mæθs ˈprɒbləm/",
+    "meaning": "数学题（Work it out Unit 5）",
+    "unit": 11,
+    "book": "5b"
+  },
+  {
+    "word": "question",
+    "phonetic": "/ˈkwestʃən/",
+    "meaning": "问题（Work it out Unit 5）",
+    "unit": 11,
+    "book": "5b"
+  },
+  {
+    "word": "solve",
+    "phonetic": "/sɒlv/",
+    "meaning": "解决（Work it out Unit 5）",
+    "unit": 11,
+    "book": "5b"
+  },
+  {
+    "word": "way",
+    "phonetic": "/weɪ/",
+    "meaning": "方法（Work it out Unit 5）",
+    "unit": 11,
+    "book": "5b"
+  },
+  {
+    "word": "believe",
+    "phonetic": "/bɪˈliːv/",
+    "meaning": "相信（Work it out Unit 5）",
+    "unit": 11,
+    "book": "5b"
+  },
+  {
+    "word": "then",
+    "phonetic": "/ðen/",
+    "meaning": "那时（Then and now Unit 6）",
+    "unit": 12,
+    "book": "5b"
+  },
+  {
+    "word": "now",
+    "phonetic": "/naʊ/",
+    "meaning": "现在（Then and now Unit 6）",
+    "unit": 12,
+    "book": "5b"
+  },
+  {
+    "word": "live",
+    "phonetic": "/lɪv/",
+    "meaning": "居住（Then and now Unit 6）",
+    "unit": 12,
+    "book": "5b"
+  },
+  {
+    "word": "work",
+    "phonetic": "/wɜːk/",
+    "meaning": "工作（Then and now Unit 6）",
+    "unit": 12,
+    "book": "5b"
+  },
+  {
+    "word": "study",
+    "phonetic": "/ˈstʌdi/",
+    "meaning": "学习（Then and now Unit 6）",
+    "unit": 12,
+    "book": "5b"
+  },
+  {
+    "word": "travel",
+    "phonetic": "/ˈtrævl/",
+    "meaning": "旅行（Then and now Unit 6）",
+    "unit": 12,
+    "book": "5b"
+  },
+  {
+    "word": "phone",
+    "phonetic": "/fəʊn/",
+    "meaning": "电话（Then and now Unit 6）",
+    "unit": 12,
+    "book": "5b"
+  },
+  {
+    "word": "computer",
+    "phonetic": "/kəmˈpjuːtər/",
+    "meaning": "电脑（Then and now Unit 6）",
+    "unit": 12,
+    "book": "5b"
+  },
+  {
+    "word": "house",
+    "phonetic": "/haʊs/",
+    "meaning": "房子（Then and now Unit 6）",
+    "unit": 12,
+    "book": "5b"
+  },
+  {
+    "word": "car",
+    "phonetic": "/kɑː/",
+    "meaning": "汽车（Then and now Unit 6）",
+    "unit": 12,
+    "book": "5b"
+  },
+  {
+    "word": "village",
+    "phonetic": "/ˈvɪlɪdʒ/",
+    "meaning": "村庄（Then and now Unit 6）",
+    "unit": 12,
+    "book": "5b"
+  },
+  {
+    "word": "city",
+    "phonetic": "/ˈsɪti/",
+    "meaning": "城市（Then and now Unit 6）",
+    "unit": 12,
+    "book": "5b"
+  },
+  {
+    "word": "present",
+    "phonetic": "/ˈprezənt/",
+    "meaning": "现在（Then and now Unit 6）",
+    "unit": 12,
+    "book": "5b"
+  },
+  {
+    "word": "fast",
+    "phonetic": "/fɑːst/",
+    "meaning": "快的（Then and now Unit 6）",
+    "unit": 12,
+    "book": "5b"
+  },
+  {
+    "word": "money",
+    "phonetic": "/ˈmʌni/",
+    "meaning": "钱（What do you do with money Unit 1）",
+    "unit": 13,
+    "book": "6a"
+  },
+  {
+    "word": "save",
+    "phonetic": "/seɪv/",
+    "meaning": "储蓄，存（钱）；拯救（What do you do with money Unit 1）",
+    "unit": 13,
+    "book": "6a"
+  },
+  {
+    "word": "spend",
+    "phonetic": "/spend/",
+    "meaning": "用（钱），花费（What do you do with money Unit 1）",
+    "unit": 13,
+    "book": "6a"
+  },
+  {
+    "word": "pocket money",
+    "phonetic": "/ˈpɒkɪt ˈmʌni/",
+    "meaning": "零花钱（What do you do with money Unit 1）",
+    "unit": 13,
+    "book": "6a"
+  },
+  {
+    "word": "shopkeeper",
+    "phonetic": "/ˈʃɒpkiːpər/",
+    "meaning": "店主（What do you do with money Unit 1）",
+    "unit": 13,
+    "book": "6a"
+  },
+  {
+    "word": "golden",
+    "phonetic": "/ˈɡəʊldən/",
+    "meaning": "adj.（What do you do with money Unit 1）",
+    "unit": 13,
+    "book": "6a"
+  },
+  {
+    "word": "gold",
+    "phonetic": "/ɡəʊld/",
+    "meaning": "金，黄金（What do you do with money Unit 1）",
+    "unit": 13,
+    "book": "6a"
+  },
+  {
+    "word": "even",
+    "phonetic": "/ˈiːvən/",
+    "meaning": "甚至（What do you do with money Unit 1）",
+    "unit": 13,
+    "book": "6a"
+  },
+  {
+    "word": "smile",
+    "phonetic": "/smaɪl/",
+    "meaning": "微笑（What do you do with money Unit 1）",
+    "unit": 13,
+    "book": "6a"
+  },
+  {
+    "word": "choice",
+    "phonetic": "/tʃɔɪs/",
+    "meaning": "选择（What do you do with money Unit 1）",
+    "unit": 13,
+    "book": "6a"
+  },
+  {
+    "word": "crayon",
+    "phonetic": "/ˈkreɪən/",
+    "meaning": "彩色蜡笔（What do you do with money Unit 1）",
+    "unit": 13,
+    "book": "6a"
+  },
+  {
+    "word": "earthquake",
+    "phonetic": "/ˈɜːθkweɪk/",
+    "meaning": "地震（What do you do with money Unit 1）",
+    "unit": 13,
+    "book": "6a"
+  },
+  {
+    "word": "everything",
+    "phonetic": "/ˈevriθɪŋ/",
+    "meaning": "一切（What do you do with money Unit 1）",
+    "unit": 13,
+    "book": "6a"
+  },
+  {
+    "word": "cost",
+    "phonetic": "/kɒst/",
+    "meaning": "花费（What do you do with money Unit 1）",
+    "unit": 13,
+    "book": "6a"
+  },
+  {
+    "word": "wallet",
+    "phonetic": "/ˈwɒlɪt/",
+    "meaning": "钱包（What do you do with money Unit 1）",
+    "unit": 13,
+    "book": "6a"
+  },
+  {
+    "word": "bank",
+    "phonetic": "/bæŋk/",
+    "meaning": "银行（What do you do with money Unit 1）",
+    "unit": 13,
+    "book": "6a"
+  },
+  {
+    "word": "coin",
+    "phonetic": "/kɔɪn/",
+    "meaning": "硬币（What do you do with money Unit 1）",
+    "unit": 13,
+    "book": "6a"
+  },
+  {
+    "word": "note",
+    "phonetic": "/nəʊt/",
+    "meaning": "纸币（What do you do with money Unit 1）",
+    "unit": 13,
+    "book": "6a"
+  },
+  {
+    "word": "market",
+    "phonetic": "/ˈmɑːkɪt/",
+    "meaning": "市场（What do you do with money Unit 1）",
+    "unit": 13,
+    "book": "6a"
+  },
+  {
+    "word": "gift",
+    "phonetic": "/ɡɪft/",
+    "meaning": "礼物（What do you do with money Unit 1）",
+    "unit": 13,
+    "book": "6a"
+  },
+  {
+    "word": "from now on",
+    "phonetic": "/frɒm naʊ ɒn/",
+    "meaning": "从现在起（What do you do with money Unit 1）",
+    "unit": 13,
+    "book": "6a"
+  },
+  {
+    "word": "come true",
+    "phonetic": "/kʌm truː/",
+    "meaning": "实现（What do you do with money Unit 1）",
+    "unit": 13,
+    "book": "6a"
+  },
+  {
+    "word": "people in need",
+    "phonetic": "/ˈpiːpl ɪn niːd/",
+    "meaning": "需要帮助的人（What do you do with money Unit 1）",
+    "unit": 13,
+    "book": "6a"
+  },
+  {
+    "word": "clang",
+    "phonetic": "/kl/",
+    "meaning": "叮当声；发出叮当声（What do you do with money Unit 1）",
+    "unit": 13,
+    "book": "6a"
+  },
+  {
+    "word": "line",
+    "phonetic": "/laɪn/",
+    "meaning": "线，线条（What do you do with money Unit 1）",
+    "unit": 13,
+    "book": "6a"
+  },
+  {
+    "word": "sometime",
+    "phonetic": "/s mta m/",
+    "meaning": "在某个时候（What do you do with money Unit 1）",
+    "unit": 13,
+    "book": "6a"
+  },
+  {
+    "word": "explore",
+    "phonetic": "/k spl  (r)/",
+    "meaning": "探讨，探究（What do you do with money Unit 1）",
+    "unit": 13,
+    "book": "6a"
+  },
+  {
+    "word": "truth",
+    "phonetic": "/truːθ/",
+    "meaning": "事实，真相，实情（What do you do with money Unit 1）",
+    "unit": 13,
+    "book": "6a"
+  },
+  {
+    "word": "fear",
+    "phonetic": "/f  (r)/",
+    "meaning": "害怕，恐惧；担忧（What do you do with money Unit 1）",
+    "unit": 13,
+    "book": "6a"
+  },
+  {
+    "word": "map",
+    "phonetic": "/m p/",
+    "meaning": "地图（What do you do with money Unit 1）",
+    "unit": 13,
+    "book": "6a"
+  },
+  {
+    "word": "trust",
+    "phonetic": "/tr st/",
+    "meaning": "信任，相信（What do you do with money Unit 1）",
+    "unit": 13,
+    "book": "6a"
+  },
+  {
+    "word": "wisdom",
+    "phonetic": "/w zd m/",
+    "meaning": "智慧，才智（What do you do with money Unit 1）",
+    "unit": 13,
+    "book": "6a"
+  },
+  {
+    "word": "discussion",
+    "phonetic": "/d  sk  n/",
+    "meaning": "讨论，谈论（What do you do with money Unit 1）",
+    "unit": 13,
+    "book": "6a"
+  },
+  {
+    "word": "unanswered",
+    "phonetic": "/n ɑ ns d/",
+    "meaning": "未解答的，尚未决定的（What do you do with money Unit 1）",
+    "unit": 13,
+    "book": "6a"
+  },
+  {
+    "word": "fairy tale",
+    "phonetic": "/fe ri te l/",
+    "meaning": "童话；神话（What do you do with money Unit 1）",
+    "unit": 13,
+    "book": "6a"
+  },
+  {
+    "word": "reason",
+    "phonetic": "/ˈriːzən/",
+    "meaning": "原因，理由（What do you do with money Unit 1）",
+    "unit": 13,
+    "book": "6a"
+  },
+  {
+    "word": "rewrite",
+    "phonetic": "/ri  ra t/",
+    "meaning": "重写，改写（What do you do with money Unit 1）",
+    "unit": 13,
+    "book": "6a"
+  },
+  {
+    "word": "rule",
+    "phonetic": "/ruːl/",
+    "meaning": "规定，规则（What do you do with money Unit 1）",
+    "unit": 13,
+    "book": "6a"
+  },
+  {
+    "word": "opinion",
+    "phonetic": "/əˈpɪnjən/",
+    "meaning": "观点，看法（What's your opinion Unit 2）",
+    "unit": 14,
+    "book": "6a"
+  },
+  {
+    "word": "debate",
+    "phonetic": "/dɪˈbeɪt/",
+    "meaning": "辩论（What's your opinion Unit 2）",
+    "unit": 14,
+    "book": "6a"
+  },
+  {
+    "word": "dinosaur",
+    "phonetic": "/ˈdaɪnəsɔː/",
+    "meaning": "恐龙（What's your opinion Unit 2）",
+    "unit": 14,
+    "book": "6a"
+  },
+  {
+    "word": "peel",
+    "phonetic": "/piːl/",
+    "meaning": "削皮（What's your opinion Unit 2）",
+    "unit": 14,
+    "book": "6a"
+  },
+  {
+    "word": "fact",
+    "phonetic": "/fækt/",
+    "meaning": "事实（What's your opinion Unit 2）",
+    "unit": 14,
+    "book": "6a"
+  },
+  {
+    "word": "health",
+    "phonetic": "/helθ/",
+    "meaning": "健康（What's your opinion Unit 2）",
+    "unit": 14,
+    "book": "6a"
+  },
+  {
+    "word": "grey",
+    "phonetic": "/ɡreɪ/",
+    "meaning": "adj.（What's your opinion Unit 2）",
+    "unit": 14,
+    "book": "6a"
+  },
+  {
+    "word": "happily",
+    "phonetic": "/ˈhæpɪli/",
+    "meaning": "adv.（What's your opinion Unit 2）",
+    "unit": 14,
+    "book": "6a"
+  },
+  {
+    "word": "agree",
+    "phonetic": "/əˈɡriː/",
+    "meaning": "同意（What's your opinion Unit 2）",
+    "unit": 14,
+    "book": "6a"
+  },
+  {
+    "word": "disagree",
+    "phonetic": "/ˌdɪsəˈɡriː/",
+    "meaning": "不同意（What's your opinion Unit 2）",
+    "unit": 14,
+    "book": "6a"
+  },
+  {
+    "word": "important",
+    "phonetic": "/ɪmˈpɔːtənt/",
+    "meaning": "重要的（What's your opinion Unit 2）",
+    "unit": 14,
+    "book": "6a"
+  },
+  {
+    "word": "good",
+    "phonetic": "/ɡʊd/",
+    "meaning": "好的（What's your opinion Unit 2）",
+    "unit": 14,
+    "book": "6a"
+  },
+  {
+    "word": "without",
+    "phonetic": "/wɪˈðaʊt/",
+    "meaning": "缺乏，没有（What's your opinion Unit 2）",
+    "unit": 14,
+    "book": "6a"
+  },
+  {
+    "word": "plateau",
+    "phonetic": "/ˈplætəʊ/",
+    "meaning": "高原（Wonderful nature Unit 3）",
+    "unit": 15,
+    "book": "6a"
+  },
+  {
+    "word": "grassland",
+    "phonetic": "/ˈɡrɑːslænd/",
+    "meaning": "草原（Wonderful nature Unit 3）",
+    "unit": 15,
+    "book": "6a"
+  },
+  {
+    "word": "desert",
+    "phonetic": "/ˈdezət/",
+    "meaning": "沙漠（Wonderful nature Unit 3）",
+    "unit": 15,
+    "book": "6a"
+  },
+  {
+    "word": "traveller",
+    "phonetic": "/ˈtrævələr/",
+    "meaning": "旅行者（Wonderful nature Unit 3）",
+    "unit": 15,
+    "book": "6a"
+  },
+  {
+    "word": "beach",
+    "phonetic": "/biːtʃ/",
+    "meaning": "海滩（Wonderful nature Unit 3）",
+    "unit": 15,
+    "book": "6a"
+  },
+  {
+    "word": "interested",
+    "phonetic": "/ˈɪntrəstɪd/",
+    "meaning": "感兴趣的（Wonderful nature Unit 3）",
+    "unit": 15,
+    "book": "6a"
+  },
+  {
+    "word": "river",
+    "phonetic": "/ˈrɪvər/",
+    "meaning": "河流（Wonderful nature Unit 3）",
+    "unit": 15,
+    "book": "6a"
+  },
+  {
+    "word": "mountain",
+    "phonetic": "/ˈmaʊntən/",
+    "meaning": "高山（Wonderful nature Unit 3）",
+    "unit": 15,
+    "book": "6a"
+  },
+  {
+    "word": "sea",
+    "phonetic": "/siː/",
+    "meaning": "大海（Wonderful nature Unit 3）",
+    "unit": 15,
+    "book": "6a"
+  },
+  {
+    "word": "small",
+    "phonetic": "/smɔːl/",
+    "meaning": "小的（Wonderful nature Unit 3）",
+    "unit": 15,
+    "book": "6a"
+  },
+  {
+    "word": "big",
+    "phonetic": "/bɪɡ/",
+    "meaning": "大的（Wonderful nature Unit 3）",
+    "unit": 15,
+    "book": "6a"
+  },
+  {
+    "word": "beautiful",
+    "phonetic": "/ˈbjuːtɪfəl/",
+    "meaning": "美丽的（Wonderful nature Unit 3）",
+    "unit": 15,
+    "book": "6a"
+  },
+  {
+    "word": "amazing",
+    "phonetic": "/əˈmeɪzɪŋ/",
+    "meaning": "令人惊奇的（Wonderful nature Unit 3）",
+    "unit": 15,
+    "book": "6a"
+  },
+  {
+    "word": "wonder",
+    "phonetic": "/ˈwʌndər/",
+    "meaning": "奇观（Wonderful nature Unit 3）",
+    "unit": 15,
+    "book": "6a"
+  },
+  {
+    "word": "nature",
+    "phonetic": "/ˈneɪtʃər/",
+    "meaning": "自然（Wonderful nature Unit 3）",
+    "unit": 15,
+    "book": "6a"
+  },
+  {
+    "word": "world",
+    "phonetic": "/wɜːld/",
+    "meaning": "世界（Wonderful nature Unit 3）",
+    "unit": 15,
+    "book": "6a"
+  },
+  {
+    "word": "text",
+    "phonetic": "/tekst/",
+    "meaning": "原文，文本（Wonderful nature Unit 3）",
+    "unit": 15,
+    "book": "6a"
+  },
+  {
+    "word": "wonderful",
+    "phonetic": "/w nd fl/",
+    "meaning": "令人惊叹的，奇妙的（Wonderful nature Unit 3）",
+    "unit": 15,
+    "book": "6a"
+  },
+  {
+    "word": "lake",
+    "phonetic": "/leɪk/",
+    "meaning": "湖，湖泊（Wonderful nature Unit 3）",
+    "unit": 15,
+    "book": "6a"
+  },
+  {
+    "word": "natural",
+    "phonetic": "/n t r l/",
+    "meaning": "自然的，天然的（Wonderful nature Unit 3）",
+    "unit": 15,
+    "book": "6a"
+  },
+  {
+    "word": "square kilometre",
+    "phonetic": "/skwe  k  l m t (r)/",
+    "meaning": "平方千米（Wonderful nature Unit 3）",
+    "unit": 15,
+    "book": "6a"
+  },
+  {
+    "word": "deep",
+    "phonetic": "/di p/",
+    "meaning": "深的（Wonderful nature Unit 3）",
+    "unit": 15,
+    "book": "6a"
+  },
+  {
+    "word": "roof",
+    "phonetic": "/ru f/",
+    "meaning": "顶，顶部（Wonderful nature Unit 3）",
+    "unit": 15,
+    "book": "6a"
+  },
+  {
+    "word": "waterfall",
+    "phonetic": "/w  t f  l/",
+    "meaning": "瀑布（Wonderful nature Unit 3）",
+    "unit": 15,
+    "book": "6a"
+  },
+  {
+    "word": "wide",
+    "phonetic": "/wa d/",
+    "meaning": "……宽的；宽阔的（Wonderful nature Unit 3）",
+    "unit": 15,
+    "book": "6a"
+  },
+  {
+    "word": "pretty",
+    "phonetic": "/pr ti/",
+    "meaning": "好看的，漂亮的（Wonderful nature Unit 3）",
+    "unit": 15,
+    "book": "6a"
+  },
+  {
+    "word": "scene",
+    "phonetic": "/si n/",
+    "meaning": "景色，景象（Wonderful nature Unit 3）",
+    "unit": 15,
+    "book": "6a"
+  },
+  {
+    "word": "delight",
+    "phonetic": "/d  la t/",
+    "meaning": "高兴，快乐（Wonderful nature Unit 3）",
+    "unit": 15,
+    "book": "6a"
+  },
+  {
+    "word": "speech",
+    "phonetic": "/spi t/",
+    "meaning": "演说，演讲（Wonderful nature Unit 3）",
+    "unit": 15,
+    "book": "6a"
+  },
+  {
+    "word": "planet",
+    "phonetic": "/ˈplænɪt/",
+    "meaning": "行星（We can do it! Unit 4）",
+    "unit": 16,
+    "book": "6a"
+  },
+  {
+    "word": "moon",
+    "phonetic": "/muːn/",
+    "meaning": "月亮（We can do it! Unit 4）",
+    "unit": 16,
+    "book": "6a"
+  },
+  {
+    "word": "sun",
+    "phonetic": "/sʌn/",
+    "meaning": "太阳（We can do it! Unit 4）",
+    "unit": 16,
+    "book": "6a"
+  },
+  {
+    "word": "earth",
+    "phonetic": "/ɜːθ/",
+    "meaning": "地球（We can do it! Unit 4）",
+    "unit": 16,
+    "book": "6a"
+  },
+  {
+    "word": "mars",
+    "phonetic": "/mɑːz/",
+    "meaning": "火星（We can do it! Unit 4）",
+    "unit": 16,
+    "book": "6a"
+  },
+  {
+    "word": "jupiter",
+    "phonetic": "/ˈdʒuːpɪtə/",
+    "meaning": "木星（We can do it! Unit 4）",
+    "unit": 16,
+    "book": "6a"
+  },
+  {
+    "word": "saturn",
+    "phonetic": "/ˈsætən/",
+    "meaning": "土星（We can do it! Unit 4）",
+    "unit": 16,
+    "book": "6a"
+  },
+  {
+    "word": "rocket",
+    "phonetic": "/ˈrɒkɪt/",
+    "meaning": "火箭（We can do it! Unit 4）",
+    "unit": 16,
+    "book": "6a"
+  },
+  {
+    "word": "astronaut",
+    "phonetic": "/ˈæstrənɔːt/",
+    "meaning": "宇航员（We can do it! Unit 4）",
+    "unit": 16,
+    "book": "6a"
+  },
+  {
+    "word": "machine",
+    "phonetic": "/məˈʃiːn/",
+    "meaning": "杌器（We can do it! Unit 4）",
+    "unit": 16,
+    "book": "6a"
+  },
+  {
+    "word": "far",
+    "phonetic": "/fɑː/",
+    "meaning": "adv.（We can do it! Unit 4）",
+    "unit": 16,
+    "book": "6a"
+  },
+  {
+    "word": "near",
+    "phonetic": "/nɪə/",
+    "meaning": "近的（We can do it! Unit 4）",
+    "unit": 16,
+    "book": "6a"
+  },
+  {
+    "word": "wheelchair",
+    "phonetic": "/wi lt e (r)/",
+    "meaning": "轮椅（We can do it! Unit 4）",
+    "unit": 16,
+    "book": "6a"
+  },
+  {
+    "word": "collection",
+    "phonetic": "/k  lek n/",
+    "meaning": "收集，采集（We can do it! Unit 4）",
+    "unit": 16,
+    "book": "6a"
+  },
+  {
+    "word": "toothbrush",
+    "phonetic": "/tu θbr/",
+    "meaning": "牙刷（We can do it! Unit 4）",
+    "unit": 16,
+    "book": "6a"
+  },
+  {
+    "word": "exhibition",
+    "phonetic": "/eks  b  n/",
+    "meaning": "展览（会）（We can do it! Unit 4）",
+    "unit": 16,
+    "book": "6a"
+  },
+  {
+    "word": "invention",
+    "phonetic": "/n ven n/",
+    "meaning": "发明（物）（We can do it! Unit 4）",
+    "unit": 16,
+    "book": "6a"
+  },
+  {
+    "word": "middle",
+    "phonetic": "/m dl/",
+    "meaning": "中间，中部（We can do it! Unit 4）",
+    "unit": 16,
+    "book": "6a"
+  },
+  {
+    "word": "bottom",
+    "phonetic": "/b t m/",
+    "meaning": "底部；下端（We can do it! Unit 4）",
+    "unit": 16,
+    "book": "6a"
+  },
+  {
+    "word": "finally",
+    "phonetic": "/fa n li/",
+    "meaning": "最后（We can do it! Unit 4）",
+    "unit": 16,
+    "book": "6a"
+  },
+  {
+    "word": "fine",
+    "phonetic": "/fa n/",
+    "meaning": "健康的；好的（We can do it! Unit 4）",
+    "unit": 16,
+    "book": "6a"
+  },
+  {
+    "word": "window",
+    "phonetic": "/w nd/",
+    "meaning": "窗户（We can do it! Unit 4）",
+    "unit": 16,
+    "book": "6a"
+  },
+  {
+    "word": "side",
+    "phonetic": "/sa d/",
+    "meaning": "面，侧（We can do it! Unit 4）",
+    "unit": 16,
+    "book": "6a"
+  },
+  {
+    "word": "hang",
+    "phonetic": "/hæŋ/",
+    "meaning": "悬挂（We can do it! Unit 4）",
+    "unit": 16,
+    "book": "6a"
+  },
+  {
+    "word": "feeder",
+    "phonetic": "/fi d (r)/",
+    "meaning": "饲料容器；饲养者（We can do it! Unit 4）",
+    "unit": 16,
+    "book": "6a"
+  },
+  {
+    "word": "string",
+    "phonetic": "/str/",
+    "meaning": "线，细绳，带子（We can do it! Unit 4）",
+    "unit": 16,
+    "book": "6a"
+  },
+  {
+    "word": "lotus",
+    "phonetic": "/l  t s/",
+    "meaning": "莲花，荷花（We can do it! Unit 4）",
+    "unit": 16,
+    "book": "6a"
+  },
+  {
+    "word": "piece",
+    "phonetic": "/pi s/",
+    "meaning": "片；块（We can do it! Unit 4）",
+    "unit": 16,
+    "book": "6a"
+  },
+  {
+    "word": "oilcloth",
+    "phonetic": "/lkl θ/",
+    "meaning": "油布（We can do it! Unit 4）",
+    "unit": 16,
+    "book": "6a"
+  },
+  {
+    "word": "cover",
+    "phonetic": "/k v (r)/",
+    "meaning": "盖，覆盖（We can do it! Unit 4）",
+    "unit": 16,
+    "book": "6a"
+  },
+  {
+    "word": "connect",
+    "phonetic": "/k  nekt/",
+    "meaning": "连接（We can do it! Unit 4）",
+    "unit": 16,
+    "book": "6a"
+  },
+  {
+    "word": "glue",
+    "phonetic": "/ɡlu/",
+    "meaning": "胶水；黏合，粘贴（We can do it! Unit 4）",
+    "unit": 16,
+    "book": "6a"
+  },
+  {
+    "word": "fold",
+    "phonetic": "/f  ld/",
+    "meaning": "折叠（We can do it! Unit 4）",
+    "unit": 16,
+    "book": "6a"
+  },
+  {
+    "word": "trash",
+    "phonetic": "/tr/",
+    "meaning": "废物，垃圾（We can do it! Unit 4）",
+    "unit": 16,
+    "book": "6a"
+  },
+  {
+    "word": "pleasure",
+    "phonetic": "/ple  (r)/",
+    "meaning": "愉快，快乐（We can do it! Unit 4）",
+    "unit": 16,
+    "book": "6a"
+  },
+  {
+    "word": "flow",
+    "phonetic": "/fləʊ/",
+    "meaning": "（谈话或思路）流畅；流动（We can do it! Unit 4）",
+    "unit": 16,
+    "book": "6a"
+  },
+  {
+    "word": "freely",
+    "phonetic": "/fri li/",
+    "meaning": "自由地（We can do it! Unit 4）",
+    "unit": 16,
+    "book": "6a"
+  },
+  {
+    "word": "wing",
+    "phonetic": "/wɪŋ/",
+    "meaning": "翅膀，翼（We can do it! Unit 4）",
+    "unit": 16,
+    "book": "6a"
+  },
+  {
+    "word": "instrument",
+    "phonetic": "/nstr m nt/",
+    "meaning": "乐器（We can do it! Unit 4）",
+    "unit": 16,
+    "book": "6a"
+  },
+  {
+    "word": "prepare",
+    "phonetic": "/pr  pe (r)/",
+    "meaning": "筹备，做准备（We can do it! Unit 4）",
+    "unit": 16,
+    "book": "6a"
+  },
+  {
+    "word": "concert",
+    "phonetic": "/k ns t/",
+    "meaning": "音乐会；演唱会（We can do it! Unit 4）",
+    "unit": 16,
+    "book": "6a"
+  },
+  {
+    "word": "drum",
+    "phonetic": "/dr m/",
+    "meaning": "鼓（We can do it! Unit 4）",
+    "unit": 16,
+    "book": "6a"
+  },
+  {
+    "word": "tooth",
+    "phonetic": "/tuːθ/",
+    "meaning": "牙齿（Health matters Unit 5）",
+    "unit": 17,
+    "book": "6a"
+  },
+  {
+    "word": "teeth",
+    "phonetic": "/tiːθ/",
+    "meaning": "牙齿（复数）（Health matters Unit 5）",
+    "unit": 17,
+    "book": "6a"
+  },
+  {
+    "word": "body",
+    "phonetic": "/ˈbɒdi/",
+    "meaning": "身体（Health matters Unit 5）",
+    "unit": 17,
+    "book": "6a"
+  },
+  {
+    "word": "sick",
+    "phonetic": "/sɪk/",
+    "meaning": "生病的（Health matters Unit 5）",
+    "unit": 17,
+    "book": "6a"
+  },
+  {
+    "word": "well",
+    "phonetic": "/wel/",
+    "meaning": "健康的（Health matters Unit 5）",
+    "unit": 17,
+    "book": "6a"
+  },
+  {
+    "word": "better",
+    "phonetic": "/ˈbetər/",
+    "meaning": "更好的（Health matters Unit 5）",
+    "unit": 17,
+    "book": "6a"
+  },
+  {
+    "word": "rest",
+    "phonetic": "/rest/",
+    "meaning": "休息（Health matters Unit 5）",
+    "unit": 17,
+    "book": "6a"
+  },
+  {
+    "word": "sleep",
+    "phonetic": "/sliːp/",
+    "meaning": "睡觉（Health matters Unit 5）",
+    "unit": 17,
+    "book": "6a"
+  },
+  {
+    "word": "vegetable",
+    "phonetic": "/ˈvedʒtəbl/",
+    "meaning": "蔬菜（Health matters Unit 5）",
+    "unit": 17,
+    "book": "6a"
+  },
+  {
+    "word": "junk food",
+    "phonetic": "/dʒʌŋk fuːd/",
+    "meaning": "垃圾食品（Health matters Unit 5）",
+    "unit": 17,
+    "book": "6a"
+  },
+  {
+    "word": "habit",
+    "phonetic": "/ˈhæbɪt/",
+    "meaning": "习惯（Health matters Unit 5）",
+    "unit": 17,
+    "book": "6a"
+  },
+  {
+    "word": "matter",
+    "phonetic": "/m t (r)/",
+    "meaning": "重要，要紧，有关系（Health matters Unit 5）",
+    "unit": 17,
+    "book": "6a"
+  },
+  {
+    "word": "fever",
+    "phonetic": "/fi v (r)/",
+    "meaning": "发烧，发热（Health matters Unit 5）",
+    "unit": 17,
+    "book": "6a"
+  },
+  {
+    "word": "runny",
+    "phonetic": "/r ni/",
+    "meaning": "流鼻涕的（Health matters Unit 5）",
+    "unit": 17,
+    "book": "6a"
+  },
+  {
+    "word": "sore",
+    "phonetic": "/s  (r)/",
+    "meaning": "疼痛的；酸痛的（Health matters Unit 5）",
+    "unit": 17,
+    "book": "6a"
+  },
+  {
+    "word": "throat",
+    "phonetic": "/θr  t/",
+    "meaning": "喉咙，咽喉（Health matters Unit 5）",
+    "unit": 17,
+    "book": "6a"
+  },
+  {
+    "word": "headache",
+    "phonetic": "/hede k/",
+    "meaning": "头痛（Health matters Unit 5）",
+    "unit": 17,
+    "book": "6a"
+  },
+  {
+    "word": "toothache",
+    "phonetic": "/tu θe k/",
+    "meaning": "牙痛（Health matters Unit 5）",
+    "unit": 17,
+    "book": "6a"
+  },
+  {
+    "word": "flu",
+    "phonetic": "/flu/",
+    "meaning": "流行性感冒，流感（Health matters Unit 5）",
+    "unit": 17,
+    "book": "6a"
+  },
+  {
+    "word": "blackboard",
+    "phonetic": "/bl kb  d/",
+    "meaning": "黑板（Health matters Unit 5）",
+    "unit": 17,
+    "book": "6a"
+  },
+  {
+    "word": "dark",
+    "phonetic": "/dɑ k/",
+    "meaning": "昏暗的；黑暗（Health matters Unit 5）",
+    "unit": 17,
+    "book": "6a"
+  },
+  {
+    "word": "quick",
+    "phonetic": "/kw k/",
+    "meaning": "快的，短时间的（Health matters Unit 5）",
+    "unit": 17,
+    "book": "6a"
+  },
+  {
+    "word": "gladly",
+    "phonetic": "/ɡ dli/",
+    "meaning": "高兴地；快乐地（Health matters Unit 5）",
+    "unit": 17,
+    "book": "6a"
+  },
+  {
+    "word": "forget",
+    "phonetic": "/f  ɡet/",
+    "meaning": "忘记，遗忘（Health matters Unit 5）",
+    "unit": 17,
+    "book": "6a"
+  },
+  {
+    "word": "bath",
+    "phonetic": "/bɑ θ/",
+    "meaning": "洗澡，沐浴（Health matters Unit 5）",
+    "unit": 17,
+    "book": "6a"
+  },
+  {
+    "word": "traditional",
+    "phonetic": "/trəˈdɪʃənl/",
+    "meaning": "传统的（See the world Unit 6）",
+    "unit": 18,
+    "book": "6a"
+  },
+  {
+    "word": "food",
+    "phonetic": "/fuːd/",
+    "meaning": "食物（See the world Unit 6）",
+    "unit": 18,
+    "book": "6a"
+  },
+  {
+    "word": "dumpling",
+    "phonetic": "/ˈdʌmplɪŋ/",
+    "meaning": "饺子（See the world Unit 6）",
+    "unit": 18,
+    "book": "6a"
+  },
+  {
+    "word": "lantern",
+    "phonetic": "/ˈlæntən/",
+    "meaning": "灯笼（See the world Unit 6）",
+    "unit": 18,
+    "book": "6a"
+  },
+  {
+    "word": "dragon",
+    "phonetic": "/ˈdræɡən/",
+    "meaning": "龙（See the world Unit 6）",
+    "unit": 18,
+    "book": "6a"
+  },
+  {
+    "word": "boat",
+    "phonetic": "/bəʊt/",
+    "meaning": "船（See the world Unit 6）",
+    "unit": 18,
+    "book": "6a"
+  },
+  {
+    "word": "race",
+    "phonetic": "/reɪs/",
+    "meaning": "比赛（See the world Unit 6）",
+    "unit": 18,
+    "book": "6a"
+  },
+  {
+    "word": "zongzi",
+    "phonetic": "/ˈzɒŋzi/",
+    "meaning": "粽子（See the world Unit 6）",
+    "unit": 18,
+    "book": "6a"
+  },
+  {
+    "word": "red envelope",
+    "phonetic": "/red ˈenvələʊp/",
+    "meaning": "红包（See the world Unit 6）",
+    "unit": 18,
+    "book": "6a"
+  },
+  {
+    "word": "firework",
+    "phonetic": "/ˈfaɪəwɜːk/",
+    "meaning": "烟花（See the world Unit 6）",
+    "unit": 18,
+    "book": "6a"
+  },
+  {
+    "word": "view",
+    "phonetic": "/vju/",
+    "meaning": "视野；视线（See the world Unit 6）",
+    "unit": 18,
+    "book": "6a"
+  },
+  {
+    "word": "bridge",
+    "phonetic": "/br d/",
+    "meaning": "桥，桥梁（See the world Unit 6）",
+    "unit": 18,
+    "book": "6a"
+  },
+  {
+    "word": "neck",
+    "phonetic": "/nek/",
+    "meaning": "颈，脖子（See the world Unit 6）",
+    "unit": 18,
+    "book": "6a"
+  },
+  {
+    "word": "luck",
+    "phonetic": "/l k/",
+    "meaning": "好运，幸运（See the world Unit 6）",
+    "unit": 18,
+    "book": "6a"
+  },
+  {
+    "word": "understand",
+    "phonetic": "/nd  st nd/",
+    "meaning": "懂得，理解，明白（See the world Unit 6）",
+    "unit": 18,
+    "book": "6a"
+  },
+  {
+    "word": "splash",
+    "phonetic": "/spl/",
+    "meaning": "溅湿，往……上泼（See the world Unit 6）",
+    "unit": 18,
+    "book": "6a"
+  },
+  {
+    "word": "wet",
+    "phonetic": "/wet/",
+    "meaning": "湿的（See the world Unit 6）",
+    "unit": 18,
+    "book": "6a"
+  },
+  {
+    "word": "brand-new",
+    "phonetic": "/br nd  nju/",
+    "meaning": "全新的（See the world Unit 6）",
+    "unit": 18,
+    "book": "6a"
+  },
+  {
+    "word": "experience",
+    "phonetic": "/k sp  ri ns/",
+    "meaning": "经历；体验（See the world Unit 6）",
+    "unit": 18,
+    "book": "6a"
+  },
+  {
+    "word": "local",
+    "phonetic": "/l  kl/",
+    "meaning": "当地的，本地的（See the world Unit 6）",
+    "unit": 18,
+    "book": "6a"
+  },
+  {
+    "word": "noise",
+    "phonetic": "/n  z/",
+    "meaning": "噪声；喧闹声（See the world Unit 6）",
+    "unit": 18,
+    "book": "6a"
+  },
+  {
+    "word": "advice",
+    "phonetic": "/d va s/",
+    "meaning": "建议；忠告（See the world Unit 6）",
+    "unit": 18,
+    "book": "6a"
+  },
+  {
+    "word": "deal with",
+    "phonetic": "/diːl wɪð/",
+    "meaning": "对付，应付，处理（See the world Unit 6）",
+    "unit": 18,
+    "book": "6a"
+  },
+  {
+    "word": "cultural",
+    "phonetic": "/k lt  r l/",
+    "meaning": "文化的；文化上的（See the world Unit 6）",
+    "unit": 18,
+    "book": "6a"
+  },
+  {
+    "word": "taller",
+    "phonetic": "/tɔːlər/",
+    "meaning": "更高的（Comparing Unit 1）",
+    "unit": 19,
+    "book": "6b"
+  },
+  {
+    "word": "shorter",
+    "phonetic": "/ˈʃɔːtə/",
+    "meaning": "更矮的（Comparing Unit 1）",
+    "unit": 19,
+    "book": "6b"
+  },
+  {
+    "word": "longer",
+    "phonetic": "/ˈlɒŋɡər/",
+    "meaning": "更长的（Comparing Unit 1）",
+    "unit": 19,
+    "book": "6b"
+  },
+  {
+    "word": "grandchildren",
+    "phonetic": "/ˈɡræntʃɪldrən/",
+    "meaning": "更强壮的（Comparing Unit 1）",
+    "unit": 19,
+    "book": "6b"
+  },
+  {
+    "word": "older",
+    "phonetic": "/ˈəʊldər/",
+    "meaning": "更老的（Comparing Unit 1）",
+    "unit": 19,
+    "book": "6b"
+  },
+  {
+    "word": "younger",
+    "phonetic": "/ˈjʌŋɡər/",
+    "meaning": "更年轻的（Comparing Unit 1）",
+    "unit": 19,
+    "book": "6b"
+  },
+  {
+    "word": "bigger",
+    "phonetic": "/bɪɡər/",
+    "meaning": "更大的（Comparing Unit 1）",
+    "unit": 19,
+    "book": "6b"
+  },
+  {
+    "word": "thinner",
+    "phonetic": "/ˈθɪnər/",
+    "meaning": "更瘦的（Comparing Unit 1）",
+    "unit": 19,
+    "book": "6b"
+  },
+  {
+    "word": "heavier",
+    "phonetic": "/ˈhevɪə/",
+    "meaning": "更重的（Comparing Unit 1）",
+    "unit": 19,
+    "book": "6b"
+  },
+  {
+    "word": "long",
+    "phonetic": "/lɒŋ/",
+    "meaning": "长的（Comparing Unit 1）",
+    "unit": 19,
+    "book": "6b"
+  },
+  {
+    "word": "strong",
+    "phonetic": "/strɒŋ/",
+    "meaning": "强壮的（Comparing Unit 1）",
+    "unit": 19,
+    "book": "6b"
+  },
+  {
+    "word": "thin",
+    "phonetic": "/θɪn/",
+    "meaning": "瘦的（Comparing Unit 1）",
+    "unit": 19,
+    "book": "6b"
+  },
+  {
+    "word": "compare",
+    "phonetic": "/kəmˈpeə/",
+    "meaning": "比较（Comparing Unit 1）",
+    "unit": 19,
+    "book": "6b"
+  },
+  {
+    "word": "cleaned",
+    "phonetic": "/kliːnd/",
+    "meaning": "打扫（过去式）（Looking back Unit 2）",
+    "unit": 20,
+    "book": "6b"
+  },
+  {
+    "word": "washed",
+    "phonetic": "/wɒʃt/",
+    "meaning": "洗（过去式）（Looking back Unit 2）",
+    "unit": 20,
+    "book": "6b"
+  },
+  {
+    "word": "watched",
+    "phonetic": "/wɒtʃt/",
+    "meaning": "看（过去式）（Looking back Unit 2）",
+    "unit": 20,
+    "book": "6b"
+  },
+  {
+    "word": "stayed",
+    "phonetic": "/steɪd/",
+    "meaning": "停留（过去式）（Looking back Unit 2）",
+    "unit": 20,
+    "book": "6b"
+  },
+  {
+    "word": "saw",
+    "phonetic": "/sɔː/",
+    "meaning": "看见（过去式）（Looking back Unit 2）",
+    "unit": 20,
+    "book": "6b"
+  },
+  {
+    "word": "see",
+    "phonetic": "/siː/",
+    "meaning": "看见（过去式）（Looking back Unit 2）",
+    "unit": 20,
+    "book": "6b"
+  },
+  {
+    "word": "slept",
+    "phonetic": "/slept/",
+    "meaning": "睡觉（过去式）（Looking back Unit 2）",
+    "unit": 20,
+    "book": "6b"
+  },
+  {
+    "word": "did",
+    "phonetic": "/dɪd/",
+    "meaning": "做（过去式）（Looking back Unit 2）",
+    "unit": 20,
+    "book": "6b"
+  },
+  {
+    "word": "went",
+    "phonetic": "/went/",
+    "meaning": "去（过去式）（Looking back Unit 2）",
+    "unit": 20,
+    "book": "6b"
+  },
+  {
+    "word": "had",
+    "phonetic": "/hæd/",
+    "meaning": "有（过去式）（Looking back Unit 2）",
+    "unit": 20,
+    "book": "6b"
+  },
+  {
+    "word": "have",
+    "phonetic": "/hæv/",
+    "meaning": "有（过去式）（Looking back Unit 2）",
+    "unit": 20,
+    "book": "6b"
+  },
+  {
+    "word": "was",
+    "phonetic": "/wɒz/",
+    "meaning": "是（过去式）（Looking back Unit 2）",
+    "unit": 20,
+    "book": "6b"
+  },
+  {
+    "word": "were",
+    "phonetic": "/wɜː(r)/",
+    "meaning": "是（过去式）（Looking back Unit 2）",
+    "unit": 20,
+    "book": "6b"
+  },
+  {
+    "word": "bought",
+    "phonetic": "/bɔːt/",
+    "meaning": "买（过去式）（Looking back Unit 2）",
+    "unit": 20,
+    "book": "6b"
+  },
+  {
+    "word": "took",
+    "phonetic": "/tʊk/",
+    "meaning": "拿（过去式）（Looking back Unit 2）",
+    "unit": 20,
+    "book": "6b"
+  },
+  {
+    "word": "weekend",
+    "phonetic": "/ˌwiːkˈend/",
+    "meaning": "周末（Looking back Unit 2）",
+    "unit": 20,
+    "book": "6b"
+  },
+  {
+    "word": "after",
+    "phonetic": "/ˈɑːftər/",
+    "meaning": "在.…•之后（Looking back Unit 2）",
+    "unit": 20,
+    "book": "6b"
+  },
+  {
+    "word": "gym",
+    "phonetic": "/dʒɪm/",
+    "meaning": "体育馆（Sports Unit 3）",
+    "unit": 21,
+    "book": "6b"
+  },
+  {
+    "word": "grass",
+    "phonetic": "/ɡrɑːs/",
+    "meaning": "草坪（Sports Unit 3）",
+    "unit": 21,
+    "book": "6b"
+  },
+  {
+    "word": "cycling",
+    "phonetic": "/ˈsaɪklɪŋ/",
+    "meaning": "骑行（Sports Unit 3）",
+    "unit": 21,
+    "book": "6b"
+  },
+  {
+    "word": "ice-skate",
+    "phonetic": "/ˈaɪs skeɪt/",
+    "meaning": "滑冰（Sports Unit 3）",
+    "unit": 21,
+    "book": "6b"
+  },
+  {
+    "word": "badminton",
+    "phonetic": "/ˈbædmɪntən/",
+    "meaning": "羽毛球（Sports Unit 3）",
+    "unit": 21,
+    "book": "6b"
+  },
+  {
+    "word": "basketball",
+    "phonetic": "/ˈbɑːskɪtbɔːl/",
+    "meaning": "篮球（Sports Unit 3）",
+    "unit": 21,
+    "book": "6b"
+  },
+  {
+    "word": "football",
+    "phonetic": "/ˈfʊtbɔːl/",
+    "meaning": "足球（Sports Unit 3）",
+    "unit": 21,
+    "book": "6b"
+  },
+  {
+    "word": "swim",
+    "phonetic": "/swɪm/",
+    "meaning": "游泳（Sports Unit 3）",
+    "unit": 21,
+    "book": "6b"
+  },
+  {
+    "word": "run",
+    "phonetic": "/rʌn/",
+    "meaning": "跑（Sports Unit 3）",
+    "unit": 21,
+    "book": "6b"
+  },
+  {
+    "word": "jump",
+    "phonetic": "/dʒʌmp/",
+    "meaning": "V.（Sports Unit 3）",
+    "unit": 21,
+    "book": "6b"
+  },
+  {
+    "word": "sport",
+    "phonetic": "/spɔːt/",
+    "meaning": "运动（Sports Unit 3）",
+    "unit": 21,
+    "book": "6b"
+  },
+  {
+    "word": "game",
+    "phonetic": "/ɡeɪm/",
+    "meaning": "比赛（Sports Unit 3）",
+    "unit": 21,
+    "book": "6b"
+  },
+  {
+    "word": "team",
+    "phonetic": "/tiːm/",
+    "meaning": "队（Sports Unit 3）",
+    "unit": 21,
+    "book": "6b"
+  },
+  {
+    "word": "win",
+    "phonetic": "/wɪn/",
+    "meaning": "赢（Sports Unit 3）",
+    "unit": 21,
+    "book": "6b"
+  },
+  {
+    "word": "lose",
+    "phonetic": "/luːz/",
+    "meaning": "输（Sports Unit 3）",
+    "unit": 21,
+    "book": "6b"
+  },
+  {
+    "word": "kilogram",
+    "phonetic": "/ˈkɪləɡræm/",
+    "meaning": "千克（Shopping Unit 4）",
+    "unit": 22,
+    "book": "6b"
+  },
+  {
+    "word": "kilometre",
+    "phonetic": "/kɪˈlɒmɪtə/",
+    "meaning": "千米（Shopping Unit 4）",
+    "unit": 22,
+    "book": "6b"
+  },
+  {
+    "word": "centimetre",
+    "phonetic": "/ˈsentɪmiːtər/",
+    "meaning": "厘米（Shopping Unit 4）",
+    "unit": 22,
+    "book": "6b"
+  },
+  {
+    "word": "dictionary",
+    "phonetic": "/ˈdɪkʃənri/",
+    "meaning": "词典（Shopping Unit 4）",
+    "unit": 22,
+    "book": "6b"
+  },
+  {
+    "word": "tomorrow",
+    "phonetic": "/təˈmɒrəʊ/",
+    "meaning": "明天（Shopping Unit 4）",
+    "unit": 22,
+    "book": "6b"
+  },
+  {
+    "word": "souvenir",
+    "phonetic": "/ˌsuːvəˈnɪə/",
+    "meaning": "纪念品（Shopping Unit 4）",
+    "unit": 22,
+    "book": "6b"
+  },
+  {
+    "word": "stationery",
+    "phonetic": "/ˈsteɪʃənri/",
+    "meaning": "文具（Shopping Unit 4）",
+    "unit": 22,
+    "book": "6b"
+  },
+  {
+    "word": "bookshop",
+    "phonetic": "/ˈbʊkʃɒp/",
+    "meaning": "书店（Shopping Unit 4）",
+    "unit": 22,
+    "book": "6b"
+  },
+  {
+    "word": "clothes",
+    "phonetic": "/kləʊðz/",
+    "meaning": "衣服（Shopping Unit 4）",
+    "unit": 22,
+    "book": "6b"
+  },
+  {
+    "word": "shoe",
+    "phonetic": "/ʃuː/",
+    "meaning": "1.（Shopping Unit 4）",
+    "unit": 22,
+    "book": "6b"
+  },
+  {
+    "word": "toy",
+    "phonetic": "/tɔɪ/",
+    "meaning": "玩具（Shopping Unit 4）",
+    "unit": 22,
+    "book": "6b"
+  },
+  {
+    "word": "price",
+    "phonetic": "/praɪs/",
+    "meaning": "价格（Shopping Unit 4）",
+    "unit": 22,
+    "book": "6b"
+  },
+  {
+    "word": "cheap",
+    "phonetic": "/tʃiːp/",
+    "meaning": "便宜的（Shopping Unit 4）",
+    "unit": 22,
+    "book": "6b"
+  },
+  {
+    "word": "expensive",
+    "phonetic": "/ɪkˈspensɪv/",
+    "meaning": "昂贵的（Shopping Unit 4）",
+    "unit": 22,
+    "book": "6b"
+  }
+]

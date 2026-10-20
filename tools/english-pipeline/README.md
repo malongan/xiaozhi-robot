@@ -12,6 +12,28 @@
 | `data/merged_words.csv` | 最终合并词表（课本优先，补充去重后追加） |
 | `data/pep4a_words.csv` | 人教 PEP 四年级上册词表（备选） |
 | `data/extra_grades.csv` | 五年级 / 六年级拓展词汇（`build_extra_grades.py` 生成） |
+| `data/grades56_words.csv` | **外研版新标准 五上/五下/六上/六下 课本词表**（518 词，unit 1~22 连续编号） |
+| `data/grades56_words.json` | 同上的 JSON 版（多一个 `book` 字段标册别） |
+
+### 五年级/六年级课本词表（grades56）
+
+外研社「三起」教材 2024 秋起分批启用**新标准修订版**（孙有中 / 刘兆义 主编），
+新版每册 6 个 Unit（不再是旧版的 10 个 Module），与 `wy4a_words.csv`（四上）同一版。
+
+| 册别 | book | unit | 单元标题 | 词数 |
+|---|---|---|---|---|
+| 五年级上册 | `5a` | 1–6 | What's on your plate / A green life / Happy together / A better me / Look into the future / Enjoy the festivals | 136 |
+| 五年级下册 | `5b` | 7–12 | Growing up / You can make a difference / We love reading / Back in time / Work it out / Then and now | 152 |
+| 六年级上册 | `6a` | 13–18 | What do you do with money / What's your opinion / Wonderful nature / We can do it! / Health matters / See the world | 171 |
+| 六年级下册 | `6b` | 19–22 | Comparing / Looking back / Sports / Shopping | 59 |
+
+`meaning` 列格式为 `中文释义（单元标题 Unit N）`。生成与校验：
+
+```bash
+python3 verify_grades56.py          # JSON 合法性 / 去重 / 音标 / unit 连续性 / CSV-JSON 一致性
+```
+
+数据来源与抓取脚本见 `build_grades56.py`（表格 OCR + 单词精讲课件解析）。
 
 单元编号：
 

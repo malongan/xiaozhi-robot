@@ -91,6 +91,7 @@ protected:
     lv_obj_t* english_mode_label_ = nullptr;
     lv_obj_t* english_speak_label_ = nullptr;
     lv_obj_t* english_score_label_ = nullptr;
+    lv_obj_t* english_title_label_ = nullptr;
     lv_obj_t* english_interval_label_ = nullptr;
     // 启动选择面板
     lv_obj_t* english_setup_panel_ = nullptr;

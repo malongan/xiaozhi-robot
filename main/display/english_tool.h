@@ -50,6 +50,8 @@ public:
     int UnitCount(int unit) const;  // 该单元词数
     // 单元显示名（如 "Unit 3"、"食物水果"）；未知单元返回 "Unit N"
     std::string UnitName(int unit) const;
+    // 课本单元标题（来自 words.csv 的 unit_title 列），没有则返回空
+    std::string_view UnitTitle(int unit) const;
     // 自检：抽查前 n 个词的音频是否可读。返回有问题��词数。
     int CheckAudio(int sample) const;
     // 有中文音频的词数
@@ -77,6 +79,7 @@ private:
     std::vector<uint32_t> word_offsets_;
     std::vector<uint32_t> phonetic_offsets_;
     std::vector<uint32_t> meaning_offsets_;
+    std::vector<uint32_t> title_offsets_;
 };
 
 #endif  // ENGLISH_TOOL_H
