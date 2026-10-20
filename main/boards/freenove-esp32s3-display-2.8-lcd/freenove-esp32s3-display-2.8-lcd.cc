@@ -344,9 +344,9 @@ private:
         mcp.AddTool(
             "self.english.dictation",
             "开始英语报听写：设备依次朗读单词，每个词之间间隔若干秒，学生在本子上写下听到的单词。"
-            "unit 为单元号（1-6 课本单元，7 戏剧板块，8 食物水果，9 数字颜色时间，10 动物场所物品，11 日常动作形容，0 表示全部），count 为词数（0 表示该单元全部），"
+            "unit 为单元号（1-6 课本单元，7 戏剧板块，8 食物水果，9 数字颜色时间，10 动物场所物品，11 日常动作形容，12 五年级，13 六年级，0 表示全部），count 为词数（0 表示该单元全部），"
             "interval 为间隔秒数（默认 10），show_word 为 true 时屏幕上会显示单词（默认真听写只发音）。",
-            PropertyList({Property("unit", kPropertyTypeInteger, 0, 7),
+            PropertyList({Property("unit", kPropertyTypeInteger, 0, 13),
                           Property("count", kPropertyTypeInteger, 0, 100),
                           Property("interval", kPropertyTypeInteger, 1, 120),
                           Property("show_word", kPropertyTypeBoolean, false)}),
@@ -377,7 +377,7 @@ private:
             "unit 为单元号（1-6 课本单元，7 戏剧板块，8 食物水果，9 数字颜色时间，"
             "10 动物场所物品，11 日常动作形容，0 表示全部），count 为词数（0 表示全部），"
             "interval 为每张卡停留的秒数（默认 10）。",
-            PropertyList({Property("unit", kPropertyTypeInteger, 0, 11),
+            PropertyList({Property("unit", kPropertyTypeInteger, 0, 13),
                           Property("count", kPropertyTypeInteger, 0, 100),
                           Property("interval", kPropertyTypeInteger, 1, 120)}),
             [lcd](const PropertyList& properties) -> ToolResult {

@@ -3701,16 +3701,16 @@ void LcdDisplay::UpdateEnglishScreen() {
 
     // 单词卡模式始终显示；听写模式默认只显示问号（真听写）
     if (player.CurrentMode() == EnglishPlayer::kCards || player.ShowWord()) {
-        lv_label_set_text(english_word_label_, store.WordAt(idx).c_str());
+        lv_label_set_text(english_word_label_, store.WordAt(idx).data());
     } else {
         lv_label_set_text(english_word_label_, "？");
     }
-    lv_label_set_text(english_phonetic_label_, store.PhoneticAt(idx).c_str());
+    lv_label_set_text(english_phonetic_label_, store.PhoneticAt(idx).data());
     // 真听写时藏起释义，免得直接看到答案
     if (player.CurrentMode() == EnglishPlayer::kDictation && !player.ShowWord()) {
         lv_label_set_text(english_meaning_label_, "");
     } else {
-        lv_label_set_text(english_meaning_label_, store.MeaningAt(idx).c_str());
+        lv_label_set_text(english_meaning_label_, store.MeaningAt(idx).data());
     }
 
     const int cd = player.Countdown();
@@ -3802,8 +3802,8 @@ void LcdDisplay::OnEnglishSetupUnitClicked(lv_event_t* e) {
     if (self == nullptr) {
         return;
     }
-    // 0=全部，1..11 各单元
-    self->english_setup_unit_ = (self->english_setup_unit_ + 1) % 12;
+    // 0=全部，1..13 各单元
+    self->english_setup_unit_ = (self->english_setup_unit_ + 1) % 14;
     self->UpdateEnglishSetup();
 }
 

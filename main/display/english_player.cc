@@ -180,7 +180,7 @@ void EnglishPlayer::PlayCurrent() {
         return;
     }
     if (!store.ReadAudio(current_, audio_)) {
-        ESP_LOGW(TAG, "读取音频失败：%s", store.WordAt(current_).c_str());
+        ESP_LOGW(TAG, "读取音频失败：%s", store.WordAt(current_).data());
         audio_.clear();
     } else if (!audio_.empty()) {
         app.PlaySound(

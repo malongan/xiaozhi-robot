@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <vector>
 
 // 英语学习数据层：读取 TF 卡词库（tools/english-pipeline 产出）。
@@ -25,9 +26,10 @@ public:
     const std::string& Name() const { return name_; }
 
     // 第 idx 个词条（0 起）。空串表示越界。
-    const std::string& WordAt(int idx) const;
-    const std::string& PhoneticAt(int idx) const;
-    const std::string& MeaningAt(int idx) const;
+    // 返回的 string_view 指向内部字符池，调用方需立即使用
+    std::string_view WordAt(int idx) const;
+    std::string_view PhoneticAt(int idx) const;
+    std::string_view MeaningAt(int idx) const;
     uint8_t UnitAt(int idx) const;
 
     // 词条 ogg 的绝对路径（audio/w0001.ogg）
@@ -57,9 +59,12 @@ private:
     std::string name_ = "英语词库";
     std::vector<Entry> entries_;
     // 词表文本（每词 4 段，索引与 entries_ 对齐）
-    std::vector<std::string> words_;
-    std::vector<std::string> phonetics_;
-    std::vector<std::string> meanings_;
+    // 用定长字符池而不是 std::vector<std::string>：避免大量小对象占用
+    // 内部 SRAM（词库上千词时 std::string 的堆开销会到 100KB+）。
+    std::vector<char> text_pool_;
+    std::vector<uint32_t> word_offsets_;
+    std::vector<uint32_t> phonetic_offsets_;
+    std::vector<uint32_t> meaning_offsets_;
 };
 
 #endif  // ENGLISH_TOOL_H

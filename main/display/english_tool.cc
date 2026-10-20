@@ -20,9 +20,10 @@ EnglishStore& EnglishStore::GetInstance() {
 bool EnglishStore::Init() {
     ready_ = false;
     entries_.clear();
-    words_.clear();
-    phonetics_.clear();
-    meanings_.clear();
+    text_pool_.clear();
+    word_offsets_.clear();
+    phonetic_offsets_.clear();
+    meaning_offsets_.clear();
     count_ = 0;
 
     if (!LoadIndex()) {
@@ -164,37 +165,44 @@ bool EnglishStore::LoadWords() {
         if (fields[0].empty()) {
             continue;
         }
-        words_.push_back(fields[0]);
-        phonetics_.push_back(fields[1]);
-        meanings_.push_back(fields[2]);
+        // 全部字段拼进同一个字符池，用偏移表索引
+        word_offsets_.push_back(static_cast<uint32_t>(text_pool_.size()));
+        text_pool_.insert(text_pool_.end(), fields[0].begin(), fields[0].end());
+        text_pool_.push_back('\0');
+
+        phonetic_offsets_.push_back(static_cast<uint32_t>(text_pool_.size()));
+        text_pool_.insert(text_pool_.end(), fields[1].begin(), fields[1].end());
+        text_pool_.push_back('\0');
+
+        meaning_offsets_.push_back(static_cast<uint32_t>(text_pool_.size()));
+        text_pool_.insert(text_pool_.end(), fields[2].begin(), fields[2].end());
+        text_pool_.push_back('\0');
     }
     fclose(f);
-    ESP_LOGI(TAG, "词表文本：%u 条", (unsigned)words_.size());
+    ESP_LOGI(TAG, "词表文本：%u 条，字符池 %u B", (unsigned)word_offsets_.size(),
+             (unsigned)text_pool_.size());
     return true;
 }
 
-const std::string& EnglishStore::WordAt(int idx) const {
-    static const std::string kEmpty;
-    if (idx < 0 || idx >= (int)words_.size()) {
-        return kEmpty;
+std::string_view EnglishStore::WordAt(int idx) const {
+    if (idx < 0 || idx >= (int)word_offsets_.size()) {
+        return std::string_view();
     }
-    return words_[idx];
+    return std::string_view(text_pool_.data() + word_offsets_[idx]);
 }
 
-const std::string& EnglishStore::PhoneticAt(int idx) const {
-    static const std::string kEmpty;
-    if (idx < 0 || idx >= (int)phonetics_.size()) {
-        return kEmpty;
+std::string_view EnglishStore::PhoneticAt(int idx) const {
+    if (idx < 0 || idx >= (int)phonetic_offsets_.size()) {
+        return std::string_view();
     }
-    return phonetics_[idx];
+    return std::string_view(text_pool_.data() + phonetic_offsets_[idx]);
 }
 
-const std::string& EnglishStore::MeaningAt(int idx) const {
-    static const std::string kEmpty;
-    if (idx < 0 || idx >= (int)meanings_.size()) {
-        return kEmpty;
+std::string_view EnglishStore::MeaningAt(int idx) const {
+    if (idx < 0 || idx >= (int)meaning_offsets_.size()) {
+        return std::string_view();
     }
-    return meanings_[idx];
+    return std::string_view(text_pool_.data() + meaning_offsets_[idx]);
 }
 
 uint8_t EnglishStore::UnitAt(int idx) const {
