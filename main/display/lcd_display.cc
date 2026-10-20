@@ -14,6 +14,7 @@
 
 LV_FONT_DECLARE(font_zzz_30);
 LV_FONT_DECLARE(font_pinyin_20);
+LV_FONT_DECLARE(font_english_20);
 
 #include <cstdio>
 #include "settings.h"
@@ -1646,7 +1647,8 @@ void LcdDisplay::SetupUI() {
         lv_obj_align(english_word_label_, LV_ALIGN_CENTER, 0, -34);
 
         english_phonetic_label_ = lv_label_create(english_screen_);
-        lv_obj_set_style_text_font(english_phonetic_label_, text_font, 0);
+        // Phonetics need IPA glyphs (ˈ ə ɪ ŋ ...) that the theme font lacks.
+        lv_obj_set_style_text_font(english_phonetic_label_, &font_english_20, 0);
         lv_obj_set_style_text_color(english_phonetic_label_, lv_color_hex(0x9A9AA8), 0);
         lv_label_set_text(english_phonetic_label_, "");
         lv_obj_align(english_phonetic_label_, LV_ALIGN_CENTER, 0, -4);
@@ -2818,6 +2820,18 @@ void LcdDisplay::SetAvatarMood(AvatarMood mood) {
             ShowStrokeScreen(false);
         }
     }
+    if (english_screen_visible_ || english_setup_visible_) {
+        // The English page follows the same rule: a new turn or the end of
+        // the session puts the normal chat back in front.
+        const bool new_turn = previous_mood == kAvatarMoodIdle &&
+                              (mood == kAvatarMoodListening || mood == kAvatarMoodThinking);
+        const bool session_end = mood == kAvatarMoodIdle && previous_mood != kAvatarMoodIdle;
+        if (new_turn || session_end) {
+            EnglishPlayer::GetInstance().Stop();
+            ShowEnglishScreen(false);
+            ShowEnglishSetup(false);
+        }
+    }
     if (mood != kAvatarMoodIdle) {
         // A conversation started: leave the media/paired/stroke/settings
         // screens so the user sees the dialog immediately.
@@ -2826,6 +2840,11 @@ void LcdDisplay::SetAvatarMood(AvatarMood mood) {
         if (settings_screen_visible_) {
             ShowSettingsScreen(false);
         }
+        if (english_screen_visible_) {
+            EnglishPlayer::GetInstance().Stop();
+            ShowEnglishScreen(false);
+        }
+        ShowEnglishSetup(false);
 
     }
     UpdateChatViewport();
@@ -3315,6 +3334,12 @@ void LcdDisplay::ShowMediaScreen(bool show) {
     media_screen_visible_ = show;
     if (show) {
         ShowBluetoothScreen(false);
+        // 媒体页与英语页互斥
+        if (english_screen_visible_) {
+            EnglishPlayer::GetInstance().Stop();
+            ShowEnglishScreen(false);
+        }
+        ShowEnglishSetup(false);
         lv_obj_remove_flag(media_screen_, LV_OBJ_FLAG_HIDDEN);
         lv_obj_move_foreground(media_screen_);
     } else {
@@ -3331,6 +3356,11 @@ void LcdDisplay::ShowBluetoothScreen(bool show) {
     bluetooth_screen_visible_ = show;
     if (show) {
         RefreshBluetoothList();
+        if (english_screen_visible_) {
+            EnglishPlayer::GetInstance().Stop();
+            ShowEnglishScreen(false);
+        }
+        ShowEnglishSetup(false);
         lv_obj_remove_flag(bluetooth_screen_, LV_OBJ_FLAG_HIDDEN);
         lv_obj_move_foreground(bluetooth_screen_);
     } else {
@@ -3763,8 +3793,8 @@ void LcdDisplay::UpdateEnglishScreen() {
 }
 
 void LcdDisplay::RebindEnglishFonts(const lv_font_t* text_font, const lv_font_t* icon_font) {
-    lv_obj_t* text_labels[] = {english_word_label_, english_phonetic_label_,
-                               english_meaning_label_, english_progress_label_,
+    lv_obj_t* text_labels[] = {english_word_label_, english_meaning_label_,
+                               english_progress_label_,
                                english_countdown_label_, english_entry_label_,
                                english_mode_label_, english_interval_label_,
                                english_setup_unit_label_, english_setup_count_label_,
@@ -3774,6 +3804,9 @@ void LcdDisplay::RebindEnglishFonts(const lv_font_t* text_font, const lv_font_t*
         if (label != nullptr && text_font != nullptr) {
             lv_obj_set_style_text_font(label, text_font, 0);
         }
+    }
+    if (english_phonetic_label_ != nullptr) {
+        lv_obj_set_style_text_font(english_phonetic_label_, &font_english_20, 0);
     }
     if (english_close_icon_ != nullptr && icon_font != nullptr) {
         lv_obj_set_style_text_font(english_close_icon_, icon_font, 0);
