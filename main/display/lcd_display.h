@@ -82,6 +82,15 @@ protected:
     static constexpr int kStrokeCanvasMargin = 8;  // 160px 字模在画布内的留白
     static constexpr int kStrokeGlyphSpan = 160;   // 字模边长
     static constexpr int kStrokeMaxStrokes = 48;   // 单字最大笔画数（字库最大 33，留余量）
+    lv_obj_t* english_screen_ = nullptr;
+    lv_obj_t* english_word_label_ = nullptr;
+    lv_obj_t* english_phonetic_label_ = nullptr;
+    lv_obj_t* english_meaning_label_ = nullptr;
+    lv_obj_t* english_progress_label_ = nullptr;
+    lv_obj_t* english_countdown_label_ = nullptr;
+    lv_obj_t* english_close_icon_ = nullptr;
+    lv_obj_t* english_entry_label_ = nullptr;
+    lv_obj_t* english_entry_btn_ = nullptr;
     lv_obj_t* stroke_screen_ = nullptr;
     lv_obj_t* stroke_canvas_ = nullptr;
     lv_obj_t* stroke_title_label_ = nullptr;
@@ -117,6 +126,7 @@ protected:
     void StrokeHideAllLines();
     uint32_t stroke_done_tick_ = 0;
     bool stroke_screen_visible_ = false;
+    bool english_screen_visible_ = false;
     lv_timer_t* stroke_anim_timer_ = nullptr;
 
     float avatar_face_scale_ = 1.0f;  // 1.0 = 80px, 1.875 = 150px idle face
@@ -271,6 +281,11 @@ protected:
     static void OnStrokeReplayClicked(lv_event_t* e);
     static void OnStrokePrevClicked(lv_event_t* e);
     static void OnStrokeNextClicked(lv_event_t* e);
+    static void OnEnglishCloseClicked(lv_event_t* e);
+    static void OnEnglishEntryClicked(lv_event_t* e);
+    static void OnEnglishRepeatClicked(lv_event_t* e);
+    static void OnEnglishPrevClicked(lv_event_t* e);
+    static void OnEnglishNextClicked(lv_event_t* e);
     static void OnAvatarPressed(lv_event_t* e);
     static void OnAvatarReleased(lv_event_t* e);
     static void OnAvatarLongPressed(lv_event_t* e);
@@ -300,6 +315,10 @@ public:
     // 笔顺学习页：char_idx 显示指定汉字并从头播放；bool 控制显隐（MCP 语音入口）
     void ShowStrokeScreen(int char_idx);
     void ShowStrokeScreen(bool show);
+    // 英语听写页
+    void ShowEnglishScreen(bool show);
+    void UpdateEnglishScreen();
+    void RebindEnglishFonts(const lv_font_t* text_font, const lv_font_t* icon_font);
     void StrokeChangeChar(int dir);  // dir = -1/+1，年级内循环
     // Add theme switching function
     virtual void SetTheme(Theme* theme) override;

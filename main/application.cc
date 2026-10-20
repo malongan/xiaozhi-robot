@@ -5,6 +5,7 @@
 #include "board.h"
 #include "cjson_utils.h"
 #include "display.h"
+#include "display/english_player.h"
 #include "mcp_server.h"
 #include "mqtt_protocol.h"
 #include "settings.h"
@@ -304,6 +305,9 @@ void Application::Run() {
             clock_ticks_++;
             auto display = Board::GetInstance().GetDisplay();
             display->UpdateStatusBar();
+
+            // 英语听写：每秒推进一次（发下一个词 / 倒计时）
+            EnglishPlayer::GetInstance().Tick();
 
             // Print debug info every 10 seconds
             if (clock_ticks_ % 10 == 0) {

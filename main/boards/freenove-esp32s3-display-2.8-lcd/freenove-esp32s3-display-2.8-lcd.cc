@@ -18,6 +18,8 @@
 #include "config.h"
 #include "display/lcd_display.h"
 #include "display/stroke_tool.h"
+#include "display/english_tool.h"
+#include "display/english_player.h"
 #include "mcp_server.h"
 #include "settings.h"
 #include "wifi_board.h"
@@ -133,7 +135,8 @@ private:
         if (board->MountSdCard()) {
             board->StopSdRetryTimer();
             StrokeStore::GetInstance().Init();
-            ESP_LOGI(TAG, "TF 卡热插拔挂载成功，笔顺数据已加载");
+            EnglishStore::GetInstance().Init();
+            ESP_LOGI(TAG, "TF 卡热插拔挂载成功，笔顺与英语词库已加载");
         }
     }
 
@@ -146,6 +149,7 @@ private:
     void InitializeSdCard() {
         if (MountSdCard()) {
             StrokeStore::GetInstance().Init();
+            EnglishStore::GetInstance().Init();
             return;
         }
         esp_timer_create_args_t timer_args = {
@@ -334,6 +338,75 @@ private:
                 Application::GetInstance().Schedule([lcd, dir]() { lcd->StrokeChangeChar(dir); });
                 return dir > 0 ? std::string("已切换到下一个字。")
                                : std::string("已切换到上一个字。");
+            });
+
+
+        mcp.AddTool(
+            "self.english.dictation",
+            "开始英语报听写：设备依次朗读单词，每个词之间间隔若干秒，学生在本子上写下听到的单词。"
+            "unit 为单元号（1-6，0 表示全部），count 为词数（0 表示该单元全部），"
+            "interval 为间隔秒数（默认 10），show_word 为 true 时屏幕上会显示单词（默认真听写只发音）。",
+            PropertyList({Property("unit", kPropertyTypeInteger, 0, 6),
+                          Property("count", kPropertyTypeInteger, 0, 100),
+                          Property("interval", kPropertyTypeInteger, 1, 120),
+                          Property("show_word", kPropertyTypeBoolean, false)}),
+            [lcd](const PropertyList& properties) -> ToolResult {
+                auto& store = EnglishStore::GetInstance();
+                if (!store.Ready() || store.WordCount() == 0) {
+                    return std::string("英语词库还没准备好，请确认 TF 卡已插入并包含 english 目录。");
+                }
+                const int unit = properties["unit"].value<int>();
+                const int count = properties["count"].value<int>();
+                const int interval = properties["interval"].value<int>();
+                const bool show_word = properties["show_word"].value<bool>();
+                Application::GetInstance().Schedule([lcd, unit, count, interval, show_word]() {
+                    lcd->ShowEnglishScreen(true);
+                    EnglishPlayer::GetInstance().Start(unit, count, interval, show_word);
+                    lcd->UpdateEnglishScreen();
+                });
+                const int total = unit > 0 ? store.UnitCount(unit) : store.WordCount();
+                return "开始报听写：共 " + std::to_string(count > 0 && count < total ? count : total) +
+                       " 个词，每 " + std::to_string(interval > 0 ? interval : 10) + " 秒一个，屏幕上会显示进度。";
+            });
+
+        mcp.AddTool(
+            "self.english.next", "听写页翻到下一个词。", PropertyList(),
+            [lcd](const PropertyList&) -> ToolResult {
+                Application::GetInstance().Schedule([lcd]() {
+                    EnglishPlayer::GetInstance().Next();
+                    lcd->UpdateEnglishScreen();
+                });
+                return std::string("已到下一个词。");
+            });
+
+        mcp.AddTool(
+            "self.english.prev", "听写页回到上一个词。", PropertyList(),
+            [lcd](const PropertyList&) -> ToolResult {
+                Application::GetInstance().Schedule([lcd]() {
+                    EnglishPlayer::GetInstance().Prev();
+                    lcd->UpdateEnglishScreen();
+                });
+                return std::string("已回到上一个词。");
+            });
+
+        mcp.AddTool(
+            "self.english.repeat", "重播当前单词的发音。", PropertyList(),
+            [lcd](const PropertyList&) -> ToolResult {
+                Application::GetInstance().Schedule([lcd]() {
+                    EnglishPlayer::GetInstance().Repeat();
+                    lcd->UpdateEnglishScreen();
+                });
+                return std::string("重播当前单词。");
+            });
+
+        mcp.AddTool(
+            "self.english.stop", "结束英语听写，关闭学习页。", PropertyList(),
+            [lcd](const PropertyList&) -> ToolResult {
+                Application::GetInstance().Schedule([lcd]() {
+                    EnglishPlayer::GetInstance().Stop();
+                    lcd->ShowEnglishScreen(false);
+                });
+                return std::string("已结束听写。");
             });
 
         mcp.AddTool(
