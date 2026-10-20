@@ -2401,15 +2401,22 @@ void LcdDisplay::ApplyChatLayout() {
         return;
     }
     auto lvgl_theme = static_cast<LvglTheme*>(current_theme_);
-    auto text_font = lvgl_theme->text_font();
-    if (text_font == nullptr || text_font->font() == nullptr) {
-        return;
+    // The theme's own font may have been freed by a theme refresh, so fall
+    // back to the resident chat font.
+    const lv_font_t* font = SafeTextFont();
+    if (font == nullptr) {
+        auto text_font = lvgl_theme->text_font();
+        if (text_font == nullptr || text_font->font() == nullptr) {
+            return;
+        }
+        font = text_font->font();
     }
-    const lv_font_t* font = text_font->font();
     RebindStrokeFonts(
         font, lvgl_theme->icon_font() != nullptr ? lvgl_theme->icon_font()->font() : nullptr,
         lvgl_theme->large_icon_font() != nullptr ? lvgl_theme->large_icon_font()->font() : nullptr);
     RebindSettingsFonts(
+        font, lvgl_theme->icon_font() != nullptr ? lvgl_theme->icon_font()->font() : nullptr);
+    RebindEnglishFonts(
         font, lvgl_theme->icon_font() != nullptr ? lvgl_theme->icon_font()->font() : nullptr);
     /* Portrait 240x320 canvas: top bar (one line), avatar, then five text lines.
        The avatar sits right under the top bar and the text keeps a readable gap
