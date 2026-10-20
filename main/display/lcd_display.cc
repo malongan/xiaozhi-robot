@@ -1705,7 +1705,7 @@ void LcdDisplay::SetupUI() {
         auto make_en_small = [this, text_font, lvgl_theme](int x, const char* text,
                                                             lv_event_cb_t cb) {
             lv_obj_t* key = lv_button_create(english_screen_);
-            lv_obj_set_size(key, 80, 28);
+            lv_obj_set_size(key, 68, 28);
             lv_obj_align(key, LV_ALIGN_BOTTOM_MID, x, -56);
             lv_obj_set_style_bg_color(key, lv_color_hex(0x16161C), 0);
             lv_obj_set_style_bg_opa(key, LV_OPA_COVER, 0);
@@ -1723,8 +1723,9 @@ void LcdDisplay::SetupUI() {
             lv_obj_center(label);
             return label;
         };
-        english_mode_label_ = make_en_small(-50, "看词", &LcdDisplay::OnEnglishModeClicked);
-        english_interval_label_ = make_en_small(50, "10s", &LcdDisplay::OnEnglishIntervalClicked);
+        english_mode_label_ = make_en_small(-72, "真听写", &LcdDisplay::OnEnglishModeClicked);
+        english_speak_label_ = make_en_small(0, "报英文", &LcdDisplay::OnEnglishSpeakClicked);
+        english_interval_label_ = make_en_small(72, "10s", &LcdDisplay::OnEnglishIntervalClicked);
 
         english_entry_btn_ = lv_button_create(screen);
         lv_obj_set_size(english_entry_btn_, 36, 36);
@@ -1813,15 +1814,41 @@ void LcdDisplay::SetupUI() {
         english_setup_interval_label_ =
             make_setup_row(140, "间隔", &LcdDisplay::OnEnglishSetupIntervalClicked);
 
+        // 播报语言
+        lv_obj_t* speak_name = lv_label_create(english_setup_panel_);
+        lv_obj_set_style_text_font(speak_name, text_font, 0);
+        lv_obj_set_style_text_color(speak_name, lv_color_hex(0x9A9AA8), 0);
+        lv_label_set_text(speak_name, "播报");
+        lv_obj_set_pos(speak_name, 16, 192);
+        lv_obj_t* speak_btn = lv_button_create(english_setup_panel_);
+        lv_obj_set_size(speak_btn, 120, 34);
+        lv_obj_set_pos(speak_btn, 100, 184);
+        lv_obj_set_style_bg_color(speak_btn, lv_color_hex(0x1E1E26), 0);
+        lv_obj_set_style_bg_opa(speak_btn, LV_OPA_COVER, 0);
+        lv_obj_set_style_radius(speak_btn, 8, 0);
+        lv_obj_set_style_border_width(speak_btn, 0, 0);
+        lv_obj_set_style_shadow_width(speak_btn, 0, 0);
+        lv_obj_set_style_pad_all(speak_btn, 0, 0);
+        lv_obj_set_style_bg_opa(speak_btn, LV_OPA_30, LV_STATE_PRESSED);
+        lv_obj_set_ext_click_area(speak_btn, 6);
+        lv_obj_add_event_cb(speak_btn, &LcdDisplay::OnEnglishSetupSpeakClicked, LV_EVENT_PRESSED,
+                            this);
+        lv_obj_t* speak_value = lv_label_create(speak_btn);
+        lv_obj_set_style_text_font(speak_value, text_font, 0);
+        lv_obj_set_style_text_color(speak_value, lvgl_theme->text_color(), 0);
+        lv_label_set_text(speak_value, "报英文");
+        lv_obj_center(speak_value);
+        english_setup_speak_label_ = speak_value;
+
         // 模式（听写 / 单词卡）
         lv_obj_t* mode_name = lv_label_create(english_setup_panel_);
         lv_obj_set_style_text_font(mode_name, text_font, 0);
         lv_obj_set_style_text_color(mode_name, lv_color_hex(0x9A9AA8), 0);
         lv_label_set_text(mode_name, "模式");
-        lv_obj_set_pos(mode_name, 16, 194);
+        lv_obj_set_pos(mode_name, 16, 234);
         lv_obj_t* mode_btn = lv_button_create(english_setup_panel_);
         lv_obj_set_size(mode_btn, 120, 34);
-        lv_obj_set_pos(mode_btn, 100, 186);
+        lv_obj_set_pos(mode_btn, 100, 226);
         lv_obj_set_style_bg_color(mode_btn, lv_color_hex(0x1E1E26), 0);
         lv_obj_set_style_bg_opa(mode_btn, LV_OPA_COVER, 0);
         lv_obj_set_style_radius(mode_btn, 8, 0);
@@ -3753,12 +3780,9 @@ void LcdDisplay::UpdateEnglishScreen() {
         lv_label_set_text(english_word_label_, "？");
     }
     lv_label_set_text(english_phonetic_label_, store.PhoneticAt(idx).data());
-    // 真听写时藏起释义，免得直接看到答案
-    if (player.CurrentMode() == EnglishPlayer::kDictation && !player.ShowWord()) {
-        lv_label_set_text(english_meaning_label_, "");
-    } else {
-        lv_label_set_text(english_meaning_label_, store.MeaningAt(idx).data());
-    }
+    // 听写时也显示中文释义（提示意思，英文让学生自己写）；
+    // 英文拼写只在"看词听写"和单词卡模式下显示。
+    lv_label_set_text(english_meaning_label_, store.MeaningAt(idx).data());
 
     const int cd = player.Countdown();
     if (cd > 0) {
@@ -3790,6 +3814,9 @@ void LcdDisplay::UpdateEnglishScreen() {
         snprintf(buf, sizeof(buf), "%ds", player.Interval());
         lv_label_set_text(english_interval_label_, buf);
     }
+    if (english_speak_label_ != nullptr) {
+        lv_label_set_text(english_speak_label_, EnglishPlayer::SpeakName(player.CurrentSpeak()));
+    }
 }
 
 void LcdDisplay::RebindEnglishFonts(const lv_font_t* text_font, const lv_font_t* icon_font) {
@@ -3799,7 +3826,8 @@ void LcdDisplay::RebindEnglishFonts(const lv_font_t* text_font, const lv_font_t*
                                english_mode_label_, english_interval_label_,
                                english_setup_unit_label_, english_setup_count_label_,
                                english_setup_interval_label_, english_setup_mode_label_,
-                               english_score_label_};
+                               english_score_label_, english_speak_label_,
+                               english_setup_speak_label_};
     for (lv_obj_t* label : text_labels) {
         if (label != nullptr && text_font != nullptr) {
             lv_obj_set_style_text_font(label, text_font, 0);
@@ -3857,6 +3885,11 @@ void LcdDisplay::UpdateEnglishSetup() {
         lv_label_set_text(english_setup_mode_label_,
                          english_setup_mode_ == 1 ? "单词卡" : "报听写");
     }
+    if (english_setup_speak_label_ != nullptr) {
+        static const char* kNames[] = {"报英文", "报中文", "中英"};
+        lv_label_set_text(english_setup_speak_label_,
+                         kNames[english_setup_speak_ % 3]);
+    }
 }
 
 void LcdDisplay::OnEnglishSetupUnitClicked(lv_event_t* e) {
@@ -3903,6 +3936,15 @@ void LcdDisplay::OnEnglishSetupIntervalClicked(lv_event_t* e) {
     self->UpdateEnglishSetup();
 }
 
+void LcdDisplay::OnEnglishSetupSpeakClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self == nullptr) {
+        return;
+    }
+    self->english_setup_speak_ = (self->english_setup_speak_ + 1) % 3;
+    self->UpdateEnglishSetup();
+}
+
 void LcdDisplay::OnEnglishSetupModeClicked(lv_event_t* e) {
     auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
     if (self == nullptr) {
@@ -3925,9 +3967,15 @@ void LcdDisplay::OnEnglishSetupStartClicked(lv_event_t* e) {
     const int count = self->english_setup_count_;
     const int interval = self->english_setup_interval_;
     const auto mode = static_cast<EnglishPlayer::Mode>(self->english_setup_mode_);
+    const auto speak = static_cast<EnglishPlayer::Speak>(self->english_setup_speak_);
     self->ShowEnglishSetup(false);
     self->ShowEnglishScreen(true);
-    EnglishPlayer::GetInstance().Start(unit, count, interval, mode == EnglishPlayer::kCards, mode);
+    auto& player = EnglishPlayer::GetInstance();
+    // 先设播报语言再开始，避免第一词用错语言
+    while (player.CurrentSpeak() != speak) {
+        player.CycleSpeak();
+    }
+    player.Start(unit, count, interval, mode == EnglishPlayer::kCards, mode);
     self->UpdateEnglishScreen();
 }
 
@@ -3999,6 +4047,15 @@ void LcdDisplay::OnEnglishModeClicked(lv_event_t* e) {
         return;
     }
     EnglishPlayer::GetInstance().ToggleMode();
+    self->UpdateEnglishScreen();
+}
+
+void LcdDisplay::OnEnglishSpeakClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self == nullptr) {
+        return;
+    }
+    EnglishPlayer::GetInstance().CycleSpeak();
     self->UpdateEnglishScreen();
 }
 

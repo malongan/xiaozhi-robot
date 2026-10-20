@@ -69,7 +69,7 @@ bool EnglishStore::LoadIndex() {
     }
     entries_.resize(count);
     for (uint16_t i = 0; i < count; ++i) {
-        uint8_t rec[12];
+        uint8_t rec[16];
         if (fread(rec, 1, sizeof(rec), f) != sizeof(rec)) {
             ESP_LOGW(TAG, "词条 %u 读取失败", i);
             fclose(f);
@@ -81,6 +81,8 @@ bool EnglishStore::LoadIndex() {
                        ((uint32_t)rec[3] << 24);
         e.unit = rec[8];
         e.flags = rec[9];
+        e.cn_audio_size = (uint32_t)rec[12] | ((uint32_t)rec[13] << 8) | ((uint32_t)rec[14] << 16) |
+                          ((uint32_t)rec[15] << 24);
     }
     fclose(f);
     count_ = count;
@@ -219,6 +221,42 @@ std::string EnglishStore::AudioPath(int idx) const {
     char path[80];
     snprintf(path, sizeof(path), "%s/audio/w%04d.ogg", kRoot, idx + 1);
     return std::string(path);
+}
+
+std::string EnglishStore::ChineseAudioPath(int idx) const {
+    if (idx < 0 || idx >= count_) {
+        return std::string();
+    }
+    char path[80];
+    snprintf(path, sizeof(path), "%s/audio/c%04d.ogg", kRoot, idx + 1);
+    return std::string(path);
+}
+
+bool EnglishStore::HasChinese(int idx) const {
+    if (idx < 0 || idx >= (int)entries_.size()) {
+        return false;
+    }
+    return entries_[idx].cn_audio_size > 0;
+}
+
+bool EnglishStore::ReadChineseAudio(int idx, std::vector<uint8_t>& out) const {
+    if (!HasChinese(idx)) {
+        return false;
+    }
+    const std::string path = ChineseAudioPath(idx);
+    FILE* f = fopen(path.c_str(), "rb");
+    if (f == nullptr) {
+        return false;
+    }
+    const size_t size = entries_[idx].cn_audio_size;
+    out.resize(size);
+    size_t got = size > 0 ? fread(out.data(), 1, size, f) : 0;
+    fclose(f);
+    if (got != size) {
+        out.clear();
+        return false;
+    }
+    return true;
 }
 
 bool EnglishStore::ReadAudio(int idx, std::vector<uint8_t>& out) const {

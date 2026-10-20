@@ -345,11 +345,13 @@ private:
             "self.english.dictation",
             "开始英语报听写：设备依次朗读单词，每个词之间间隔若干秒，学生在本子上写下听到的单词。"
             "unit 为单元号（1-6 课本单元，7 戏剧板块，8 食物水果，9 数字颜色时间，10 动物场所物品，11 日常动作形容，12 五年级，13 六年级，0 表示全部），count 为词数（0 表示该单元全部），"
-            "interval 为间隔秒数（默认 10），show_word 为 true 时屏幕上会显示单词（默认真听写只发音）。",
+            "interval 为间隔秒数（默认 10），show_word 为 true 时屏幕上会显示单词拼写"
+            "（默认只显示中文意思），speak 为播报语言：0 报英文，1 报中文，2 中英都报。",
             PropertyList({Property("unit", kPropertyTypeInteger, 0, 13),
                           Property("count", kPropertyTypeInteger, 0, 100),
                           Property("interval", kPropertyTypeInteger, 1, 120),
-                          Property("show_word", kPropertyTypeBoolean, false)}),
+                          Property("show_word", kPropertyTypeBoolean, false),
+                          Property("speak", kPropertyTypeInteger, 0, 2)}),
             [lcd](const PropertyList& properties) -> ToolResult {
                 auto& store = EnglishStore::GetInstance();
                 if (!store.Ready() || store.WordCount() == 0) {
@@ -359,9 +361,15 @@ private:
                 const int count = properties["count"].value<int>();
                 const int interval = properties["interval"].value<int>();
                 const bool show_word = properties["show_word"].value<bool>();
-                Application::GetInstance().Schedule([lcd, unit, count, interval, show_word]() {
+                const int speak = properties["speak"].value<int>();
+                Application::GetInstance().Schedule([lcd, unit, count, interval, show_word, speak]() {
                     lcd->ShowEnglishScreen(true);
-                    EnglishPlayer::GetInstance().Start(unit, count, interval, show_word);
+                    auto& player = EnglishPlayer::GetInstance();
+                    const auto want = static_cast<EnglishPlayer::Speak>(speak < 0 ? 0 : (speak % 3));
+                    while (player.CurrentSpeak() != want) {
+                        player.CycleSpeak();
+                    }
+                    player.Start(unit, count, interval, show_word);
                     lcd->UpdateEnglishScreen();
                 });
                 const int total = unit > 0 ? store.UnitCount(unit) : store.WordCount();

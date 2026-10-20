@@ -10,9 +10,10 @@
 //
 // 卡上布局（与 docs/english-wordlib-format.md 一致，勿改动格式）：
 //   /sdcard/english/index.bin  "ENGL" + u16 version + u16 count + u32 reserved；
-//                              条目 12B：u32 audio_off | u32 audio_size |
-//                              u8 unit | u8 flags | u16 reserved
-//                              第 i 条对应 audio/w{i+1:04d}.ogg
+//                              条目 16B：u32 audio_off | u32 audio_size |
+//                              u8 unit | u8 flags | u16 reserved | u32 cn_size
+//                              第 i 条对应 audio/w{i+1:04d}.ogg（英文）
+//                              和 audio/c{i+1:04d}.ogg（中文释义，可选）
 //   /sdcard/english/words.csv  源词表：word,phonetic,meaning,unit（UTF-8）
 //   /sdcard/english/meta.txt   name=... / version=... / count=...
 class EnglishStore {
@@ -36,6 +37,12 @@ public:
     std::string AudioPath(int idx) const;
     // 读取整个 ogg 到内存（单文件约 1.4KB）。失败返回 false。
     bool ReadAudio(int idx, std::vector<uint8_t>& out) const;
+    // 读取中文释义音频；没有则返回 false。
+    bool ReadChineseAudio(int idx, std::vector<uint8_t>& out) const;
+    // 该词是否有中文音频
+    bool HasChinese(int idx) const;
+    // 中文音频路径
+    std::string ChineseAudioPath(int idx) const;
 
     // 单元范围：unit 0 表示复习/词汇表
     int UnitStart(int unit) const;  // 该单元首个 idx（无则 -1）
@@ -47,6 +54,7 @@ public:
 private:
     struct Entry {
         uint32_t audio_size;
+        uint32_t cn_audio_size;
         uint8_t unit;
         uint8_t flags;
     };

@@ -25,6 +25,13 @@ public:
         kCards = 1,      // 单词卡
     };
 
+    // 播报语言
+    enum Speak {
+        kSpeakEnglish = 0,  // 只播英文
+        kSpeakChinese = 1,  // 只播中文
+        kSpeakBoth = 2,     // 先英文再中文
+    };
+
     static EnglishPlayer& GetInstance();
 
     // 开始学习。unit=0 表示不限定单元；count<=0 表示到词库末尾。
@@ -43,6 +50,8 @@ public:
     void ToggleMode();
     // 在 5/10/15/20/30 秒之间轮换间隔
     void CycleInterval();
+    // 轮换播报语言（英文 / 中文 / 中英）
+    void CycleSpeak();
 
     bool Active() const { return active_; }
     bool Paused() const { return paused_; }
@@ -56,6 +65,9 @@ public:
     int CorrectCount() const { return correct_; }
     int AnsweredCount() const { return answered_; }
     Mode CurrentMode() const { return mode_; }
+    Speak CurrentSpeak() const { return speak_; }
+    // 播报语言名（用于界面显示）
+    static const char* SpeakName(Speak speak);
     // 距离下一个词还有几秒（-1 表示不在等待中）
     int Countdown() const;
     // 词库就绪且有词
@@ -70,6 +82,7 @@ private:
     bool paused_ = false;
     bool show_word_ = false;
     Mode mode_ = kDictation;
+    Speak speak_ = kSpeakEnglish;
     int unit_ = 0;
     int count_ = 0;
     int interval_ = 10;
@@ -80,6 +93,7 @@ private:
     int played_ = 0;
     int correct_ = 0;
     int answered_ = 0;
+    bool pending_cn_ = false;
     uint32_t next_tick_ = 0;
     std::vector<uint8_t> audio_;
 };

@@ -89,6 +89,7 @@ protected:
     lv_obj_t* english_progress_label_ = nullptr;
     lv_obj_t* english_countdown_label_ = nullptr;
     lv_obj_t* english_mode_label_ = nullptr;
+    lv_obj_t* english_speak_label_ = nullptr;
     lv_obj_t* english_score_label_ = nullptr;
     lv_obj_t* english_interval_label_ = nullptr;
     // 启动选择面板
@@ -97,10 +98,12 @@ protected:
     lv_obj_t* english_setup_count_label_ = nullptr;
     lv_obj_t* english_setup_interval_label_ = nullptr;
     lv_obj_t* english_setup_mode_label_ = nullptr;
+    lv_obj_t* english_setup_speak_label_ = nullptr;
     int english_setup_unit_ = 1;
     int english_setup_count_ = 10;
     int english_setup_interval_ = 10;
     int english_setup_mode_ = 0;  // 0=报听写 1=单词卡
+    int english_setup_speak_ = 0;  // 0=报英文 1=报中文 2=中英
     lv_obj_t* english_close_icon_ = nullptr;
     lv_obj_t* english_entry_label_ = nullptr;
     lv_obj_t* english_entry_btn_ = nullptr;
@@ -303,7 +306,9 @@ protected:
     static void OnEnglishNextLongPressed(lv_event_t* e);
     static void OnEnglishModeClicked(lv_event_t* e);
     static void OnEnglishIntervalClicked(lv_event_t* e);
+    static void OnEnglishSpeakClicked(lv_event_t* e);
     static void OnEnglishSetupModeClicked(lv_event_t* e);
+    static void OnEnglishSetupSpeakClicked(lv_event_t* e);
     static void OnEnglishSetupUnitClicked(lv_event_t* e);
     static void OnEnglishSetupCountClicked(lv_event_t* e);
     static void OnEnglishSetupIntervalClicked(lv_event_t* e);

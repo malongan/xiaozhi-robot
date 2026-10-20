@@ -92,6 +92,25 @@ void EnglishPlayer::ToggleMode() {
     }
 }
 
+const char* EnglishPlayer::SpeakName(Speak speak) {
+    switch (speak) {
+        case kSpeakChinese:
+            return "报中文";
+        case kSpeakBoth:
+            return "中英";
+        default:
+            return "报英文";
+    }
+}
+
+void EnglishPlayer::CycleSpeak() {
+    speak_ = static_cast<Speak>((speak_ + 1) % 3);
+    ESP_LOGI(TAG, "播报语言：%s", SpeakName(speak_));
+    if (active_) {
+        PlayCurrent();
+    }
+}
+
 void EnglishPlayer::CycleInterval() {
     static const int kSteps[] = {5, 10, 15, 20, 30};
     int idx = 0;
@@ -194,6 +213,25 @@ void EnglishPlayer::PlayCurrent() {
         next_tick_ = static_cast<uint32_t>(esp_timer_get_time() / 1000) + 1;
         return;
     }
+    // 按播报语言决定播放哪一段
+    bool want_en = (speak_ == kSpeakEnglish || speak_ == kSpeakBoth);
+    bool want_cn = (speak_ == kSpeakChinese || speak_ == kSpeakBoth);
+
+    if (want_cn && !want_en) {
+        // 只播中文
+        if (!store.ReadChineseAudio(current_, audio_)) {
+            ESP_LOGW(TAG, "没有中文音频：%s", store.WordAt(current_).data());
+            audio_.clear();
+        } else {
+            app.PlaySound(
+                std::string_view(reinterpret_cast<const char*>(audio_.data()), audio_.size()));
+        }
+        played_++;
+        next_tick_ = static_cast<uint32_t>(esp_timer_get_time() / 1000) + interval_ + 1;
+        return;
+    }
+
+    // 英文（和中英双语的第一段）
     if (!store.ReadAudio(current_, audio_)) {
         ESP_LOGW(TAG, "读取音频失败：%s", store.WordAt(current_).data());
         audio_.clear();
@@ -202,6 +240,14 @@ void EnglishPlayer::PlayCurrent() {
             std::string_view(reinterpret_cast<const char*>(audio_.data()), audio_.size()));
     }
     played_++;
+
+    if (want_cn) {
+        // 中英双语：英文播完后再播中文（由 Tick 接力）
+        pending_cn_ = true;
+        // 留出英文发音的播放时间，稍后播中文
+        next_tick_ = static_cast<uint32_t>(esp_timer_get_time() / 1000) + 1;
+        return;
+    }
     // 发音播放完（约 0.5s）后开始倒计时等待；单词卡模式整张卡停留 interval 秒
     next_tick_ = static_cast<uint32_t>(esp_timer_get_time() / 1000) + interval_ + 1;
 }
@@ -212,6 +258,18 @@ void EnglishPlayer::Tick() {
     }
     const uint32_t now = static_cast<uint32_t>(esp_timer_get_time() / 1000);
     if (next_tick_ == 0 || now < next_tick_) {
+        return;
+    }
+    if (pending_cn_) {
+        // 英文已播完，接着播中文释义
+        pending_cn_ = false;
+        auto& store = EnglishStore::GetInstance();
+        if (store.ReadChineseAudio(current_, audio_)) {
+            Application::GetInstance().PlaySound(
+                std::string_view(reinterpret_cast<const char*>(audio_.data()), audio_.size()));
+        }
+        // 中文播完后才开始倒计时
+        next_tick_ = now + interval_ + 1;
         return;
     }
     if (current_ + 1 < end_) {
