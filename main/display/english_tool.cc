@@ -77,8 +77,10 @@ bool EnglishStore::LoadIndex() {
             return false;
         }
         Entry& e = entries_[i];
-        e.audio_size = (uint32_t)rec[0] | ((uint32_t)rec[1] << 8) | ((uint32_t)rec[2] << 16) |
-                       ((uint32_t)rec[3] << 24);
+        // 条目布局：u32 audio_offset | u32 audio_size | u8 unit | u8 flags |
+        //          u16 reserved | u32 cn_audio_size
+        e.audio_size = (uint32_t)rec[4] | ((uint32_t)rec[5] << 8) | ((uint32_t)rec[6] << 16) |
+                       ((uint32_t)rec[7] << 24);
         e.unit = rec[8];
         e.flags = rec[9];
         e.cn_audio_size = (uint32_t)rec[12] | ((uint32_t)rec[13] << 8) | ((uint32_t)rec[14] << 16) |

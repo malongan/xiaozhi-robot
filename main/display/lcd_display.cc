@@ -1,22 +1,23 @@
 #include "lcd_display.h"
+#include <esp_system.h>
+#include <wifi_manager.h>
 #include "application.h"
 #include "assets.h"
 #include "assets/lang_config.h"
+#include "english_player.h"
+#include "english_tool.h"
 #include "gif/lvgl_gif.h"
 #include "lvgl_font.h"
 #include "lvgl_theme.h"
 #include "media_ble.h"
-#include "english_tool.h"
-#include "english_player.h"
 #include "wifi_board.h"
-#include <wifi_manager.h>
-#include <esp_system.h>
 
 LV_FONT_DECLARE(font_zzz_30);
 LV_FONT_DECLARE(font_pinyin_20);
 LV_FONT_DECLARE(font_english_20);
 
 #include <cstdio>
+#include <functional>
 #include "settings.h"
 
 #include <esp_err.h>
@@ -33,8 +34,8 @@ LV_FONT_DECLARE(font_english_20);
 #include <mutex>
 #include <vector>
 
-#include "board.h"
 #include "backlight.h"
+#include "board.h"
 
 #define TAG "LcdDisplay"
 
@@ -1674,13 +1675,14 @@ void LcdDisplay::SetupUI() {
         // 操作提示：长按"下一个"记为答对
         lv_obj_t* en_hint = lv_label_create(english_screen_);
         lv_obj_set_style_text_font(en_hint, text_font, 0);
+        english_setup_labels_.push_back(en_hint);
         lv_obj_set_style_text_color(en_hint, lv_color_hex(0x4A4A56), 0);
         lv_label_set_text(en_hint, "长按下一个 = 答对");
         lv_obj_align(en_hint, LV_ALIGN_CENTER, 0, 82);
 
         // 底部：重播 / 上一个 / 下一个
         auto make_en_key = [this, text_font, lvgl_theme](int x, const char* text,
-                                                          lv_event_cb_t cb) -> lv_obj_t* {
+                                                         lv_event_cb_t cb) -> lv_obj_t* {
             lv_obj_t* key = lv_button_create(english_screen_);
             lv_obj_set_size(key, 62, 38);
             lv_obj_align(key, LV_ALIGN_BOTTOM_MID, x, -8);
@@ -1709,7 +1711,7 @@ void LcdDisplay::SetupUI() {
 
         // 第二排：显示模式 / 间隔
         auto make_en_small = [this, text_font, lvgl_theme](int x, const char* text,
-                                                            lv_event_cb_t cb) {
+                                                           lv_event_cb_t cb) {
             lv_obj_t* key = lv_button_create(english_screen_);
             lv_obj_set_size(key, 68, 28);
             lv_obj_align(key, LV_ALIGN_BOTTOM_MID, x, -56);
@@ -1744,8 +1746,8 @@ void LcdDisplay::SetupUI() {
         lv_obj_set_style_pad_all(english_entry_btn_, 0, 0);
         lv_obj_add_flag(english_entry_btn_, LV_OBJ_FLAG_HIDDEN);
         lv_obj_set_ext_click_area(english_entry_btn_, 10);
-        lv_obj_add_event_cb(english_entry_btn_, &LcdDisplay::OnEnglishEntryClicked, LV_EVENT_PRESSED,
-                            this);
+        lv_obj_add_event_cb(english_entry_btn_, &LcdDisplay::OnEnglishEntryClicked,
+                            LV_EVENT_PRESSED, this);
         english_entry_label_ = lv_label_create(english_entry_btn_);
         lv_obj_set_style_text_font(english_entry_label_, text_font, 0);
         lv_obj_set_style_text_color(english_entry_label_, lvgl_theme->text_color(), 0);
@@ -1774,21 +1776,24 @@ void LcdDisplay::SetupUI() {
                             this);
         lv_obj_t* setup_close_icon = lv_label_create(setup_close);
         lv_obj_set_style_text_font(setup_close_icon, icon_font, 0);
+        english_setup_close_icon_ = setup_close_icon;
         lv_obj_set_style_text_color(setup_close_icon, lvgl_theme->text_color(), 0);
         lv_label_set_text(setup_close_icon, MATERIAL_SYMBOLS_CLOSE);
         lv_obj_center(setup_close_icon);
 
         lv_obj_t* setup_title = lv_label_create(english_setup_panel_);
         lv_obj_set_style_text_font(setup_title, text_font, 0);
+        english_setup_labels_.push_back(setup_title);
         lv_obj_set_style_text_color(setup_title, lvgl_theme->text_color(), 0);
         lv_label_set_text(setup_title, "英语学习");
         lv_obj_align(setup_title, LV_ALIGN_TOP_MID, 0, 8);
 
         // 一行：一个左标签 + 一个右侧可点击的值
         auto make_setup_row = [this, text_font, lvgl_theme](int y, const char* label,
-                                                             lv_event_cb_t cb) {
+                                                            lv_event_cb_t cb) {
             lv_obj_t* name = lv_label_create(english_setup_panel_);
             lv_obj_set_style_text_font(name, text_font, 0);
+            english_setup_labels_.push_back(name);
             lv_obj_set_style_text_color(name, lv_color_hex(0x9A9AA8), 0);
             lv_label_set_text(name, label);
             lv_obj_set_pos(name, 16, y + 8);
@@ -1823,6 +1828,7 @@ void LcdDisplay::SetupUI() {
         // 播报语言
         lv_obj_t* speak_name = lv_label_create(english_setup_panel_);
         lv_obj_set_style_text_font(speak_name, text_font, 0);
+        english_setup_labels_.push_back(speak_name);
         lv_obj_set_style_text_color(speak_name, lv_color_hex(0x9A9AA8), 0);
         lv_label_set_text(speak_name, "播报");
         lv_obj_set_pos(speak_name, 16, 192);
@@ -1849,6 +1855,7 @@ void LcdDisplay::SetupUI() {
         // 模式（听写 / 单词卡）
         lv_obj_t* mode_name = lv_label_create(english_setup_panel_);
         lv_obj_set_style_text_font(mode_name, text_font, 0);
+        english_setup_labels_.push_back(mode_name);
         lv_obj_set_style_text_color(mode_name, lv_color_hex(0x9A9AA8), 0);
         lv_label_set_text(mode_name, "模式");
         lv_obj_set_pos(mode_name, 16, 234);
@@ -1888,6 +1895,7 @@ void LcdDisplay::SetupUI() {
                             this);
         lv_obj_t* start_label = lv_label_create(start_btn);
         lv_obj_set_style_text_font(start_label, text_font, 0);
+        english_setup_labels_.push_back(start_label);
         lv_obj_set_style_text_color(start_label, lv_color_hex(0xFFFFFF), 0);
         lv_label_set_text(start_label, "开始");
         lv_obj_center(start_label);
@@ -2040,8 +2048,8 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_width(settings_wifi_status_, 100);
     lv_obj_set_style_text_align(settings_wifi_status_, LV_TEXT_ALIGN_LEFT, 0);
     lv_obj_set_pos(settings_wifi_status_, 58, 186);
-    settings_wifi_btn_label_ = make_wide_button(settings_screen_, 166, 180, 62, "配网",
-                                                &LcdDisplay::OnWifiConfigClicked);
+    settings_wifi_btn_label_ =
+        make_wide_button(settings_screen_, 166, 180, 62, "配网", &LcdDisplay::OnWifiConfigClicked);
 
     // Bluetooth
     settings_bt_label_ = make_text_label(settings_screen_, "蓝牙");
@@ -2056,8 +2064,8 @@ void LcdDisplay::SetupUI() {
                                                  &LcdDisplay::OnSettingsBtForgetClicked);
 
     // Reboot
-    settings_reboot_label_ = make_wide_button(settings_screen_, 60, 272, 120, "重启设备",
-                                              &LcdDisplay::OnRebootClicked);
+    settings_reboot_label_ =
+        make_wide_button(settings_screen_, 60, 272, 120, "重启设备", &LcdDisplay::OnRebootClicked);
 
     // Gear entry (bottom-left, idle only)
     settings_entry_btn_ = lv_button_create(screen);
@@ -2199,6 +2207,59 @@ void LcdDisplay::SetChatMessage(const char* role, const char* content) {
     if (was_reviewing) {
         ShowNotification("新消息", 1200);
     }
+}
+
+void LcdDisplay::RepairDanglingFonts(const lv_font_t* text_font, const lv_font_t* icon_font,
+                                     const lv_font_t* large_icon_font) {
+    // The set of fonts that are still alive after the assets were replaced.
+    // Anything else in a label is a pointer into freed memory.
+    const lv_font_t* live[] = {text_font,    icon_font,       large_icon_font,
+                               &font_zzz_30, &font_pinyin_20, &font_english_20};
+    int repaired = 0;
+
+    // Walk the whole tree: hidden pages are laid out too, so a label inside a
+    // hidden page can still crash the device.
+    std::function<void(lv_obj_t*)> walk = [&](lv_obj_t* obj) {
+        if (obj == nullptr) {
+            return;
+        }
+        if (lv_obj_check_type(obj, &lv_label_class)) {
+            const lv_font_t* current = lv_obj_get_style_text_font(obj, LV_PART_MAIN);
+            bool alive = false;
+            for (const lv_font_t* candidate : live) {
+                if (candidate != nullptr && current == candidate) {
+                    alive = true;
+                    break;
+                }
+            }
+            if (!alive && current != nullptr) {
+                lv_obj_set_style_text_font(obj, text_font, 0);
+                repaired++;
+            }
+        }
+        const uint32_t count = lv_obj_get_child_count(obj);
+        for (uint32_t i = 0; i < count; ++i) {
+            walk(lv_obj_get_child(obj, static_cast<int32_t>(i)));
+        }
+    };
+    walk(lv_screen_active());
+
+    if (repaired > 0) {
+        ESP_LOGW(TAG, "修复了 %d 个指向失效字体的标签", repaired);
+    }
+}
+
+const lv_font_t* LcdDisplay::SafeTextFont() const {
+    // chat_font_ 是在 assets 分区里常驻的字体（LvglCBinFont 持有数据），
+    // 主题刷新时不会失效；lvgl_theme 里的 text_font 可能是刚被释放的旧字体。
+    if (chat_font_ != nullptr && chat_font_->font() != nullptr) {
+        return chat_font_->font();
+    }
+    auto lvgl_theme = static_cast<LvglTheme*>(current_theme_);
+    if (lvgl_theme != nullptr && lvgl_theme->text_font() != nullptr) {
+        return lvgl_theme->text_font()->font();
+    }
+    return nullptr;
 }
 
 const lv_font_t* LcdDisplay::GetChatFont() {
@@ -2345,18 +2406,11 @@ void LcdDisplay::ApplyChatLayout() {
         return;
     }
     const lv_font_t* font = text_font->font();
-    RebindStrokeFonts(font, lvgl_theme->icon_font() != nullptr ? lvgl_theme->icon_font()->font()
-                                                              : nullptr,
-                      lvgl_theme->large_icon_font() != nullptr
-                          ? lvgl_theme->large_icon_font()->font()
-                          : nullptr);
-    RebindSettingsFonts(font, lvgl_theme->icon_font() != nullptr
-                                    ? lvgl_theme->icon_font()->font()
-                                    : nullptr);
-    RebindEnglishFonts(font, lvgl_theme->icon_font() != nullptr
-                                  ? lvgl_theme->icon_font()->font()
-                                  : nullptr);
-
+    RebindStrokeFonts(
+        font, lvgl_theme->icon_font() != nullptr ? lvgl_theme->icon_font()->font() : nullptr,
+        lvgl_theme->large_icon_font() != nullptr ? lvgl_theme->large_icon_font()->font() : nullptr);
+    RebindSettingsFonts(
+        font, lvgl_theme->icon_font() != nullptr ? lvgl_theme->icon_font()->font() : nullptr);
     /* Portrait 240x320 canvas: top bar (one line), avatar, then five text lines.
        The avatar sits right under the top bar and the text keeps a readable gap
        below the avatar. */
@@ -2878,7 +2932,6 @@ void LcdDisplay::SetAvatarMood(AvatarMood mood) {
             ShowEnglishScreen(false);
         }
         ShowEnglishSetup(false);
-
     }
     UpdateChatViewport();
 }
@@ -3338,8 +3391,7 @@ void LcdDisplay::UpdateMediaBarVisibility() {
         }
     }
     if (english_entry_btn_ != nullptr) {
-        const bool entry_show =
-            page_clear && EnglishPlayer::Available() && !english_setup_visible_;
+        const bool entry_show = page_clear && EnglishPlayer::Available() && !english_setup_visible_;
         if (entry_show) {
             lv_obj_remove_flag(english_entry_btn_, LV_OBJ_FLAG_HIDDEN);
         } else {
@@ -3589,9 +3641,7 @@ void LcdDisplay::StrokeDrawStroke(int s, lv_color_t color) {
     }
 }
 
-void LcdDisplay::StrokeFinishStroke(int s) {
-    StrokeDrawStroke(s, stroke_color_done_);
-}
+void LcdDisplay::StrokeFinishStroke(int s) { StrokeDrawStroke(s, stroke_color_done_); }
 
 void LcdDisplay::StrokeLoadChar(int idx) {
     auto& store = StrokeStore::GetInstance();
@@ -3637,7 +3687,8 @@ void LcdDisplay::StrokeLoadChar(int idx) {
                 radius = 1.5f;
             }
             lv_line_set_points(stroke_lines_[i], pts.data(), static_cast<uint32_t>(pts.size()));
-            lv_obj_set_style_line_width(stroke_lines_[i], LV_MAX(2, static_cast<int>(lroundf(radius * 2))), 0);
+            lv_obj_set_style_line_width(stroke_lines_[i],
+                                        LV_MAX(2, static_cast<int>(lroundf(radius * 2))), 0);
             lv_obj_set_style_line_color(stroke_lines_[i], stroke_color_active_, 0);
             lv_obj_remove_flag(stroke_lines_[i], LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(stroke_lines_[i], LV_OBJ_FLAG_HIDDEN);
@@ -3736,7 +3787,6 @@ void LcdDisplay::ShowStrokeScreen(int char_idx) {
     UpdateMediaBarVisibility();
 }
 
-
 // ---- 英语听写页 ----
 
 void LcdDisplay::ShowEnglishScreen(bool show) {
@@ -3775,8 +3825,8 @@ void LcdDisplay::UpdateEnglishScreen() {
     // 进度：单元名 + 第几个/共几个
     char buf[96];
     const int unit = store.UnitAt(idx);
-    snprintf(buf, sizeof(buf), "%s  %d / %d", store.UnitName(unit).c_str(),
-             pos < 0 ? 0 : pos, total);
+    snprintf(buf, sizeof(buf), "%s  %d / %d", store.UnitName(unit).c_str(), pos < 0 ? 0 : pos,
+             total);
     lv_label_set_text(english_progress_label_, buf);
 
     // 课本单元标题（如 "What's on your plate"），有就显示在进度下方
@@ -3836,14 +3886,12 @@ void LcdDisplay::UpdateEnglishScreen() {
 }
 
 void LcdDisplay::RebindEnglishFonts(const lv_font_t* text_font, const lv_font_t* icon_font) {
-    lv_obj_t* text_labels[] = {english_word_label_, english_meaning_label_,
-                               english_progress_label_,
-                               english_countdown_label_, english_entry_label_,
-                               english_mode_label_, english_interval_label_,
-                               english_setup_unit_label_, english_setup_count_label_,
-                               english_setup_interval_label_, english_setup_mode_label_,
-                               english_score_label_, english_speak_label_,
-                               english_setup_speak_label_, english_title_label_};
+    lv_obj_t* text_labels[] = {
+        english_word_label_,           english_meaning_label_,     english_progress_label_,
+        english_countdown_label_,      english_entry_label_,       english_mode_label_,
+        english_interval_label_,       english_setup_unit_label_,  english_setup_count_label_,
+        english_setup_interval_label_, english_setup_mode_label_,  english_score_label_,
+        english_speak_label_,          english_setup_speak_label_, english_title_label_};
     for (lv_obj_t* label : text_labels) {
         if (label != nullptr && text_font != nullptr) {
             lv_obj_set_style_text_font(label, text_font, 0);
@@ -3852,11 +3900,24 @@ void LcdDisplay::RebindEnglishFonts(const lv_font_t* text_font, const lv_font_t*
     if (english_phonetic_label_ != nullptr) {
         lv_obj_set_style_text_font(english_phonetic_label_, &font_english_20, 0);
     }
+    // 启动面板里那些没有单独成员的标签
+    for (lv_obj_t* label : english_setup_labels_) {
+        if (label != nullptr && text_font != nullptr) {
+            lv_obj_set_style_text_font(label, text_font, 0);
+        }
+    }
+    if (english_setup_close_icon_ != nullptr && icon_font != nullptr) {
+        lv_obj_set_style_text_font(english_setup_close_icon_, icon_font, 0);
+    }
+    for (lv_obj_t* label : english_key_icons_) {
+        if (label != nullptr && icon_font != nullptr) {
+            lv_obj_set_style_text_font(label, icon_font, 0);
+        }
+    }
     if (english_close_icon_ != nullptr && icon_font != nullptr) {
         lv_obj_set_style_text_font(english_close_icon_, icon_font, 0);
     }
 }
-
 
 // ---- 英语学习启动面板 ----
 
@@ -3882,7 +3943,8 @@ void LcdDisplay::UpdateEnglishSetup() {
         if (english_setup_unit_ == 0) {
             lv_label_set_text(english_setup_unit_label_, "全部");
         } else {
-            lv_label_set_text(english_setup_unit_label_, store.UnitName(english_setup_unit_).c_str());
+            lv_label_set_text(english_setup_unit_label_,
+                              store.UnitName(english_setup_unit_).c_str());
         }
     }
     if (english_setup_count_label_ != nullptr) {
@@ -3899,12 +3961,11 @@ void LcdDisplay::UpdateEnglishSetup() {
     }
     if (english_setup_mode_label_ != nullptr) {
         lv_label_set_text(english_setup_mode_label_,
-                         english_setup_mode_ == 1 ? "单词卡" : "报听写");
+                          english_setup_mode_ == 1 ? "单词卡" : "报听写");
     }
     if (english_setup_speak_label_ != nullptr) {
         static const char* kNames[] = {"报英文", "报中文", "中英"};
-        lv_label_set_text(english_setup_speak_label_,
-                         kNames[english_setup_speak_ % 3]);
+        lv_label_set_text(english_setup_speak_label_, kNames[english_setup_speak_ % 3]);
     }
 }
 
@@ -4554,15 +4615,40 @@ void LcdDisplay::SetTheme(Theme* theme) {
     // Get the active screen
     lv_obj_t* screen = lv_screen_active();
 
-    // Set font
-    auto text_font = lvgl_theme->text_font()->font();
+    // Set font.  The theme's own font may already have been released when the
+    // assets were replaced, so use the resident chat font where possible.
+    auto text_font = SafeTextFont();
+    if (text_font == nullptr) {
+        text_font = lvgl_theme->text_font()->font();
+    }
     auto icon_font = lvgl_theme->icon_font()->font();
     auto large_icon_font = lvgl_theme->large_icon_font()->font();
 
-    // Rebind the stroke and settings pages immediately: their labels are not
-    // part of the chat layout and would still point at freed previous fonts.
+    // Rebind the stroke, settings and English pages immediately: their labels
+    // are not part of the chat layout and would still point at freed previous
+    // fonts.  This must happen before anything triggers a label relayout.
     RebindStrokeFonts(text_font, icon_font, large_icon_font);
     RebindSettingsFonts(text_font, icon_font);
+    RebindEnglishFonts(text_font, icon_font);
+
+    // Labels that use the icon font must follow the new theme font as well:
+    // the old font is freed when the assets are replaced.
+    // Anything still pointing at a freed font (from the previous theme) is
+    // repaired here, before any layout runs.
+    RepairDanglingFonts(text_font, icon_font, large_icon_font);
+
+    if (emoji_label_ != nullptr) {
+        lv_obj_set_style_text_font(emoji_label_, large_icon_font, 0);
+    }
+    if (sleep_zzz_ != nullptr) {
+        lv_obj_set_style_text_font(sleep_zzz_, large_icon_font, 0);
+    }
+    if (page_progress_ != nullptr) {
+        lv_obj_set_style_text_font(page_progress_, large_icon_font, 0);
+    }
+    if (avatar_think_dots_ != nullptr) {
+        lv_obj_set_style_text_font(avatar_think_dots_, large_icon_font, 0);
+    }
 
     if (text_font->line_height >= 40) {
         lv_obj_set_style_text_font(mute_label_, large_icon_font, 0);

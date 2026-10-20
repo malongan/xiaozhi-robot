@@ -100,10 +100,14 @@ protected:
     lv_obj_t* english_setup_interval_label_ = nullptr;
     lv_obj_t* english_setup_mode_label_ = nullptr;
     lv_obj_t* english_setup_speak_label_ = nullptr;
+    // 启动面板里所有用主题字体的标签（主题刷新时必须一起重绑）
+    std::vector<lv_obj_t*> english_setup_labels_;
+    lv_obj_t* english_setup_close_icon_ = nullptr;
+    std::vector<lv_obj_t*> english_key_icons_;
     int english_setup_unit_ = 1;
     int english_setup_count_ = 10;
     int english_setup_interval_ = 10;
-    int english_setup_mode_ = 0;  // 0=报听写 1=单词卡
+    int english_setup_mode_ = 0;   // 0=报听写 1=单词卡
     int english_setup_speak_ = 0;  // 0=报英文 1=报中文 2=中英
     lv_obj_t* english_close_icon_ = nullptr;
     lv_obj_t* english_entry_label_ = nullptr;
@@ -350,6 +354,13 @@ public:
     void ShowEnglishScreen(bool show);
     void UpdateEnglishScreen();
     void RebindEnglishFonts(const lv_font_t* text_font, const lv_font_t* icon_font);
+    // 当前有效的主题字体。主题刷新时 lvgl_theme 里的旧字体已被释放，
+    // 必须优先用常驻的 chat_font_，否则标签会指向野指针。
+    const lv_font_t* SafeTextFont() const;
+    // 遍历整棵对象树，把所有指向已释放字体的标签换成安全字体。
+    // 逐页维护标签清单总会遗漏，这是一劳永逸的兜底。
+    void RepairDanglingFonts(const lv_font_t* text_font, const lv_font_t* icon_font,
+                             const lv_font_t* large_icon_font);
     void StrokeChangeChar(int dir);  // dir = -1/+1，年级内循环
     // Add theme switching function
     virtual void SetTheme(Theme* theme) override;
