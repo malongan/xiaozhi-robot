@@ -1637,32 +1637,32 @@ void LcdDisplay::SetupUI() {
         lv_obj_set_style_text_font(english_word_label_, text_font, 0);
         lv_obj_set_style_text_color(english_word_label_, lvgl_theme->text_color(), 0);
         lv_label_set_text(english_word_label_, "");
-        lv_obj_align(english_word_label_, LV_ALIGN_CENTER, 0, -12);
+        lv_obj_align(english_word_label_, LV_ALIGN_CENTER, 0, -34);
 
         english_phonetic_label_ = lv_label_create(english_screen_);
         lv_obj_set_style_text_font(english_phonetic_label_, text_font, 0);
         lv_obj_set_style_text_color(english_phonetic_label_, lv_color_hex(0x9A9AA8), 0);
         lv_label_set_text(english_phonetic_label_, "");
-        lv_obj_align(english_phonetic_label_, LV_ALIGN_CENTER, 0, 22);
+        lv_obj_align(english_phonetic_label_, LV_ALIGN_CENTER, 0, -4);
 
         english_meaning_label_ = lv_label_create(english_screen_);
         lv_obj_set_style_text_font(english_meaning_label_, text_font, 0);
         lv_obj_set_style_text_color(english_meaning_label_, lv_color_hex(0xC8C8D0), 0);
         lv_label_set_text(english_meaning_label_, "");
-        lv_obj_align(english_meaning_label_, LV_ALIGN_CENTER, 0, 48);
+        lv_obj_align(english_meaning_label_, LV_ALIGN_CENTER, 0, 24);
 
         english_countdown_label_ = lv_label_create(english_screen_);
         lv_obj_set_style_text_font(english_countdown_label_, text_font, 0);
         lv_obj_set_style_text_color(english_countdown_label_, lv_color_hex(0x7A7A88), 0);
         lv_label_set_text(english_countdown_label_, "");
-        lv_obj_align(english_countdown_label_, LV_ALIGN_CENTER, 0, 78);
+        lv_obj_align(english_countdown_label_, LV_ALIGN_CENTER, 0, 54);
 
         // 底部：重播 / 上一个 / 下一个
         auto make_en_key = [this, text_font, lvgl_theme](int x, const char* text,
                                                           lv_event_cb_t cb) {
             lv_obj_t* key = lv_button_create(english_screen_);
-            lv_obj_set_size(key, 64, 40);
-            lv_obj_align(key, LV_ALIGN_BOTTOM_MID, x, -12);
+            lv_obj_set_size(key, 62, 38);
+            lv_obj_align(key, LV_ALIGN_BOTTOM_MID, x, -8);
             lv_obj_set_style_bg_color(key, lv_color_hex(0x1E1E26), 0);
             lv_obj_set_style_bg_opa(key, LV_OPA_COVER, 0);
             lv_obj_set_style_radius(key, 10, 0);
@@ -1678,16 +1678,16 @@ void LcdDisplay::SetupUI() {
             lv_label_set_text(label, text);
             lv_obj_center(label);
         };
-        make_en_key(-70, "重播", &LcdDisplay::OnEnglishRepeatClicked);
+        make_en_key(-66, "重播", &LcdDisplay::OnEnglishRepeatClicked);
         make_en_key(0, "上一个", &LcdDisplay::OnEnglishPrevClicked);
-        make_en_key(70, "下一个", &LcdDisplay::OnEnglishNextClicked);
+        make_en_key(66, "下一个", &LcdDisplay::OnEnglishNextClicked);
 
         // 第二排：显示模式 / 间隔
         auto make_en_small = [this, text_font, lvgl_theme](int x, const char* text,
                                                             lv_event_cb_t cb) {
             lv_obj_t* key = lv_button_create(english_screen_);
-            lv_obj_set_size(key, 84, 30);
-            lv_obj_align(key, LV_ALIGN_BOTTOM_MID, x, -52);
+            lv_obj_set_size(key, 80, 28);
+            lv_obj_align(key, LV_ALIGN_BOTTOM_MID, x, -56);
             lv_obj_set_style_bg_color(key, lv_color_hex(0x16161C), 0);
             lv_obj_set_style_bg_opa(key, LV_OPA_COVER, 0);
             lv_obj_set_style_radius(key, 8, 0);
