@@ -89,6 +89,7 @@ protected:
     lv_obj_t* english_progress_label_ = nullptr;
     lv_obj_t* english_countdown_label_ = nullptr;
     lv_obj_t* english_mode_label_ = nullptr;
+    lv_obj_t* english_score_label_ = nullptr;
     lv_obj_t* english_interval_label_ = nullptr;
     // 启动选择面板
     lv_obj_t* english_setup_panel_ = nullptr;
@@ -299,6 +300,7 @@ protected:
     static void OnEnglishRepeatClicked(lv_event_t* e);
     static void OnEnglishPrevClicked(lv_event_t* e);
     static void OnEnglishNextClicked(lv_event_t* e);
+    static void OnEnglishNextLongPressed(lv_event_t* e);
     static void OnEnglishModeClicked(lv_event_t* e);
     static void OnEnglishIntervalClicked(lv_event_t* e);
     static void OnEnglishSetupModeClicked(lv_event_t* e);

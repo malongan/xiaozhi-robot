@@ -1633,6 +1633,12 @@ void LcdDisplay::SetupUI() {
         lv_label_set_text(english_progress_label_, "听写");
         lv_obj_align(english_progress_label_, LV_ALIGN_TOP_MID, 0, 8);
 
+        english_score_label_ = lv_label_create(english_screen_);
+        lv_obj_set_style_text_font(english_score_label_, text_font, 0);
+        lv_obj_set_style_text_color(english_score_label_, lv_color_hex(0x7AB88A), 0);
+        lv_label_set_text(english_score_label_, "");
+        lv_obj_align(english_score_label_, LV_ALIGN_TOP_RIGHT, -8, 8);
+
         english_word_label_ = lv_label_create(english_screen_);
         lv_obj_set_style_text_font(english_word_label_, text_font, 0);
         lv_obj_set_style_text_color(english_word_label_, lvgl_theme->text_color(), 0);
@@ -1657,9 +1663,16 @@ void LcdDisplay::SetupUI() {
         lv_label_set_text(english_countdown_label_, "");
         lv_obj_align(english_countdown_label_, LV_ALIGN_CENTER, 0, 54);
 
+        // 操作提示：长按"下一个"记为答对
+        lv_obj_t* en_hint = lv_label_create(english_screen_);
+        lv_obj_set_style_text_font(en_hint, text_font, 0);
+        lv_obj_set_style_text_color(en_hint, lv_color_hex(0x4A4A56), 0);
+        lv_label_set_text(en_hint, "长按下一个 = 答对");
+        lv_obj_align(en_hint, LV_ALIGN_CENTER, 0, 82);
+
         // 底部：重播 / 上一个 / 下一个
         auto make_en_key = [this, text_font, lvgl_theme](int x, const char* text,
-                                                          lv_event_cb_t cb) {
+                                                          lv_event_cb_t cb) -> lv_obj_t* {
             lv_obj_t* key = lv_button_create(english_screen_);
             lv_obj_set_size(key, 62, 38);
             lv_obj_align(key, LV_ALIGN_BOTTOM_MID, x, -8);
@@ -1677,10 +1690,14 @@ void LcdDisplay::SetupUI() {
             lv_obj_set_style_text_color(label, lvgl_theme->text_color(), 0);
             lv_label_set_text(label, text);
             lv_obj_center(label);
+            return key;
         };
         make_en_key(-66, "重播", &LcdDisplay::OnEnglishRepeatClicked);
         make_en_key(0, "上一个", &LcdDisplay::OnEnglishPrevClicked);
-        make_en_key(66, "下一个", &LcdDisplay::OnEnglishNextClicked);
+        lv_obj_t* en_next = make_en_key(66, "下一个", &LcdDisplay::OnEnglishNextClicked);
+        // 长按"下一个"= 标记这个单词听写正确
+        lv_obj_add_event_cb(en_next, &LcdDisplay::OnEnglishNextLongPressed, LV_EVENT_LONG_PRESSED,
+                            this);
 
         // 第二排：显示模式 / 间隔
         auto make_en_small = [this, text_font, lvgl_theme](int x, const char* text,
@@ -3721,6 +3738,17 @@ void LcdDisplay::UpdateEnglishScreen() {
         lv_label_set_text(english_countdown_label_, "");
     }
 
+    // 听写成绩（有作答记录时显示）
+    if (english_score_label_ != nullptr) {
+        const int answered = player.AnsweredCount();
+        if (answered > 0) {
+            snprintf(buf, sizeof(buf), "对 %d / %d", player.CorrectCount(), answered);
+        } else {
+            buf[0] = '\0';
+        }
+        lv_label_set_text(english_score_label_, buf);
+    }
+
     // 底部两个小按钮的文案
     if (english_mode_label_ != nullptr) {
         const char* mode_text = player.CurrentMode() == EnglishPlayer::kCards
@@ -3740,7 +3768,8 @@ void LcdDisplay::RebindEnglishFonts(const lv_font_t* text_font, const lv_font_t*
                                english_countdown_label_, english_entry_label_,
                                english_mode_label_, english_interval_label_,
                                english_setup_unit_label_, english_setup_count_label_,
-                               english_setup_interval_label_, english_setup_mode_label_};
+                               english_setup_interval_label_, english_setup_mode_label_,
+                               english_score_label_};
     for (lv_obj_t* label : text_labels) {
         if (label != nullptr && text_font != nullptr) {
             lv_obj_set_style_text_font(label, text_font, 0);
@@ -3919,6 +3948,16 @@ void LcdDisplay::OnEnglishNextClicked(lv_event_t* e) {
         EnglishPlayer::GetInstance().Next();
         self->UpdateEnglishScreen();
     }
+}
+
+void LcdDisplay::OnEnglishNextLongPressed(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self == nullptr) {
+        return;
+    }
+    // 长按"下一个"表示这个单词听写正确
+    EnglishPlayer::GetInstance().MarkCorrect();
+    self->UpdateEnglishScreen();
 }
 
 void LcdDisplay::OnEnglishModeClicked(lv_event_t* e) {

@@ -109,6 +109,16 @@ void EnglishPlayer::CycleInterval() {
     }
 }
 
+void EnglishPlayer::MarkCorrect() {
+    if (!active_ || mode_ != kDictation) {
+        return;
+    }
+    correct_++;
+    answered_++;
+    ESP_LOGI(TAG, "标记答对：%d/%d", correct_, answered_);
+    Next();
+}
+
 void EnglishPlayer::Stop() {
     if (!active_) {
         return;
@@ -118,6 +128,11 @@ void EnglishPlayer::Stop() {
     current_ = -1;
     total_ = 0;
     played_ = 0;
+    if (answered_ > 0) {
+        ESP_LOGI(TAG, "停止听写，本次成绩 %d/%d", correct_, answered_);
+    }
+    correct_ = 0;
+    answered_ = 0;
     ESP_LOGI(TAG, "停止听写");
 }
 

@@ -35,6 +35,8 @@ public:
     void Next();
     void Prev();
     void Repeat();
+    // 标记当前词听写正确（长按"下一个"触发）
+    void MarkCorrect();
     // 切换显示模式（真听写 <-> 看词听写）
     void ToggleShowWord();
     // 在报听写与单词卡之间切换
@@ -50,6 +52,9 @@ public:
     int Total() const { return total_; }
     int Interval() const { return interval_; }
     bool ShowWord() const { return show_word_; }
+    // 听写成绩
+    int CorrectCount() const { return correct_; }
+    int AnsweredCount() const { return answered_; }
     Mode CurrentMode() const { return mode_; }
     // 距离下一个词还有几秒（-1 表示不在等待中）
     int Countdown() const;
@@ -73,6 +78,8 @@ private:
     int start_ = 0;
     int end_ = 0;
     int played_ = 0;
+    int correct_ = 0;
+    int answered_ = 0;
     uint32_t next_tick_ = 0;
     std::vector<uint8_t> audio_;
 };
