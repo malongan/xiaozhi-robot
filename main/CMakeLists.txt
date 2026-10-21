@@ -879,11 +879,9 @@ elseif(CONFIG_BOARD_TYPE_HU_087)
     set(BUILTIN_ICON_FONT font_material_symbols_14_1)
 elseif(CONFIG_BOARD_TYPE_Freenove_ESP32S3_DISPLAY_2_8_LCD)
     set(BOARD_DIR "freenove-esp32s3-display-2.8-lcd")
-    set(BUILTIN_TEXT_FONT font_noto_sans_basic_20_4)
+    set(BUILTIN_TEXT_FONT font_noto_sans_basic_16_4)
     set(BUILTIN_ICON_FONT font_material_symbols_20_4)
     set(DEFAULT_EMOJI_COLLECTION noto-color-emoji_64)
-    # Extra 18px chat font loaded from the assets partition (paged caption).
-    set(DEFAULT_ASSETS_EXTRA_FILES "${CMAKE_CURRENT_LIST_DIR}/assets/chat-font")
 elseif(CONFIG_BOARD_TYPE_AI_VOX3)
     set(BOARD_DIR "nulllab-ai-vox-v3")
     set(BUILTIN_TEXT_FONT font_noto_sans_basic_20_4)
@@ -1104,6 +1102,24 @@ if(CONFIG_IDF_TARGET_ESP32S3)
     list(APPEND SOURCES "boards/common/esp32_camera.cc")
 endif()
 
+set(WEB_ASSETS "")
+if(CONFIG_WEB_FILE_SERVER)
+    list(APPEND SOURCES "web_file_server.cc")
+    set(WEB_INDEX_HTML "${CMAKE_CURRENT_SOURCE_DIR}/web_assets/index.html")
+    set(WEB_INDEX_GZ "${CMAKE_CURRENT_BINARY_DIR}/web_assets/index.html.gz")
+    set(WEB_GZIP_SCRIPT "${PROJECT_DIR}/scripts/gzip_web_asset.py")
+    set_source_files_properties("${WEB_INDEX_GZ}" PROPERTIES GENERATED TRUE)
+    add_custom_command(
+        OUTPUT "${WEB_INDEX_GZ}"
+        COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/web_assets"
+        COMMAND python "${WEB_GZIP_SCRIPT}" "${WEB_INDEX_HTML}" "${WEB_INDEX_GZ}"
+        DEPENDS "${WEB_INDEX_HTML}" "${WEB_GZIP_SCRIPT}"
+        COMMENT "Compressing web assets"
+        VERBATIM
+    )
+    list(APPEND WEB_ASSETS "${WEB_INDEX_GZ}")
+endif()
+
 set(MAIN_PRIV_REQUIRES_EXTRA "")
 if(CONFIG_XIAOZHI_NETWORK_ETHERNET AND CONFIG_XIAOZHI_ETH_PHY_IP101)
     list(APPEND MAIN_PRIV_REQUIRES_EXTRA espressif__ip101)
@@ -1138,7 +1154,7 @@ if(CONFIG_BOARD_TYPE_Freenove_ESP32S3_DISPLAY_2_8_LCD)
     )
 endif()
 idf_component_register(SRCS ${SOURCES}
-                    EMBED_FILES ${LANG_SOUNDS} ${COMMON_SOUNDS}
+                    EMBED_FILES ${LANG_SOUNDS} ${COMMON_SOUNDS} ${WEB_ASSETS}
                     INCLUDE_DIRS ${INCLUDE_DIRS}
                     WHOLE_ARCHIVE
                     PRIV_REQUIRES
@@ -1156,6 +1172,7 @@ idf_component_register(SRCS ${SOURCES}
                         esp_driver_ppa
                         esp_driver_tsens
                         esp_app_format
+                        esp_http_server
                         app_update
                         spi_flash
                         mbedtls

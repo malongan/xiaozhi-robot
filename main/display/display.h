@@ -76,6 +76,9 @@ public:
     virtual bool KeepsChatHistory() const { return false; }
     virtual void SetTheme(Theme* theme);
     virtual Theme* GetTheme() { return current_theme_; }
+    // Pushed by the board when the network link comes up or goes down.  Empty
+    // means offline; config mode passes the hotspot address instead.
+    virtual void SetIpAddress(const std::string& ip) { (void)ip; }
     virtual void UpdateStatusBar(bool update_all = false);
     virtual void SetPowerSaveMode(bool on);
     virtual bool AddTextGlyphs(const std::vector<TextGlyph>& glyphs, uint8_t bpp) { return false; }

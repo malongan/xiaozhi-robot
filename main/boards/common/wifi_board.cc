@@ -17,6 +17,10 @@
 #include <wifi_manager.h>
 #include <wifi_station.h>
 #include <ssid_manager.h>
+
+#if CONFIG_WEB_FILE_SERVER
+#include "web_file_server.h"
+#endif
 #ifdef CONFIG_USE_ESP_BLUFI_WIFI_PROVISIONING
 #include "blufi.h"
 #endif
@@ -125,6 +129,13 @@ void WifiBoard::OnNetworkEvent(NetworkEvent event, const std::string& data) {
 #endif
             in_config_mode_ = false;
             ESP_LOGI(TAG, "Connected to WiFi: %s", data.c_str());
+            {
+                auto& wifi_manager = WifiManager::GetInstance();
+                GetDisplay()->SetIpAddress(wifi_manager.GetIpAddress());
+#if CONFIG_WEB_FILE_SERVER
+                WebFileServer::GetInstance().Start();
+#endif
+            }
             break;
         case NetworkEvent::Scanning:
             ESP_LOGI(TAG, "WiFi scanning");
@@ -134,10 +145,19 @@ void WifiBoard::OnNetworkEvent(NetworkEvent event, const std::string& data) {
             break;
         case NetworkEvent::Disconnected:
             ESP_LOGW(TAG, "WiFi disconnected");
+#if CONFIG_WEB_FILE_SERVER
+            WebFileServer::GetInstance().Stop();
+#endif
+            GetDisplay()->SetIpAddress("");
             break;
         case NetworkEvent::WifiConfigModeEnter:
             ESP_LOGI(TAG, "WiFi config mode entered");
             in_config_mode_ = true;
+#if CONFIG_WEB_FILE_SERVER
+            // The provisioning portal owns port 80 while the hotspot is up.
+            WebFileServer::GetInstance().Stop();
+#endif
+            GetDisplay()->SetIpAddress("");
             break;
         case NetworkEvent::WifiConfigModeExit:
             ESP_LOGI(TAG, "WiFi config mode exited");

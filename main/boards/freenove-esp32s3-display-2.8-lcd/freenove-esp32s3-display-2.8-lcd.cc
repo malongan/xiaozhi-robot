@@ -53,10 +53,12 @@ private:
     static bool MountSdSdmmc() {
         esp_vfs_fat_mount_config_t mount_cfg = {
             .format_if_mount_failed = false,
-            .max_files = 5,
+            .max_files = 10,
             .allocation_unit_size = 16 * 1024,
         };
         sdmmc_host_t host = SDMMC_HOST_DEFAULT();
+        // Keep the 20 MHz default: 40 MHz high-speed mode measured far slower
+        // on this board (link/trace dependent), so do not raise it here.
         host.max_freq_khz = SDMMC_FREQ_DEFAULT;
         sdmmc_slot_config_t slot = SDMMC_SLOT_CONFIG_DEFAULT();
         slot.clk = SD_CLK;
@@ -105,7 +107,7 @@ private:
         }
         esp_vfs_fat_mount_config_t mount_cfg = {
             .format_if_mount_failed = false,
-            .max_files = 5,
+            .max_files = 10,
             .allocation_unit_size = 16 * 1024,
         };
         sdmmc_host_t host = SDSPI_HOST_DEFAULT();

@@ -8,6 +8,7 @@
 >
 > - 定制说明与复盘：[docs/custom/lessons-20261020.md](docs/custom/lessons-20261020.md)
 > - 笔顺数据生成：[tools/stroke-pipeline/README.md](tools/stroke-pipeline/README.md)
+> - 网页传文件（Wi-Fi 管理 SD 卡）：[docs/web-file-transfer.md](docs/web-file-transfer.md)
 > - 界面预览：[docs/custom/](docs/custom/)
 >
 > **固件下载（两个版本）**：<https://github.com/malongan/xiaozhi-robot/releases>

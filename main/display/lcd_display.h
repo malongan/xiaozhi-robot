@@ -95,19 +95,32 @@ protected:
     lv_obj_t* english_interval_label_ = nullptr;
     // 启动选择面板
     lv_obj_t* english_setup_panel_ = nullptr;
-    lv_obj_t* english_setup_unit_label_ = nullptr;
-    lv_obj_t* english_setup_source_label_ = nullptr;
-    lv_obj_t* english_setup_scope_name_ = nullptr;
     lv_obj_t* english_setup_title_label_ = nullptr;
-    lv_obj_t* english_setup_start_label_ = nullptr;
-    lv_obj_t* english_setup_count_label_ = nullptr;
-    lv_obj_t* english_setup_interval_label_ = nullptr;
-    lv_obj_t* english_setup_mode_label_ = nullptr;
-    lv_obj_t* english_setup_speak_label_ = nullptr;
+    lv_obj_t* english_setup_step1_ = nullptr;
+    lv_obj_t* english_setup_step2_ = nullptr;
+    lv_obj_t* english_setup_tab_text_ = nullptr;
+    lv_obj_t* english_setup_tab_topic_ = nullptr;
+    lv_obj_t* english_setup_list_ = nullptr;
+    // 左右翻页按钮：内容列表不再滚动，避免滑动与点选互相干扰
+    lv_obj_t* english_setup_page_left_ = nullptr;
+    lv_obj_t* english_setup_page_right_ = nullptr;
+    lv_obj_t* english_setup_page_left_icon_ = nullptr;
+    lv_obj_t* english_setup_page_right_icon_ = nullptr;
+    int english_setup_page_ = 0;
+    int english_setup_page_count_ = 1;
+    lv_obj_t* english_setup_rows_[35] = {};
+    lv_obj_t* english_setup_row_names_[35] = {};
+    lv_obj_t* english_setup_row_counts_[35] = {};
+    int english_setup_row_values_[35] = {};
+    int english_setup_row_count_ = 0;
+    lv_obj_t* english_setup_next_label_ = nullptr;
+    lv_obj_t* english_setup_chip_labels_[4][6] = {};
+    int english_setup_chip_count_[4] = {0, 0, 0, 0};
+    int english_setup_chip_values_[4][6] = {};
+    int english_setup_step_ = 0;
     // 启动面板里所有用主题字体的标签（主题刷新时必须一起重绑）
     std::vector<lv_obj_t*> english_setup_labels_;
     lv_obj_t* english_setup_close_icon_ = nullptr;
-    std::vector<lv_obj_t*> english_key_labels_;
     int english_setup_unit_ = 1;
     int english_setup_topic_ = 0;
     int english_setup_source_ = 0;  // 0=课文（按单元） 1=分类（按主题）
@@ -115,27 +128,22 @@ protected:
     int english_setup_interval_ = 10;
     int english_setup_mode_ = 0;   // 0=报听写 1=单词卡
     int english_setup_speak_ = 0;  // 0=报英文 1=报中文 2=中英
-    lv_obj_t* english_close_icon_ = nullptr;
-    lv_obj_t* english_entry_label_ = nullptr;
-    lv_obj_t* english_entry_btn_ = nullptr;
+    lv_obj_t* english_back_icon_ = nullptr;
+    lv_obj_t* english_reset_icon_ = nullptr;
     lv_obj_t* stroke_screen_ = nullptr;
     lv_obj_t* stroke_canvas_ = nullptr;
     lv_obj_t* stroke_title_label_ = nullptr;
     lv_obj_t* stroke_pinyin_label_ = nullptr;
     lv_obj_t* stroke_info_label_ = nullptr;
-    lv_obj_t* stroke_entry_btn_ = nullptr;
     lv_obj_t* stroke_badges_[kStrokeMaxStrokes] = {};
     lv_obj_t* stroke_badge_labels_[kStrokeMaxStrokes] = {};
     lv_obj_t* stroke_close_icon_ = nullptr;
-    lv_obj_t* stroke_key_icons_[3] = {};
-    lv_obj_t* stroke_entry_label_ = nullptr;
     void RebindStrokeFonts(const lv_font_t* text_font, const lv_font_t* icon_font,
                            const lv_font_t* large_icon_font);
     uint8_t* stroke_canvas_buf_ = nullptr;
     lv_color_t stroke_color_bg_;
     lv_color_t stroke_color_dim_;
     lv_color_t stroke_color_done_;
-    lv_color_t stroke_color_active_;
     std::vector<StrokeMeta> stroke_metas_;
     uint8_t stroke_bits_[StrokeStore::kGlyphBytes] = {};
     int stroke_char_idx_ = -1;
@@ -163,8 +171,6 @@ protected:
     bool avatar_sleeping_ = false;
     uint32_t sleep_start_tick_ = 0;
     lv_obj_t* sleep_zzz_ = nullptr;
-    lv_obj_t* settings_entry_btn_ = nullptr;
-    lv_obj_t* settings_entry_icon_ = nullptr;
     lv_obj_t* settings_screen_ = nullptr;
     lv_obj_t* settings_title_ = nullptr;
     lv_obj_t* settings_volume_label_ = nullptr;
@@ -177,6 +183,8 @@ protected:
     lv_obj_t* settings_mic_plus_icon_ = nullptr;
     lv_obj_t* settings_wifi_label_ = nullptr;
     lv_obj_t* settings_wifi_status_ = nullptr;
+    lv_obj_t* settings_ip_label_ = nullptr;
+    lv_obj_t* settings_ip_value_ = nullptr;
     lv_obj_t* settings_bt_label_ = nullptr;
     lv_obj_t* settings_bt_status_ = nullptr;
     lv_obj_t* settings_back_icon_ = nullptr;
@@ -189,6 +197,68 @@ protected:
     lv_obj_t* settings_bt_forget_label_ = nullptr;
     lv_obj_t* settings_reboot_label_ = nullptr;
     bool settings_screen_visible_ = false;
+
+    // 文件传输页：显示网址、启停、SD 容量与上传进度
+    lv_obj_t* file_service_screen_ = nullptr;
+    lv_obj_t* file_back_icon_ = nullptr;
+    lv_obj_t* file_title_label_ = nullptr;
+    lv_obj_t* file_url_label_ = nullptr;
+    lv_obj_t* file_hint_label_ = nullptr;
+    lv_obj_t* file_status_dot_ = nullptr;
+    lv_obj_t* file_status_label_ = nullptr;
+    lv_obj_t* file_toggle_label_ = nullptr;
+    lv_obj_t* file_storage_label_ = nullptr;
+    lv_obj_t* file_activity_label_ = nullptr;
+    lv_obj_t* file_progress_bar_ = nullptr;
+    lv_obj_t* file_foot_label_ = nullptr;
+    bool file_service_visible_ = false;
+    // 从功能抽屉进入二级页时置位；返回时据此回到抽屉而不是待机画面。
+    bool return_to_drawer_ = false;
+    void CloseSubPageToDrawer();
+    void ShowFileServiceScreen(bool show);
+    void UpdateFileServiceValues();
+    void UpdateFileTransferActivity(const std::string& name, int percent, bool done, bool error);
+    static void OnFileServiceBackClicked(lv_event_t* e);
+    static void OnFileServiceToggleClicked(lv_event_t* e);
+
+    // 功能抽屉：底部点状把手展开的彩色图标宫格页（表驱动，新增功能只加一行）
+    struct DrawerTileSpec {
+        const char* icon;
+        const char* label;
+        void (LcdDisplay::*action)();
+        bool (LcdDisplay::*enabled)() const;
+        bool pending;
+        const char* hint;
+        uint32_t color_top;
+        uint32_t color_bottom;
+    };
+    static constexpr int kDrawerTileCount = 5;
+    static const DrawerTileSpec kDrawerSpecs[kDrawerTileCount];
+    lv_obj_t* drawer_screen_ = nullptr;
+    lv_obj_t* drawer_back_icon_ = nullptr;
+    lv_obj_t* drawer_title_ = nullptr;
+    lv_obj_t* drawer_hint_ = nullptr;
+    lv_obj_t* drawer_tiles_[kDrawerTileCount] = {};
+    lv_obj_t* drawer_tile_boxes_[kDrawerTileCount] = {};
+    lv_obj_t* drawer_tile_icons_[kDrawerTileCount] = {};
+    lv_obj_t* drawer_tile_labels_[kDrawerTileCount] = {};
+    lv_timer_t* drawer_hint_timer_ = nullptr;
+    bool drawer_screen_visible_ = false;
+    void ShowDrawerScreen(bool show);
+    void RefreshDrawerTiles();
+    void ShowDrawerHint(const char* text);
+    void OpenSettingsPage();
+    void OpenEnglishPage();
+    void OpenStrokePage();
+    void OpenMediaPage();
+    void OpenFileServicePage();
+    bool DrawerAlwaysEnabled() const { return true; }
+    bool DrawerEnglishEnabled() const;
+    bool DrawerStrokeEnabled() const;
+    static void OnDrawerHandleClicked(lv_event_t* e);
+    static void OnDrawerBackClicked(lv_event_t* e);
+    static void OnDrawerTileClicked(lv_event_t* e);
+    static void OnDrawerHintTimer(lv_timer_t* timer);
     lv_obj_t* media_hint_ = nullptr;
     lv_obj_t* media_bt_icon_ = nullptr;
     lv_obj_t* media_title_ = nullptr;
@@ -202,7 +272,6 @@ protected:
     lv_obj_t* bt_disconnect_btn_ = nullptr;
     lv_obj_t* bt_disconnect_label_ = nullptr;
     lv_obj_t* page_progress_ = nullptr;  // faint press ring around the avatar
-    LvglCBinFont* chat_font_ = nullptr;  // 18px Common font loaded from the assets partition
 
     // Procedural round-face avatar (white circle + two pill eyes).
     lv_obj_t* avatar_face_ = nullptr;
@@ -248,7 +317,6 @@ protected:
     void ApplyChatLayout();
     const lv_font_t* GetChatFont();
     static void AvatarAnimTimerCb(lv_timer_t* timer);
-    static void OnSettingsEntryClicked(lv_event_t* e);
     static void OnSettingsBackClicked(lv_event_t* e);
     static void OnVolumeDownClicked(lv_event_t* e);
     static void OnVolumeUpClicked(lv_event_t* e);
@@ -262,7 +330,8 @@ protected:
     static void OnRebootClicked(lv_event_t* e);
     void ShowSettingsScreen(bool show);
     void UpdateSettingsValues();
-    void RebindSettingsFonts(const lv_font_t* text_font, const lv_font_t* icon_font);
+    void RebindSettingsFonts(const lv_font_t* text_font, const lv_font_t* icon_font,
+                             const lv_font_t* large_icon_font);
     void SetAvatarEmotion(const char* emotion);
     void PickAvatarGaze();
     void RewrapMessage(size_t index);
@@ -276,7 +345,6 @@ protected:
     std::string BuildPageText(const ChatPage& page) const;
 
     static void OnChatAreaClicked(lv_event_t* e);
-    static void OnMediaBarClicked(lv_event_t* e);
     static void OnMediaBackClicked(lv_event_t* e);
     static void OnMediaKeyClicked(lv_event_t* e);
     static void MediaFeedbackTimerCb(lv_timer_t* timer);
@@ -305,30 +373,26 @@ protected:
     void StrokeStampLine(float x0, float y0, float x1, float y1, float r, lv_color_t color);
     void StrokeAnimTick();
     static void StrokeAnimTimerCb(lv_timer_t* timer);
-    static void OnStrokeEntryClicked(lv_event_t* e);
     static void OnStrokeCloseClicked(lv_event_t* e);
     static void OnStrokeReplayClicked(lv_event_t* e);
     static void OnStrokePrevClicked(lv_event_t* e);
     static void OnStrokeNextClicked(lv_event_t* e);
-    static void OnEnglishCloseClicked(lv_event_t* e);
-    static void OnEnglishEntryClicked(lv_event_t* e);
-    static void OnEnglishRepeatClicked(lv_event_t* e);
+    static void OnEnglishBackClicked(lv_event_t* e);
+    static void OnEnglishResetClicked(lv_event_t* e);
     static void OnEnglishPrevClicked(lv_event_t* e);
     static void OnEnglishNextClicked(lv_event_t* e);
     static void OnEnglishNextLongPressed(lv_event_t* e);
     static void OnEnglishModeClicked(lv_event_t* e);
     static void OnEnglishIntervalClicked(lv_event_t* e);
     static void OnEnglishSpeakClicked(lv_event_t* e);
-    static void OnEnglishSetupModeClicked(lv_event_t* e);
-    static void OnEnglishSetupSpeakClicked(lv_event_t* e);
-    static void OnEnglishSetupUnitClicked(lv_event_t* e);
-    static void OnEnglishSetupTopicClicked(lv_event_t* e);
+    static void OnEnglishSetupBackClicked(lv_event_t* e);
     static void OnEnglishSetupSourceClicked(lv_event_t* e);
-    static void OnEnglishSetupScopeClicked(lv_event_t* e);
-    static void OnEnglishSetupCountClicked(lv_event_t* e);
-    static void OnEnglishSetupIntervalClicked(lv_event_t* e);
-    static void OnEnglishSetupStartClicked(lv_event_t* e);
-    static void OnEnglishSetupCloseClicked(lv_event_t* e);
+    static void OnEnglishSetupScopeRowClicked(lv_event_t* e);
+    static void OnEnglishSetupChipClicked(lv_event_t* e);
+    static void OnEnglishSetupNextClicked(lv_event_t* e);
+    static void OnEnglishSetupPageClicked(lv_event_t* e);
+    void EnglishSetupRebuildScopeList();
+    void EnglishSetupShowStep(int step);
     void ShowEnglishSetup(bool show);
     void UpdateEnglishSetup();
     static void OnAvatarPressed(lv_event_t* e);
@@ -352,6 +416,7 @@ public:
     virtual void SetEmotion(const char* emotion) override;
     virtual void SetAvatarMood(AvatarMood mood) override;
     virtual void OnWakeWordDetected() override;
+    virtual void SetIpAddress(const std::string& ip) override;
     virtual void SetChatMessage(const char* role, const char* content) override;
     virtual void ClearChatMessages() override;
     virtual bool KeepsChatHistory() const override { return true; }
@@ -369,7 +434,7 @@ public:
     virtual void RefreshEnglishScreen() override;
     void RebindEnglishFonts(const lv_font_t* text_font, const lv_font_t* icon_font);
     // 当前有效的主题字体。主题刷新时 lvgl_theme 里的旧字体已被释放，
-    // 必须优先用常驻的 chat_font_，否则标签会指向野指针。
+    // 统一返回主题字体，避免标签指向野指针。
     const lv_font_t* SafeTextFont() const;
     // 遍历整棵对象树，把所有指向已释放字体的标签换成安全字体。
     // 逐页维护标签清单总会遗漏，这是一劳永逸的兜底。

@@ -85,6 +85,7 @@ bool EnglishPlayer::Start(int unit, int topic, int count, int interval_seconds, 
     paused_ = false;
     active_ = true;
     pending_cn_ = false;
+    retry_current_ = false;
     next_tick_ = 0;
 
     if (interval_ > 0) {
@@ -208,6 +209,7 @@ void EnglishPlayer::Stop() {
     active_ = false;
     paused_ = false;
     pending_cn_ = false;
+    retry_current_ = false;
     current_ = -1;
     total_ = 0;
     pos_ = 0;
@@ -280,6 +282,27 @@ void EnglishPlayer::Repeat() {
     PlayCurrent();
 }
 
+bool EnglishPlayer::Restart() {
+    if (!active_ || order_.empty()) {
+        return false;
+    }
+    pos_ = 0;
+    current_ = order_[0];
+    played_ = 0;
+    correct_ = 0;
+    answered_ = 0;
+    paused_ = false;
+    pending_cn_ = false;
+    retry_current_ = false;
+    next_tick_ = 0;
+    ESP_LOGI(TAG, "重新开始：%d 词", total_);
+    PlayCurrent();
+    if (refresh_cb_ != nullptr) {
+        refresh_cb_();
+    }
+    return true;
+}
+
 int EnglishPlayer::Countdown() const {
     if (!active_ || paused_ || next_tick_ == 0 || interval_ <= 0) {
         return -1;
@@ -307,6 +330,7 @@ bool EnglishPlayer::PlayCurrent() {
     if (server_busy || state_busy) {
         ESP_LOGI(TAG, "设备忙，稍后重试：%s", store.WordAt(current_).data());
         next_tick_ = NowMs() + 500;
+        retry_current_ = true;
         return false;
     }
     // 按播报语言决定播放哪一段（重播/切换语言时清掉上一词的待播中文）
@@ -325,6 +349,7 @@ bool EnglishPlayer::PlayCurrent() {
         }
         played_++;
         next_tick_ = interval_ > 0 ? NowMs() + static_cast<uint32_t>(interval_) * 1000 + 1000 : 0;
+        retry_current_ = false;
         return true;
     }
 
@@ -347,6 +372,7 @@ bool EnglishPlayer::PlayCurrent() {
     }
     // 发音约 1 秒，之后再等 interval 秒到下一个词；手动模式下等用户翻页
     next_tick_ = interval_ > 0 ? NowMs() + static_cast<uint32_t>(interval_) * 1000 + 1000 : 0;
+    retry_current_ = false;
     return true;
 }
 
@@ -355,6 +381,16 @@ void EnglishPlayer::Tick() {
         return;
     }
     const uint32_t now = NowMs();
+    if (retry_current_ && (next_tick_ == 0 || now >= next_tick_)) {
+        // 上一轮因设备忙没播出去：原地重试当前词，不推进
+        if (!PlayCurrent()) {
+            return;
+        }
+        if (refresh_cb_ != nullptr) {
+            refresh_cb_();
+        }
+        return;
+    }
     if (next_tick_ == 0 || now < next_tick_) {
         return;
     }
@@ -395,6 +431,7 @@ void EnglishPlayer::Tick() {
         // 设备忙：退回当前词，稍后重试，避免跳词
         pos_--;
         current_ = order_[pos_];
+        retry_current_ = false;
         return;
     }
     if (refresh_cb_ != nullptr) {

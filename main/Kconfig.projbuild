@@ -1038,6 +1038,32 @@ menu "WiFi Configuration Method"
             The provisioning client must support ffdhe3072, SHA-256, and AES-CTR.
 endmenu
 
+menu "Web File Transfer"
+    config WEB_FILE_SERVER
+        bool "Enable SD card web file transfer"
+        default n
+        help
+            Serve a small web UI on the station interface that lets a
+            browser browse, upload, download and delete files on the SD card.
+            The service starts automatically once Wi-Fi connects and stops
+            when the link drops or the provisioning hotspot takes over.
+
+    config WEB_FILE_SERVER_PORT
+        int "HTTP port"
+        depends on WEB_FILE_SERVER
+        range 80 65535
+        default 80
+
+    config WEB_FILE_SERVER_PIN
+        string "Optional access PIN (empty disables)"
+        depends on WEB_FILE_SERVER
+        default ""
+        help
+            When non-empty, every /api request must carry the PIN either as
+            ?token=<PIN> or in an X-Auth-Token header. Leave empty for an
+            open service on the local network.
+endmenu
+
 config AUDIO_DEBUG_UDP_SERVER
     string "Audio Debug UDP Server Address"
     default "192.168.2.100:8000"

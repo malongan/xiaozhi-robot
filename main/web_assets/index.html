@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#12121a">
+<title>SD 文件</title>
+<style>
+  :root {
+    --bg: #12121a;
+    --panel: #1c1c26;
+    --panel-hi: #262632;
+    --line: #31313d;
+    --text: #ececf2;
+    --muted: #9a9aa6;
+    --accent: #5b8cff;
+    --ok: #4cd964;
+    --danger: #ff5d5d;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+          "Microsoft YaHei", Roboto, sans-serif;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid var(--line);
+    background: linear-gradient(180deg, #191925, #14141d);
+    position: sticky; top: 0; z-index: 5;
+  }
+  .title-row { display: flex; align-items: center; gap: 10px; }
+  .title-row h1 { font-size: 17px; font-weight: 600; margin: 0; letter-spacing: .3px; }
+  .chip {
+    font-size: 11px; color: var(--muted); border: 1px solid var(--line);
+    border-radius: 999px; padding: 2px 8px; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; max-width: 50vw;
+  }
+  .grow { flex: 1; }
+  .storage { margin-top: 10px; }
+  .storage .bar { height: 6px; border-radius: 3px; background: #2a2a34; overflow: hidden; }
+  .storage .bar > i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 3px; transition: width .3s; }
+  .storage .meta { margin-top: 5px; font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; }
+
+  .toolbar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 12px; border-bottom: 1px solid var(--line);
+    position: sticky; top: 0; z-index: 4; background: var(--bg);
+  }
+  .crumb {
+    flex: 1; min-width: 0; display: flex; align-items: center; flex-wrap: wrap;
+    font-size: 13px; color: var(--muted); overflow: hidden;
+  }
+  .crumb button {
+    background: none; border: 0; padding: 2px 2px; margin: 0; color: var(--accent);
+    font: inherit; cursor: pointer;
+  }
+  .crumb span.sep { margin: 0 2px; opacity: .6; }
+  .crumb span.here { color: var(--text); }
+
+  button.btn {
+    background: var(--panel-hi); color: var(--text); border: 1px solid var(--line);
+    border-radius: 10px; padding: 8px 12px; font: inherit; font-size: 13px;
+    cursor: pointer; white-space: nowrap;
+  }
+  button.btn:active { transform: translateY(1px); }
+  button.btn.primary { background: var(--accent); border-color: var(--accent); color: #0b0b12; font-weight: 600; }
+  button.btn:disabled { opacity: .45; }
+
+  main { flex: 1; padding: 6px 8px 120px; }
+  ul.list { list-style: none; margin: 0; padding: 0; }
+  ul.list li {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 8px; border-bottom: 1px solid #21212b;
+  }
+  ul.list li:last-child { border-bottom: 0; }
+  .ico {
+    width: 30px; height: 30px; flex: 0 0 30px; border-radius: 8px;
+    display: grid; place-items: center; font-size: 15px;
+    background: #23232f; color: var(--muted);
+  }
+  .ico.dir { background: #24304a; color: #8fb2ff; }
+  .meta-main { flex: 1; min-width: 0; }
+  .name {
+    font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .sub { font-size: 11px; color: var(--muted); margin-top: 1px; }
+  .row-actions { display: flex; gap: 6px; }
+  .row-actions button {
+    background: none; border: 0; color: var(--muted); font-size: 16px;
+    padding: 6px 4px; cursor: pointer;
+  }
+  .row-actions button.del:active { color: var(--danger); }
+  .empty { text-align: center; color: var(--muted); padding: 60px 20px; font-size: 13px; }
+
+  .tray {
+    position: fixed; left: 10px; right: 10px; bottom: 10px; z-index: 20;
+    background: rgba(28, 28, 38, .96); border: 1px solid var(--line);
+    border-radius: 14px; padding: 10px 12px; backdrop-filter: blur(8px);
+    box-shadow: 0 10px 30px rgba(0,0,0,.45); display: none;
+  }
+  .tray.on { display: block; }
+  .tray .line { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+  .tray .line .nm { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tray .line .pc { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .tray .bar { height: 5px; border-radius: 3px; background: #2a2a34; margin-top: 8px; overflow: hidden; }
+  .tray .bar > i { display: block; height: 100%; width: 0; background: var(--ok); transition: width .2s; }
+  .tray .cancel { background: none; border: 0; color: var(--danger); font-size: 12px; cursor: pointer; }
+
+  .drop {
+    position: fixed; inset: 0; z-index: 30; display: none;
+    background: rgba(18,18,26,.82); border: 2px dashed var(--accent);
+  }
+  .drop.on { display: grid; place-items: center; }
+  .drop span { font-size: 18px; color: var(--text); }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%);
+    background: #2b2b38; border: 1px solid var(--line); color: var(--text);
+    padding: 9px 14px; border-radius: 10px; font-size: 13px; z-index: 40;
+    opacity: 0; pointer-events: none; transition: opacity .2s; max-width: 88vw;
+  }
+  .toast.on { opacity: 1; }
+  .toast.err { border-color: var(--danger); color: #ffd7d7; }
+</style>
+</head>
+<body>
+<header>
+  <div class="title-row">
+    <h1>SD 文件</h1>
+    <span class="chip" id="board">连接中…</span>
+    <span class="grow"></span>
+    <button class="btn" id="refresh" title="刷新">刷新</button>
+  </div>
+  <div class="storage">
+    <div class="bar"><i id="bar-fill"></i></div>
+    <div class="meta"><span id="storage-text">--</span><span id="net-text"></span></div>
+  </div>
+</header>
+
+<div class="toolbar">
+  <div class="crumb" id="crumb"></div>
+  <button class="btn" id="mkdir">新建文件夹</button>
+  <button class="btn primary" id="pick">上传</button>
+  <input type="file" id="file-input" multiple hidden>
+</div>
+
+<main>
+  <ul class="list" id="list"></ul>
+  <div class="empty" id="empty" hidden>此文件夹为空</div>
+</main>
+
+<div class="tray" id="tray">
+  <div class="line">
+    <span class="nm" id="tray-name">准备上传…</span>
+    <span class="pc" id="tray-pct">0%</span>
+    <button class="cancel" id="tray-cancel">取消</button>
+  </div>
+  <div class="bar"><i id="tray-bar"></i></div>
+</div>
+
+<div class="drop" id="drop"><span>松开以上传文件</span></div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  var params = new URLSearchParams(location.search);
+  var token = params.get('token') || '';
+  var path = '/';
+  var entries = [];
+  var queue = [];
+  var uploading = false;
+  var abortUpload = false;
+  var currentXhr = null;
+
+  var el = function (id) { return document.getElementById(id); };
+  var listEl = el('list'), emptyEl = el('empty'), crumbEl = el('crumb');
+  var boardEl = el('board'), barFill = el('bar-fill');
+  var storageText = el('storage-text'), netText = el('net-text');
+  var tray = el('tray'), trayName = el('tray-name'), trayPct = el('tray-pct');
+  var trayBar = el('tray-bar'), drop = el('drop'), toastEl = el('toast');
+
+  function withToken(url) {
+    if (!token) return url;
+    return url + (url.indexOf('?') >= 0 ? '&' : '?') + 'token=' + encodeURIComponent(token);
+  }
+
+  function toast(msg, isErr) {
+    toastEl.textContent = msg;
+    toastEl.className = 'toast on' + (isErr ? ' err' : '');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function () { toastEl.className = 'toast'; }, 2600);
+  }
+
+  function fmtSize(n) {
+    if (!n) return '0 B';
+    var u = ['B', 'KB', 'MB', 'GB'];
+    var i = 0;
+    while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+    return (i === 0 ? n : n.toFixed(n >= 100 ? 0 : 1)) + ' ' + u[i];
+  }
+
+  function join(dir, name) {
+    return dir === '/' ? '/' + name : dir + '/' + name;
+  }
+
+  function request(method, url, body, opts) {
+    opts = opts || {};
+    var init = { method: method, headers: {} };
+    if (token) init.headers['X-Auth-Token'] = token;
+    if (body !== undefined && body !== null) {
+      if (typeof body === 'string') {
+        init.headers['Content-Type'] = 'application/json';
+        init.body = body;
+      } else {
+        init.body = body;
+      }
+    }
+    return fetch(withToken(url), init).then(function (res) {
+      var type = res.headers.get('Content-Type') || '';
+      var parsed = type.indexOf('json') >= 0 ? res.json() : res.text();
+      return parsed.then(function (data) {
+        if (!res.ok) {
+          var msg = data && data.error ? data.error : ('HTTP ' + res.status);
+          throw new Error(msg);
+        }
+        return data;
+      });
+    });
+  }
+
+  function loadInfo() {
+    return request('GET', '/api/info').then(function (info) {
+      var name = info.name || 'xiaozhi';
+      boardEl.textContent = name + ' · ' + (info.version || '');
+      netText.textContent = info.ip ? ('IP ' + info.ip) : '离线';
+      var sd = info.sd || {};
+      if (sd.mounted) {
+        var total = sd.total || 0, free = sd.free || 0;
+        var used = Math.max(0, total - free);
+        var pct = total > 0 ? Math.min(100, (used / total) * 100) : 0;
+        barFill.style.width = pct.toFixed(1) + '%';
+        storageText.textContent = '剩余 ' + fmtSize(free) + ' / 共 ' + fmtSize(total);
+      } else {
+        barFill.style.width = '0%';
+        storageText.textContent = 'SD 卡未挂载';
+      }
+    });
+  }
+
+  function renderCrumb() {
+    crumbEl.textContent = '';
+    var parts = path.split('/').filter(Boolean);
+    var rootBtn = document.createElement('button');
+    rootBtn.textContent = 'SD';
+    rootBtn.onclick = function () { navigate('/'); };
+    crumbEl.appendChild(rootBtn);
+    var acc = '';
+    parts.forEach(function (p, i) {
+      acc += '/' + p;
+      var sep = document.createElement('span');
+      sep.className = 'sep';
+      sep.textContent = '/';
+      crumbEl.appendChild(sep);
+      if (i === parts.length - 1) {
+        var here = document.createElement('span');
+        here.className = 'here';
+        here.textContent = p;
+        crumbEl.appendChild(here);
+      } else {
+        var b = document.createElement('button');
+        b.textContent = p;
+        var target = acc;
+        b.onclick = function () { navigate(target); };
+        crumbEl.appendChild(b);
+      }
+    });
+  }
+
+  function entryRow(item) {
+    var li = document.createElement('li');
+    var ico = document.createElement('div');
+    ico.className = 'ico' + (item.type === 'dir' ? ' dir' : '');
+    ico.textContent = item.type === 'dir' ? '▸' : '≡';
+
+    var main = document.createElement('div');
+    main.className = 'meta-main';
+    var nm = document.createElement('div');
+    nm.className = 'name';
+    nm.textContent = item.name;
+    var sub = document.createElement('div');
+    sub.className = 'sub';
+    sub.textContent = item.type === 'dir' ? '文件夹' :
+      (fmtSize(item.size) + (item.mtime ? ' · ' + new Date(item.mtime * 1000).toLocaleString() : ''));
+    main.appendChild(nm);
+    main.appendChild(sub);
+
+    main.onclick = function () {
+      if (item.type === 'dir') navigate(join(path, item.name));
+      else download(item.name);
+    };
+    ico.onclick = main.onclick;
+
+    var actions = document.createElement('div');
+    actions.className = 'row-actions';
+    var del = document.createElement('button');
+    del.className = 'del';
+    del.textContent = '✕';
+    del.title = '删除';
+    del.onclick = function (ev) {
+      ev.stopPropagation();
+      removeEntry(join(path, item.name), item.name);
+    };
+    actions.appendChild(del);
+
+    li.appendChild(ico);
+    li.appendChild(main);
+    li.appendChild(actions);
+    return li;
+  }
+
+  function render() {
+    listEl.textContent = '';
+    entries.forEach(function (item) { listEl.appendChild(entryRow(item)); });
+    emptyEl.hidden = entries.length > 0;
+    renderCrumb();
+  }
+
+  function navigate(next) {
+    path = next || '/';
+    loadList();
+  }
+
+  function loadList() {
+    return request('GET', '/api/list?path=' + encodeURIComponent(path))
+      .then(function (data) {
+        path = data.path || path;
+        entries = data.entries || [];
+        render();
+      })
+      .catch(function (err) {
+        entries = [];
+        render();
+        toast(err.message, true);
+      });
+  }
+
+  function refresh() {
+    loadInfo().catch(function () {});
+    return loadList();
+  }
+
+  function download(name) {
+    var url = withToken('/api/file?path=' + encodeURIComponent(join(path, name)));
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    toast('开始下载 ' + name);
+  }
+
+  function removeEntry(full, name) {
+    if (!confirm('删除「' + name + '」？此操作不可恢复。')) return;
+    request('POST', '/api/rm', JSON.stringify({ path: full }))
+      .then(function () { toast('已删除 ' + name); return refresh(); })
+      .catch(function (err) { toast(err.message, true); });
+  }
+
+  function mkdir() {
+    var name = prompt('文件夹名称');
+    if (!name) return;
+    name = name.trim();
+    if (!name) return;
+    request('POST', '/api/mkdir', JSON.stringify({ path: join(path, name) }))
+      .then(function () { toast('已创建 ' + name); return refresh(); })
+      .catch(function (err) { toast(err.message, true); });
+  }
+
+  function fileKey(file, taken) {
+    var name = file.name;
+    var dot = name.lastIndexOf('.');
+    var base = dot > 0 ? name.slice(0, dot) : name;
+    var ext = dot > 0 ? name.slice(dot) : '';
+    var candidate = name;
+    var i = 1;
+    while (taken.has(candidate.toLowerCase())) {
+      candidate = base + '.' + i + ext;
+      i++;
+    }
+    taken.add(candidate.toLowerCase());
+    return candidate;
+  }
+
+  function enqueue(files) {
+    if (!files || !files.length) return;
+    var taken = new Set();
+    entries.forEach(function (it) { taken.add(it.name.toLowerCase()); });
+    for (var i = 0; i < files.length; i++) {
+      queue.push({ file: files[i], name: fileKey(files[i], taken) });
+    }
+    pump();
+  }
+
+  function setTray(on, name, pct) {
+    tray.className = 'tray' + (on ? ' on' : '');
+    if (name !== undefined) trayName.textContent = name;
+    if (pct !== undefined) {
+      trayPct.textContent = pct < 0 ? '--' : pct + '%';
+      trayBar.style.width = Math.max(0, pct) + '%';
+    }
+  }
+
+  function pump() {
+    if (uploading || !queue.length) {
+      if (!uploading && !queue.length) {
+        setTray(false);
+        refresh();
+      }
+      return;
+    }
+    uploading = true;
+    abortUpload = false;
+    var job = queue.shift();
+    var target = join(path, job.name);
+    var xhr = new XMLHttpRequest();
+    currentXhr = xhr;
+    setTray(true, job.name, 0);
+
+    xhr.open('PUT', withToken('/api/file?path=' + encodeURIComponent(target)));
+    xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+    if (token) xhr.setRequestHeader('X-Auth-Token', token);
+
+    xhr.upload.onprogress = function (ev) {
+      if (ev.lengthComputable) {
+        setTray(true, job.name, Math.round((ev.loaded / ev.total) * 100));
+      }
+    };
+    xhr.onload = function () {
+      uploading = false;
+      currentXhr = null;
+      if (xhr.status >= 200 && xhr.status < 300) {
+        var done = job.name;
+        setTray(true, '已保存 ' + done, 100);
+        setTimeout(function () { if (!uploading) pump(); }, 120);
+      } else {
+        var msg = '上传失败 (' + xhr.status + ')';
+        try { msg = JSON.parse(xhr.responseText).error || msg; } catch (e) {}
+        toast(job.name + ': ' + msg, true);
+        pump();
+      }
+    };
+    xhr.onerror = function () {
+      uploading = false;
+      currentXhr = null;
+      toast(job.name + ': 网络中断', true);
+      pump();
+    };
+    xhr.onabort = function () {
+      uploading = false;
+      currentXhr = null;
+      toast('已取消上传', true);
+      pump();
+    };
+    xhr.send(job.file);
+  }
+
+  el('refresh').onclick = function () {
+    refresh().catch(function () {});
+    toast('已刷新');
+  };
+  el('mkdir').onclick = mkdir;
+  el('pick').onclick = function () { el('file-input').click(); };
+  el('file-input').onchange = function (ev) {
+    enqueue(ev.target.files);
+    ev.target.value = '';
+  };
+  el('tray-cancel').onclick = function () {
+    abortUpload = true;
+    queue = [];
+    if (currentXhr) currentXhr.abort();
+    setTray(false);
+  };
+
+  var depth = 0;
+  window.addEventListener('dragenter', function (ev) {
+    ev.preventDefault();
+    depth++;
+    drop.className = 'drop on';
+  });
+  window.addEventListener('dragover', function (ev) { ev.preventDefault(); });
+  window.addEventListener('dragleave', function (ev) {
+    ev.preventDefault();
+    depth = Math.max(0, depth - 1);
+    if (depth === 0) drop.className = 'drop';
+  });
+  window.addEventListener('drop', function (ev) {
+    ev.preventDefault();
+    depth = 0;
+    drop.className = 'drop';
+    if (ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files.length) {
+      enqueue(ev.dataTransfer.files);
+    }
+  });
+
+  refresh();
+  setInterval(function () {
+    if (!uploading) loadInfo().catch(function () {});
+  }, 15000);
+})();
+</script>
+</body>
+</html>

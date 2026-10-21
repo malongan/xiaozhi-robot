@@ -44,6 +44,8 @@ public:
     void Next();
     void Prev();
     void Repeat();
+    // 重置整轮听写：回到第一个词并清零成绩（保留范围/间隔/播报设置）
+    bool Restart();
     // 标记当前词听写正确（长按"下一个"触发）
     void MarkCorrect();
     // 切换显示模式（真听写 <-> 看词听写）
@@ -111,6 +113,8 @@ private:
     int correct_ = 0;
     int answered_ = 0;
     bool pending_cn_ = false;
+    // 上一次播放因设备忙被推迟：下一轮 Tick 先重试当前词，避免跳词
+    bool retry_current_ = false;
     RefreshCallback refresh_cb_ = nullptr;
     uint32_t last_manual_ = 0;
     uint32_t next_tick_ = 0;

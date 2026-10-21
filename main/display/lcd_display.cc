@@ -11,6 +11,7 @@
 #include "lvgl_theme.h"
 #include "media_ble.h"
 #include "wifi_board.h"
+#include "web_file_server.h"
 
 LV_FONT_DECLARE(font_zzz_30);
 LV_FONT_DECLARE(font_pinyin_20);
@@ -26,6 +27,7 @@ LV_FONT_DECLARE(ui_font_16_4);
 #include <esp_log.h>
 #include <esp_lvgl_port.h>
 #include <esp_psram.h>
+#include <esp_vfs_fat.h>
 #include <material_symbols.h>
 #include <noto_emoji.h>
 #include <src/misc/cache/lv_cache.h>
@@ -33,6 +35,7 @@ LV_FONT_DECLARE(ui_font_16_4);
 #include <cmath>
 #include <cstring>
 #include <mutex>
+#include <sys/statvfs.h>
 #include <vector>
 
 #include "backlight.h"
@@ -44,6 +47,28 @@ LV_FONT_DECLARE(BUILTIN_TEXT_FONT);
 LV_FONT_DECLARE(BUILTIN_ICON_FONT);
 LV_FONT_DECLARE(font_material_symbols_30_4);
 LV_FONT_DECLARE(font_noto_emoji_30_4);
+
+namespace {
+constexpr uint32_t kPaperPage = 0xF0E0BC;
+constexpr uint32_t kPaperSheet = 0xFAF0D8;
+constexpr uint32_t kPaperEdge = 0xD3BE93;
+constexpr uint32_t kPaperGrid = 0xE4D2AC;
+constexpr uint32_t kPaperInk = 0x4A3423;
+constexpr uint32_t kPaperGuide = 0xE0AEA1;
+constexpr uint32_t kSkyBgTop = 0xEAF5FF;
+constexpr uint32_t kSkyBgBottom = 0xD3E9FB;
+constexpr uint32_t kSkyCard = 0xFFFFFF;
+constexpr uint32_t kSkyBorder = 0xC9DEF2;
+constexpr uint32_t kSkyInk = 0x14324F;
+constexpr uint32_t kSkyMuted = 0x5B7A99;
+constexpr uint32_t kSkyAccent = 0x3E8ED0;
+constexpr uint32_t kSkyAccentDeep = 0x2B6FAE;
+constexpr uint32_t kSkySelect = 0xBFE0FA;
+constexpr uint32_t kSkySelectEdge = 0x7FB6E6;
+constexpr uint32_t kSkyGood = 0x3E9B6B;
+// 内容列表每页行数；列表改成翻页后不再滚动，避免滑动与点选冲突。
+constexpr int kEnglishSetupRowsPerPage = 6;
+}  // namespace
 
 void LcdDisplay::InitializeLcdThemes() {
     auto text_font = std::make_shared<LvglBuiltInFont>(&BUILTIN_TEXT_FONT);
@@ -197,7 +222,7 @@ SpiLcdDisplay::SpiLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_h
         .io_handle = panel_io_,
         .panel_handle = panel_,
         .control_handle = nullptr,
-        .buffer_size = static_cast<uint32_t>(width_ * 20),
+        .buffer_size = static_cast<uint32_t>(width_ * 24),
         .double_buffer = double_buffer,
         .trans_size = 0,
         .hres = static_cast<uint32_t>(width_),
@@ -256,7 +281,7 @@ RgbLcdDisplay::RgbLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_h
     const lvgl_port_display_cfg_t display_cfg = {
         .io_handle = panel_io_,
         .panel_handle = panel_,
-        .buffer_size = static_cast<uint32_t>(width_ * 20),
+        .buffer_size = static_cast<uint32_t>(width_ * 24),
         .double_buffer = true,
         .hres = static_cast<uint32_t>(width_),
         .vres = static_cast<uint32_t>(height_),
@@ -344,6 +369,11 @@ MipiLcdDisplay::MipiLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel
 LcdDisplay::~LcdDisplay() {
     SetPreviewImage(nullptr);
 
+#if CONFIG_WEB_FILE_SERVER
+    WebFileServer::GetInstance().SetStatusCallback(nullptr);
+    WebFileServer::GetInstance().SetActivityCallback(nullptr);
+#endif
+
     // Clean up GIF controller
     if (gif_controller_) {
         gif_controller_->Stop();
@@ -363,6 +393,10 @@ LcdDisplay::~LcdDisplay() {
     if (stroke_anim_timer_ != nullptr) {
         lv_timer_delete(stroke_anim_timer_);
         stroke_anim_timer_ = nullptr;
+    }
+    if (drawer_hint_timer_ != nullptr) {
+        lv_timer_delete(drawer_hint_timer_);
+        drawer_hint_timer_ = nullptr;
     }
     if (stroke_canvas_buf_ != nullptr) {
         heap_caps_free(stroke_canvas_buf_);
@@ -417,6 +451,24 @@ LcdDisplay::~LcdDisplay() {
 bool LcdDisplay::Lock(int timeout_ms) { return lvgl_port_lock(timeout_ms); }
 
 void LcdDisplay::Unlock() { lvgl_port_unlock(); }
+
+const LcdDisplay::DrawerTileSpec LcdDisplay::kDrawerSpecs[LcdDisplay::kDrawerTileCount] = {
+    {MATERIAL_SYMBOLS_SETTINGS, "设置", &LcdDisplay::OpenSettingsPage,
+     &LcdDisplay::DrawerAlwaysEnabled, false, "", 0x5B6C8A, 0x3E4C63},
+#if CONFIG_WEB_FILE_SERVER
+    {MATERIAL_SYMBOLS_WIFI, "网络", &LcdDisplay::OpenFileServicePage,
+     &LcdDisplay::DrawerAlwaysEnabled, false, "", 0x2FB6A8, 0x1E8E86},
+#else
+    {MATERIAL_SYMBOLS_WIFI, "网络", &LcdDisplay::OpenFileServicePage,
+     &LcdDisplay::DrawerAlwaysEnabled, true, "文件传输功能开发中", 0x2FB6A8, 0x1E8E86},
+#endif
+    {MATERIAL_SYMBOLS_LANGUAGE, "听写", &LcdDisplay::OpenEnglishPage,
+     &LcdDisplay::DrawerEnglishEnabled, false, "未找到词库，请插入存储卡", 0xF0A03C, 0xD97B22},
+    {MATERIAL_SYMBOLS_EDIT_SQUARE, "笔画", &LcdDisplay::OpenStrokePage,
+     &LcdDisplay::DrawerStrokeEnabled, false, "笔顺数据未就绪", 0x8B6FE8, 0x6A4FD0},
+    {MATERIAL_SYMBOLS_BLUETOOTH, "键盘", &LcdDisplay::OpenMediaPage,
+     &LcdDisplay::DrawerAlwaysEnabled, false, "", 0x4A8FE8, 0x2E6BC8},
+};
 
 #if CONFIG_USE_WECHAT_MESSAGE_STYLE
 void LcdDisplay::SetupUI() {
@@ -1294,7 +1346,7 @@ void LcdDisplay::SetupUI() {
     lv_obj_add_flag(media_bar_, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_ext_click_area(media_bar_, 4);
     lv_obj_set_ext_click_area(media_bar_, 12);
-    lv_obj_add_event_cb(media_bar_, &LcdDisplay::OnMediaBarClicked, LV_EVENT_PRESSED, this);
+    lv_obj_add_event_cb(media_bar_, &LcdDisplay::OnDrawerHandleClicked, LV_EVENT_PRESSED, this);
 
     // Minimal media-entry glyph: two rows of four light-grey dots, no frame.
     lv_obj_t* keyboard = lv_obj_create(media_bar_);
@@ -1521,7 +1573,7 @@ void LcdDisplay::SetupUI() {
         stroke_screen_ = lv_obj_create(screen);
         lv_obj_set_size(stroke_screen_, LV_HOR_RES, LV_VER_RES);
         lv_obj_set_style_radius(stroke_screen_, 0, 0);
-        lv_obj_set_style_bg_color(stroke_screen_, lvgl_theme->background_color(), 0);
+        lv_obj_set_style_bg_color(stroke_screen_, lv_color_hex(kPaperPage), 0);
         lv_obj_set_style_bg_opa(stroke_screen_, LV_OPA_COVER, 0);
         lv_obj_set_style_border_width(stroke_screen_, 0, 0);
         lv_obj_set_style_pad_all(stroke_screen_, 0, 0);
@@ -1531,7 +1583,7 @@ void LcdDisplay::SetupUI() {
 
         lv_obj_t* stroke_close = lv_button_create(stroke_screen_);
         lv_obj_set_size(stroke_close, 44, 36);
-        lv_obj_align(stroke_close, LV_ALIGN_TOP_RIGHT, -4, 2);
+        lv_obj_align(stroke_close, LV_ALIGN_TOP_LEFT, 4, 2);
         lv_obj_set_style_bg_opa(stroke_close, LV_OPA_TRANSP, 0);
         lv_obj_set_style_border_width(stroke_close, 0, 0);
         lv_obj_set_style_shadow_width(stroke_close, 0, 0);
@@ -1542,15 +1594,15 @@ void LcdDisplay::SetupUI() {
         stroke_close_icon_ = lv_label_create(stroke_close);
         lv_obj_t* close_icon = stroke_close_icon_;
         lv_obj_set_style_text_font(close_icon, icon_font, 0);
-        lv_obj_set_style_text_color(close_icon, lvgl_theme->text_color(), 0);
-        lv_label_set_text(close_icon, MATERIAL_SYMBOLS_CLOSE);
+        lv_obj_set_style_text_color(close_icon, lv_color_hex(kPaperInk), 0);
+        lv_label_set_text(close_icon, MATERIAL_SYMBOLS_ARROW_BACK);
         lv_obj_center(close_icon);
 
         stroke_title_label_ = lv_label_create(stroke_screen_);
         // Dedicated font with pinyin tone marks (ā á ǎ à ...); the theme
         // font does not necessarily contain them.
         lv_obj_set_style_text_font(stroke_title_label_, &font_pinyin_20, 0);
-        lv_obj_set_style_text_color(stroke_title_label_, lvgl_theme->text_color(), 0);
+        lv_obj_set_style_text_color(stroke_title_label_, lv_color_hex(kPaperInk), 0);
         lv_label_set_text(stroke_title_label_, "笔顺");
         lv_obj_align(stroke_title_label_, LV_ALIGN_TOP_MID, 0, 8);
 
@@ -1558,12 +1610,12 @@ void LcdDisplay::SetupUI() {
         lv_obj_set_size(stroke_canvas_, kStrokeCanvasSide, kStrokeCanvasSide);
         lv_canvas_set_buffer(stroke_canvas_, stroke_canvas_buf_, kStrokeCanvasSide,
                              kStrokeCanvasSide, LV_COLOR_FORMAT_RGB565);
-        lv_obj_align(stroke_canvas_, LV_ALIGN_TOP_MID, 0, 56);
-        lv_obj_set_style_radius(stroke_canvas_, 8, 0);
-        lv_obj_set_style_border_width(stroke_canvas_, 1, 0);
-        lv_obj_set_style_border_color(
-            stroke_canvas_,
-            lv_color_mix(lvgl_theme->text_color(), lvgl_theme->background_color(), LV_OPA_40), 0);
+        lv_obj_align(stroke_canvas_, LV_ALIGN_TOP_MID, 0, 62);
+        lv_obj_set_style_radius(stroke_canvas_, 10, 0);
+        lv_obj_set_style_bg_color(stroke_canvas_, lv_color_hex(kPaperSheet), 0);
+        lv_obj_set_style_bg_opa(stroke_canvas_, LV_OPA_COVER, 0);
+        lv_obj_set_style_border_width(stroke_canvas_, 2, 0);
+        lv_obj_set_style_border_color(stroke_canvas_, lv_color_hex(kPaperEdge), 0);
         lv_obj_set_style_clip_corner(stroke_canvas_, true, 0);
 
         // One vector line per stroke: revealing a stroke just shows a line
@@ -1572,42 +1624,39 @@ void LcdDisplay::SetupUI() {
             stroke_lines_[i] = lv_line_create(stroke_canvas_);
             lv_obj_remove_flag(stroke_lines_[i], LV_OBJ_FLAG_CLICKABLE);
             lv_obj_remove_flag(stroke_lines_[i], LV_OBJ_FLAG_SCROLLABLE);
-            lv_obj_set_style_line_color(stroke_lines_[i], lv_color_hex(0xFFFFFF), 0);
+            lv_obj_set_style_line_color(stroke_lines_[i], lv_color_hex(kPaperInk), 0);
             lv_obj_set_style_line_width(stroke_lines_[i], 4, 0);
             lv_obj_add_flag(stroke_lines_[i], LV_OBJ_FLAG_HIDDEN);
         }
 
-        int stroke_key_slot = 0;
-        auto create_key = [this, large_icon_font, lvgl_theme, &stroke_key_slot](
-                              int x, const char* icon, lv_event_cb_t cb) {
-            lv_obj_t* key = lv_button_create(stroke_screen_);
-            lv_obj_set_size(key, 56, 46);
-            lv_obj_align(key, LV_ALIGN_BOTTOM_MID, x, -10);
-            lv_obj_set_style_bg_opa(key, LV_OPA_TRANSP, 0);
-            lv_obj_set_style_border_width(key, 0, 0);
-            lv_obj_set_style_shadow_width(key, 0, 0);
-            lv_obj_set_style_pad_all(key, 0, 0);
-            lv_obj_set_style_bg_opa(key, LV_OPA_20, LV_STATE_PRESSED);
-            lv_obj_set_style_bg_color(key, lvgl_theme->text_color(), LV_STATE_PRESSED);
-            lv_obj_set_ext_click_area(key, 8);
-            lv_obj_add_event_cb(key, cb, LV_EVENT_PRESSED, this);
-            lv_obj_t* ik = lv_label_create(key);
-            if (stroke_key_slot < 3) {
-                stroke_key_icons_[stroke_key_slot++] = ik;
-            }
-            lv_obj_set_style_text_font(ik, large_icon_font, 0);
-            lv_obj_set_style_text_color(ik, lvgl_theme->text_color(), 0);
-            lv_label_set_text(ik, icon);
-            lv_obj_center(ik);
+        auto create_tap_zone = [this](lv_align_t align, lv_event_cb_t cb) {
+            lv_obj_t* zone = lv_button_create(stroke_screen_);
+            lv_obj_set_size(zone, 52, 210);
+            lv_obj_align(zone, align, 0, 52);
+            lv_obj_set_style_bg_opa(zone, LV_OPA_TRANSP, 0);
+            lv_obj_set_style_border_width(zone, 0, 0);
+            lv_obj_set_style_shadow_width(zone, 0, 0);
+            lv_obj_set_style_pad_all(zone, 0, 0);
+            lv_obj_set_style_radius(zone, 16, 0);
+            lv_obj_set_style_bg_color(zone, lv_color_hex(kPaperInk), LV_STATE_PRESSED);
+            lv_obj_set_style_bg_opa(zone, LV_OPA_10, LV_STATE_PRESSED);
+            lv_obj_add_event_cb(zone, cb, LV_EVENT_PRESSED, this);
         };
-        create_key(-66, MATERIAL_SYMBOLS_REPEAT, &LcdDisplay::OnStrokeReplayClicked);
-        create_key(0, MATERIAL_SYMBOLS_SKIP_PREVIOUS, &LcdDisplay::OnStrokePrevClicked);
-        create_key(66, MATERIAL_SYMBOLS_SKIP_NEXT, &LcdDisplay::OnStrokeNextClicked);
+        create_tap_zone(LV_ALIGN_TOP_LEFT, &LcdDisplay::OnStrokePrevClicked);
+        create_tap_zone(LV_ALIGN_TOP_RIGHT, &LcdDisplay::OnStrokeNextClicked);
+
+        lv_obj_t* stroke_hint = lv_label_create(stroke_screen_);
+        lv_obj_set_style_text_font(stroke_hint, &ui_font_16_4, 0);
+        lv_obj_set_style_text_color(stroke_hint, lv_color_hex(0x8A7357), 0);
+        lv_label_set_text(stroke_hint, "轻点左右切换");
+        lv_obj_align(stroke_hint, LV_ALIGN_TOP_MID, 0, 250);
 
         // ---- 英语听写页 ----
         english_screen_ = lv_obj_create(screen);
         lv_obj_set_size(english_screen_, LV_HOR_RES, LV_VER_RES);
-        lv_obj_set_style_bg_color(english_screen_, lv_color_hex(0x09090B), 0);
+        lv_obj_set_style_bg_color(english_screen_, lv_color_hex(kSkyBgTop), 0);
+        lv_obj_set_style_bg_grad_color(english_screen_, lv_color_hex(kSkyBgBottom), 0);
+        lv_obj_set_style_bg_grad_dir(english_screen_, LV_GRAD_DIR_VER, 0);
         lv_obj_set_style_bg_opa(english_screen_, LV_OPA_COVER, 0);
         lv_obj_set_style_border_width(english_screen_, 0, 0);
         lv_obj_set_style_pad_all(english_screen_, 0, 0);
@@ -1615,283 +1664,343 @@ void LcdDisplay::SetupUI() {
         lv_obj_set_scrollbar_mode(english_screen_, LV_SCROLLBAR_MODE_OFF);
         lv_obj_add_flag(english_screen_, LV_OBJ_FLAG_HIDDEN);
 
-        lv_obj_t* en_close = lv_button_create(english_screen_);
-        lv_obj_set_size(en_close, 44, 32);
-        lv_obj_align(en_close, LV_ALIGN_TOP_RIGHT, -4, 0);
-        lv_obj_set_style_bg_opa(en_close, LV_OPA_TRANSP, 0);
-        lv_obj_set_style_border_width(en_close, 0, 0);
-        lv_obj_set_style_shadow_width(en_close, 0, 0);
-        lv_obj_set_style_pad_all(en_close, 0, 0);
-        lv_obj_set_ext_click_area(en_close, 8);
-        lv_obj_add_event_cb(en_close, &LcdDisplay::OnEnglishCloseClicked, LV_EVENT_PRESSED, this);
-        english_close_icon_ = lv_label_create(en_close);
-        lv_obj_set_style_text_font(english_close_icon_, icon_font, 0);
-        lv_obj_set_style_text_color(english_close_icon_, lvgl_theme->text_color(), 0);
-        lv_label_set_text(english_close_icon_, MATERIAL_SYMBOLS_CLOSE);
-        lv_obj_center(english_close_icon_);
+        auto make_en_head_icon = [this, icon_font](lv_align_t align, int x, const char* icon,
+                                                   lv_event_cb_t cb) {
+            lv_obj_t* btn = lv_button_create(english_screen_);
+            lv_obj_set_size(btn, 44, 34);
+            lv_obj_align(btn, align, x, 0);
+            lv_obj_set_style_bg_opa(btn, LV_OPA_TRANSP, 0);
+            lv_obj_set_style_border_width(btn, 0, 0);
+            lv_obj_set_style_shadow_width(btn, 0, 0);
+            lv_obj_set_style_pad_all(btn, 0, 0);
+            lv_obj_set_ext_click_area(btn, 8);
+            lv_obj_add_event_cb(btn, cb, LV_EVENT_PRESSED, this);
+            lv_obj_t* label = lv_label_create(btn);
+            lv_obj_set_style_text_font(label, icon_font, 0);
+            lv_obj_set_style_text_color(label, lv_color_hex(kSkyInk), 0);
+            lv_label_set_text(label, icon);
+            lv_obj_center(label);
+            return label;
+        };
+        english_back_icon_ = make_en_head_icon(
+            LV_ALIGN_TOP_LEFT, 4, MATERIAL_SYMBOLS_ARROW_BACK, &LcdDisplay::OnEnglishBackClicked);
+        english_reset_icon_ = make_en_head_icon(
+            LV_ALIGN_TOP_RIGHT, -4, MATERIAL_SYMBOLS_REFRESH, &LcdDisplay::OnEnglishResetClicked);
 
         english_progress_label_ = lv_label_create(english_screen_);
         lv_obj_set_style_text_font(english_progress_label_, &ui_font_16_4, 0);
-        lv_obj_set_style_text_color(english_progress_label_, lv_color_hex(0x9A9AA8), 0);
+        lv_obj_set_style_text_color(english_progress_label_, lv_color_hex(kSkyMuted), 0);
         lv_label_set_text(english_progress_label_, "听写");
-        lv_obj_set_width(english_progress_label_, 110);
-        lv_label_set_long_mode(english_progress_label_, LV_LABEL_LONG_DOT);
-        lv_obj_align(english_progress_label_, LV_ALIGN_TOP_LEFT, 8, 6);
+        lv_obj_set_width(english_progress_label_, 132);
+        lv_obj_set_style_text_align(english_progress_label_, LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_align(english_progress_label_, LV_ALIGN_TOP_MID, 0, 6);
 
         english_score_label_ = lv_label_create(english_screen_);
         lv_obj_set_style_text_font(english_score_label_, &ui_font_16_4, 0);
-        lv_obj_set_style_text_color(english_score_label_, lv_color_hex(0x7AB88A), 0);
+        lv_obj_set_style_text_color(english_score_label_, lv_color_hex(kSkyGood), 0);
         lv_label_set_text(english_score_label_, "");
-        lv_obj_align(english_score_label_, LV_ALIGN_TOP_RIGHT, -48, 6);
+        lv_obj_set_width(english_score_label_, 132);
+        lv_obj_set_style_text_align(english_score_label_, LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_align(english_score_label_, LV_ALIGN_TOP_MID, 0, 28);
 
         english_title_label_ = lv_label_create(english_screen_);
         lv_obj_set_style_text_font(english_title_label_, &ui_font_16_4, 0);
-        lv_obj_set_style_text_color(english_title_label_, lv_color_hex(0x6A6A78), 0);
+        lv_obj_set_style_text_color(english_title_label_, lv_color_hex(kSkyMuted), 0);
         lv_label_set_text(english_title_label_, "");
-        lv_obj_set_width(english_title_label_, 180);
+        lv_obj_set_width(english_title_label_, 200);
         lv_label_set_long_mode(english_title_label_, LV_LABEL_LONG_DOT);
         lv_obj_set_style_text_align(english_title_label_, LV_TEXT_ALIGN_CENTER, 0);
-        lv_obj_align(english_title_label_, LV_ALIGN_TOP_MID, 0, 28);
+        lv_obj_align(english_title_label_, LV_ALIGN_TOP_MID, 0, 50);
 
-        english_word_label_ = lv_label_create(english_screen_);
+        lv_obj_t* en_card = lv_obj_create(english_screen_);
+        lv_obj_set_size(en_card, 216, 130);
+        lv_obj_align(en_card, LV_ALIGN_TOP_MID, 0, 82);
+        lv_obj_set_style_bg_color(en_card, lv_color_hex(kSkyCard), 0);
+        lv_obj_set_style_bg_opa(en_card, LV_OPA_COVER, 0);
+        lv_obj_set_style_radius(en_card, 16, 0);
+        lv_obj_set_style_border_width(en_card, 1, 0);
+        lv_obj_set_style_border_color(en_card, lv_color_hex(kSkyBorder), 0);
+        lv_obj_set_style_shadow_color(en_card, lv_color_hex(0x8FB6D6), 0);
+        lv_obj_set_style_shadow_width(en_card, 10, 0);
+        lv_obj_set_style_shadow_ofs_y(en_card, 3, 0);
+        lv_obj_set_style_shadow_opa(en_card, LV_OPA_20, 0);
+        lv_obj_set_style_pad_all(en_card, 0, 0);
+        lv_obj_remove_flag(en_card, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_remove_flag(en_card, LV_OBJ_FLAG_CLICKABLE);
+
+        english_word_label_ = lv_label_create(en_card);
         lv_obj_set_style_text_font(english_word_label_, text_font, 0);
-        lv_obj_set_style_text_color(english_word_label_, lvgl_theme->text_color(), 0);
+        lv_obj_set_style_text_color(english_word_label_, lv_color_hex(kSkyInk), 0);
         lv_label_set_text(english_word_label_, "");
-        lv_obj_set_width(english_word_label_, 224);
+        lv_obj_set_width(english_word_label_, 200);
         lv_label_set_long_mode(english_word_label_, LV_LABEL_LONG_DOT);
         lv_obj_set_style_text_align(english_word_label_, LV_TEXT_ALIGN_CENTER, 0);
         lv_obj_align(english_word_label_, LV_ALIGN_CENTER, 0, -34);
 
-        english_phonetic_label_ = lv_label_create(english_screen_);
+        english_phonetic_label_ = lv_label_create(en_card);
         // Phonetics need IPA glyphs (ˈ ə ɪ ŋ ...) that the theme font lacks.
         lv_obj_set_style_text_font(english_phonetic_label_, &font_english_20, 0);
-        lv_obj_set_style_text_color(english_phonetic_label_, lv_color_hex(0x9A9AA8), 0);
+        lv_obj_set_style_text_color(english_phonetic_label_, lv_color_hex(kSkyMuted), 0);
         lv_label_set_text(english_phonetic_label_, "");
-        lv_obj_align(english_phonetic_label_, LV_ALIGN_CENTER, 0, -4);
+        lv_obj_align(english_phonetic_label_, LV_ALIGN_CENTER, 0, 4);
 
-        english_meaning_label_ = lv_label_create(english_screen_);
+        english_meaning_label_ = lv_label_create(en_card);
         lv_obj_set_style_text_font(english_meaning_label_, text_font, 0);
-        lv_obj_set_style_text_color(english_meaning_label_, lv_color_hex(0xC8C8D0), 0);
+        lv_obj_set_style_text_color(english_meaning_label_, lv_color_hex(0x33506B), 0);
         lv_label_set_text(english_meaning_label_, "");
-        lv_obj_set_width(english_meaning_label_, 224);
+        lv_obj_set_width(english_meaning_label_, 200);
         lv_label_set_long_mode(english_meaning_label_, LV_LABEL_LONG_DOT);
         lv_obj_set_style_text_align(english_meaning_label_, LV_TEXT_ALIGN_CENTER, 0);
-        lv_obj_align(english_meaning_label_, LV_ALIGN_CENTER, 0, 24);
+        lv_obj_align(english_meaning_label_, LV_ALIGN_CENTER, 0, 34);
 
-        // 操作提示移到启动面板，避免和底部按钮行重叠
-
-        // 底部：重播 / 上一个 / 下一个
         const lv_font_t* small_font = &ui_font_16_4;
-        auto make_en_key = [this, small_font, lvgl_theme](int x, const char* text,
-                                                          lv_event_cb_t cb) -> lv_obj_t* {
-            lv_obj_t* key = lv_button_create(english_screen_);
-            lv_obj_set_size(key, 70, 36);
-            lv_obj_align(key, LV_ALIGN_BOTTOM_MID, x, -8);
-            lv_obj_set_style_bg_color(key, lv_color_hex(0x1E1E26), 0);
-            lv_obj_set_style_bg_opa(key, LV_OPA_COVER, 0);
-            lv_obj_set_style_radius(key, 10, 0);
-            lv_obj_set_style_border_width(key, 0, 0);
-            lv_obj_set_style_shadow_width(key, 0, 0);
-            lv_obj_set_style_pad_all(key, 0, 0);
-            lv_obj_set_style_bg_opa(key, LV_OPA_30, LV_STATE_PRESSED);
-            lv_obj_set_ext_click_area(key, 8);
-            lv_obj_add_event_cb(key, cb, LV_EVENT_PRESSED, this);
-            lv_obj_t* label = lv_label_create(key);
-            lv_obj_set_style_text_font(label, small_font, 0);
-            lv_obj_set_style_text_color(label, lvgl_theme->text_color(), 0);
-            lv_label_set_text(label, text);
-            lv_obj_center(label);
-            english_key_labels_.push_back(label);
-            return key;
-        };
-        make_en_key(-74, "重播", &LcdDisplay::OnEnglishRepeatClicked);
-        make_en_key(0, "上一个", &LcdDisplay::OnEnglishPrevClicked);
-        lv_obj_t* en_next = make_en_key(74, "下一个", &LcdDisplay::OnEnglishNextClicked);
-        // 长按"下一个"= 标记这个单词听写正确
-        lv_obj_add_event_cb(en_next, &LcdDisplay::OnEnglishNextLongPressed, LV_EVENT_LONG_PRESSED,
-                            this);
-
-        // 第二排：显示模式 / 间隔
-        auto make_en_small = [this, small_font, lvgl_theme](int x, const char* text,
-                                                            lv_event_cb_t cb) {
+        auto make_en_chip = [this, small_font](int x, const char* text, lv_event_cb_t cb) {
             lv_obj_t* key = lv_button_create(english_screen_);
             lv_obj_set_size(key, 70, 28);
-            lv_obj_align(key, LV_ALIGN_BOTTOM_MID, x, -52);
-            lv_obj_set_style_bg_color(key, lv_color_hex(0x16161C), 0);
+            lv_obj_align(key, LV_ALIGN_BOTTOM_MID, x, -8);
+            lv_obj_set_style_bg_color(key, lv_color_hex(kSkyCard), 0);
             lv_obj_set_style_bg_opa(key, LV_OPA_COVER, 0);
-            lv_obj_set_style_radius(key, 8, 0);
-            lv_obj_set_style_border_width(key, 0, 0);
+            lv_obj_set_style_radius(key, 14, 0);
+            lv_obj_set_style_border_width(key, 1, 0);
+            lv_obj_set_style_border_color(key, lv_color_hex(kSkyBorder), 0);
             lv_obj_set_style_shadow_width(key, 0, 0);
             lv_obj_set_style_pad_all(key, 0, 0);
-            lv_obj_set_style_bg_opa(key, LV_OPA_30, LV_STATE_PRESSED);
+            lv_obj_set_style_bg_opa(key, LV_OPA_COVER, LV_STATE_PRESSED);
+            lv_obj_set_style_bg_color(key, lv_color_hex(kSkySelect), LV_STATE_PRESSED);
             lv_obj_set_ext_click_area(key, 6);
             lv_obj_add_event_cb(key, cb, LV_EVENT_PRESSED, this);
             lv_obj_t* label = lv_label_create(key);
             lv_obj_set_style_text_font(label, small_font, 0);
-            lv_obj_set_style_text_color(label, lvgl_theme->text_color(), 0);
+            lv_obj_set_style_text_color(label, lv_color_hex(kSkyMuted), 0);
             lv_label_set_text(label, text);
             lv_obj_center(label);
             return label;
         };
-        english_mode_label_ = make_en_small(-74, "真听写", &LcdDisplay::OnEnglishModeClicked);
-        english_speak_label_ = make_en_small(0, "报英文", &LcdDisplay::OnEnglishSpeakClicked);
-        english_interval_label_ =
-            make_en_small(74, "间隔 10s", &LcdDisplay::OnEnglishIntervalClicked);
+        english_mode_label_ = make_en_chip(-74, "听写", &LcdDisplay::OnEnglishModeClicked);
+        english_speak_label_ = make_en_chip(0, "英文", &LcdDisplay::OnEnglishSpeakClicked);
+        english_interval_label_ = make_en_chip(74, "10 秒", &LcdDisplay::OnEnglishIntervalClicked);
+
+        // 左右两侧轻点切换，与笔顺页一致；右侧长按仍然表示"这个听写正确"。
+        auto create_en_tap_zone = [this](lv_align_t align, lv_event_cb_t cb) {
+            lv_obj_t* zone = lv_button_create(english_screen_);
+            lv_obj_set_size(zone, 44, 190);
+            lv_obj_align(zone, align, 0, 44);
+            lv_obj_set_style_bg_opa(zone, LV_OPA_TRANSP, 0);
+            lv_obj_set_style_border_width(zone, 0, 0);
+            lv_obj_set_style_shadow_width(zone, 0, 0);
+            lv_obj_set_style_pad_all(zone, 0, 0);
+            lv_obj_set_style_radius(zone, 16, 0);
+            lv_obj_set_style_bg_color(zone, lv_color_hex(kSkyAccent), LV_STATE_PRESSED);
+            lv_obj_set_style_bg_opa(zone, LV_OPA_10, LV_STATE_PRESSED);
+            lv_obj_add_event_cb(zone, cb, LV_EVENT_SHORT_CLICKED, this);
+            return zone;
+        };
+        create_en_tap_zone(LV_ALIGN_TOP_LEFT, &LcdDisplay::OnEnglishPrevClicked);
+        lv_obj_t* en_next_zone =
+            create_en_tap_zone(LV_ALIGN_TOP_RIGHT, &LcdDisplay::OnEnglishNextClicked);
+        lv_obj_add_event_cb(en_next_zone, &LcdDisplay::OnEnglishNextLongPressed,
+                            LV_EVENT_LONG_PRESSED, this);
+
+        lv_obj_t* en_hint = lv_label_create(english_screen_);
+        lv_obj_set_style_text_font(en_hint, &ui_font_16_4, 0);
+        lv_obj_set_style_text_color(en_hint, lv_color_hex(0x8FA6BD), 0);
+        lv_label_set_text(en_hint, "轻点左右切换");
+        lv_obj_align(en_hint, LV_ALIGN_TOP_MID, 0, 232);
 
         // 播放器推进到下一个词时刷新本页
         EnglishPlayer::GetInstance().SetRefreshCallback(&LcdDisplay::RefreshEnglishScreenStatic);
 
-        english_entry_btn_ = lv_button_create(screen);
-        lv_obj_set_size(english_entry_btn_, 36, 36);
-        lv_obj_align(english_entry_btn_, LV_ALIGN_BOTTOM_RIGHT, -44, -4);
-        lv_obj_set_style_bg_color(english_entry_btn_, lv_color_hex(0x30303C), 0);
-        lv_obj_set_style_bg_opa(english_entry_btn_, LV_OPA_COVER, 0);
-        lv_obj_set_style_radius(english_entry_btn_, 10, 0);
-        lv_obj_set_style_border_width(english_entry_btn_, 0, 0);
-        lv_obj_set_style_shadow_width(english_entry_btn_, 0, 0);
-        lv_obj_set_style_pad_all(english_entry_btn_, 0, 0);
-        lv_obj_add_flag(english_entry_btn_, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_set_ext_click_area(english_entry_btn_, 10);
-        lv_obj_add_event_cb(english_entry_btn_, &LcdDisplay::OnEnglishEntryClicked,
-                            LV_EVENT_PRESSED, this);
-        english_entry_label_ = lv_label_create(english_entry_btn_);
-        lv_obj_set_style_text_font(english_entry_label_, text_font, 0);
-        lv_obj_set_style_text_color(english_entry_label_, lvgl_theme->text_color(), 0);
-        lv_label_set_text(english_entry_label_, "英");
-        lv_obj_center(english_entry_label_);
-
-        // ---- 英语学习启动面板 ----
+        // ---- 英语学习启动面板（① 内容 → ② 播报） ----
         english_setup_panel_ = lv_obj_create(screen);
         lv_obj_set_size(english_setup_panel_, LV_HOR_RES, LV_VER_RES);
-        lv_obj_set_style_bg_color(english_setup_panel_, lv_color_hex(0x09090B), 0);
+        lv_obj_set_style_bg_color(english_setup_panel_, lv_color_hex(kSkyBgTop), 0);
+        lv_obj_set_style_bg_grad_color(english_setup_panel_, lv_color_hex(kSkyBgBottom), 0);
+        lv_obj_set_style_bg_grad_dir(english_setup_panel_, LV_GRAD_DIR_VER, 0);
         lv_obj_set_style_bg_opa(english_setup_panel_, LV_OPA_COVER, 0);
         lv_obj_set_style_border_width(english_setup_panel_, 0, 0);
         lv_obj_set_style_pad_all(english_setup_panel_, 0, 0);
         lv_obj_remove_flag(english_setup_panel_, LV_OBJ_FLAG_SCROLLABLE);
         lv_obj_add_flag(english_setup_panel_, LV_OBJ_FLAG_HIDDEN);
 
-        lv_obj_t* setup_close = lv_button_create(english_setup_panel_);
-        lv_obj_set_size(setup_close, 44, 32);
-        lv_obj_align(setup_close, LV_ALIGN_TOP_RIGHT, -4, 0);
-        lv_obj_set_style_bg_opa(setup_close, LV_OPA_TRANSP, 0);
-        lv_obj_set_style_border_width(setup_close, 0, 0);
-        lv_obj_set_style_shadow_width(setup_close, 0, 0);
-        lv_obj_set_style_pad_all(setup_close, 0, 0);
-        lv_obj_set_ext_click_area(setup_close, 8);
-        lv_obj_add_event_cb(setup_close, &LcdDisplay::OnEnglishSetupCloseClicked, LV_EVENT_PRESSED,
+        lv_obj_t* setup_back = lv_button_create(english_setup_panel_);
+        lv_obj_set_size(setup_back, 44, 36);
+        lv_obj_align(setup_back, LV_ALIGN_TOP_LEFT, 4, 2);
+        lv_obj_set_style_bg_opa(setup_back, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_border_width(setup_back, 0, 0);
+        lv_obj_set_style_shadow_width(setup_back, 0, 0);
+        lv_obj_set_style_pad_all(setup_back, 0, 0);
+        lv_obj_set_ext_click_area(setup_back, 8);
+        lv_obj_add_event_cb(setup_back, &LcdDisplay::OnEnglishSetupBackClicked, LV_EVENT_PRESSED,
                             this);
-        lv_obj_t* setup_close_icon = lv_label_create(setup_close);
-        lv_obj_set_style_text_font(setup_close_icon, icon_font, 0);
-        english_setup_close_icon_ = setup_close_icon;
-        lv_obj_set_style_text_color(setup_close_icon, lvgl_theme->text_color(), 0);
-        lv_label_set_text(setup_close_icon, MATERIAL_SYMBOLS_CLOSE);
-        lv_obj_center(setup_close_icon);
+        english_setup_close_icon_ = lv_label_create(setup_back);
+        lv_obj_set_style_text_font(english_setup_close_icon_, icon_font, 0);
+        lv_obj_set_style_text_color(english_setup_close_icon_, lv_color_hex(kSkyInk), 0);
+        lv_label_set_text(english_setup_close_icon_, MATERIAL_SYMBOLS_ARROW_BACK);
+        lv_obj_center(english_setup_close_icon_);
 
-        lv_obj_t* setup_title = lv_label_create(english_setup_panel_);
-        lv_obj_set_style_text_font(setup_title, text_font, 0);
-        english_setup_title_label_ = setup_title;
-        lv_obj_set_style_text_color(setup_title, lvgl_theme->text_color(), 0);
-        lv_label_set_text(setup_title, "英语学习");
-        lv_obj_align(setup_title, LV_ALIGN_TOP_MID, 0, 2);
+        english_setup_title_label_ = lv_label_create(english_setup_panel_);
+        lv_obj_set_style_text_font(english_setup_title_label_, text_font, 0);
+        lv_obj_set_style_text_color(english_setup_title_label_, lv_color_hex(kSkyInk), 0);
+        lv_label_set_text(english_setup_title_label_, "选择内容");
+        lv_obj_align(english_setup_title_label_, LV_ALIGN_TOP_MID, 0, 6);
 
-        lv_obj_t* setup_hint = lv_label_create(english_setup_panel_);
-        lv_obj_set_style_text_font(setup_hint, &ui_font_16_4, 0);
-        english_setup_labels_.push_back(setup_hint);
-        lv_obj_set_style_text_color(setup_hint, lv_color_hex(0x6A6A78), 0);
-        lv_label_set_text(setup_hint, "长按「下一个」=答对");
-        lv_obj_set_width(setup_hint, 224);
-        lv_label_set_long_mode(setup_hint, LV_LABEL_LONG_DOT);
-        lv_obj_set_style_text_align(setup_hint, LV_TEXT_ALIGN_CENTER, 0);
-        lv_obj_align(setup_hint, LV_ALIGN_TOP_MID, 0, 28);
+        english_setup_step1_ = lv_obj_create(english_setup_panel_);
+        lv_obj_set_size(english_setup_step1_, LV_HOR_RES, LV_VER_RES - 38);
+        lv_obj_set_pos(english_setup_step1_, 0, 38);
+        lv_obj_set_style_bg_opa(english_setup_step1_, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_border_width(english_setup_step1_, 0, 0);
+        lv_obj_set_style_radius(english_setup_step1_, 0, 0);
+        lv_obj_set_style_pad_all(english_setup_step1_, 0, 0);
+        lv_obj_remove_flag(english_setup_step1_, LV_OBJ_FLAG_SCROLLABLE);
 
-        // 一行：一个左标签 + 一个右侧可点击的值（左标签用 16px 次级字重）
-        auto make_setup_row = [this, text_font, small_font, lvgl_theme](
-                                  int y, const char* label, lv_event_cb_t cb,
-                                  lv_obj_t** name_out = nullptr) -> lv_obj_t* {
-            lv_obj_t* name = lv_label_create(english_setup_panel_);
-            lv_obj_set_style_text_font(name, small_font, 0);
-            english_setup_labels_.push_back(name);
-            lv_obj_set_style_text_color(name, lv_color_hex(0x9A9AA8), 0);
-            lv_label_set_text(name, label);
-            lv_obj_set_pos(name, 16, y + 7);
-            if (name_out != nullptr) {
-                *name_out = name;
-            }
+        english_setup_step2_ = lv_obj_create(english_setup_panel_);
+        lv_obj_set_size(english_setup_step2_, LV_HOR_RES, LV_VER_RES - 38);
+        lv_obj_set_pos(english_setup_step2_, 0, 38);
+        lv_obj_set_style_bg_opa(english_setup_step2_, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_border_width(english_setup_step2_, 0, 0);
+        lv_obj_set_style_radius(english_setup_step2_, 0, 0);
+        lv_obj_set_style_pad_all(english_setup_step2_, 0, 0);
+        lv_obj_remove_flag(english_setup_step2_, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_add_flag(english_setup_step2_, LV_OBJ_FLAG_HIDDEN);
 
-            lv_obj_t* value_btn = lv_button_create(english_setup_panel_);
-            lv_obj_set_size(value_btn, 120, 32);
-            lv_obj_set_pos(value_btn, 100, y);
-            lv_obj_set_style_bg_color(value_btn, lv_color_hex(0x1E1E26), 0);
-            lv_obj_set_style_bg_opa(value_btn, LV_OPA_COVER, 0);
-            lv_obj_set_style_radius(value_btn, 8, 0);
-            lv_obj_set_style_border_width(value_btn, 0, 0);
-            lv_obj_set_style_shadow_width(value_btn, 0, 0);
-            lv_obj_set_style_pad_all(value_btn, 0, 0);
-            lv_obj_set_style_bg_opa(value_btn, LV_OPA_30, LV_STATE_PRESSED);
-            lv_obj_set_ext_click_area(value_btn, 6);
-            lv_obj_add_event_cb(value_btn, cb, LV_EVENT_PRESSED, this);
-            lv_obj_t* value = lv_label_create(value_btn);
-            lv_obj_set_style_text_font(value, text_font, 0);
-            lv_obj_set_style_text_color(value, lvgl_theme->text_color(), 0);
-            lv_label_set_text(value, "-");
-            lv_obj_center(value);
-            return value;
+        auto make_setup_tab = [this, small_font](int x, const char* text, int source) {
+            lv_obj_t* tab = lv_button_create(english_setup_step1_);
+            lv_obj_set_size(tab, 80, 28);
+            lv_obj_set_pos(tab, x, 0);
+            lv_obj_set_style_radius(tab, 9, 0);
+            lv_obj_set_style_border_width(tab, 1, 0);
+            lv_obj_set_style_shadow_width(tab, 0, 0);
+            lv_obj_set_style_pad_all(tab, 0, 0);
+            lv_obj_set_ext_click_area(tab, 4);
+            lv_obj_set_user_data(tab, reinterpret_cast<void*>(static_cast<intptr_t>(source)));
+            lv_obj_add_event_cb(tab, &LcdDisplay::OnEnglishSetupSourceClicked, LV_EVENT_PRESSED,
+                                this);
+            lv_obj_t* label = lv_label_create(tab);
+            lv_obj_set_style_text_font(label, small_font, 0);
+            lv_label_set_text(label, text);
+            lv_obj_center(label);
+            english_setup_labels_.push_back(label);
+            return label;
         };
+        english_setup_tab_text_ = make_setup_tab(36, "课文", 0);
+        english_setup_tab_topic_ = make_setup_tab(124, "分类", 1);
 
-        // 先选“测什么”，再选具体范围；单元 / 分类互斥。
-        english_setup_source_label_ =
-            make_setup_row(52, "内容", &LcdDisplay::OnEnglishSetupSourceClicked);
-        english_setup_unit_label_ = make_setup_row(
-            84, "单元", &LcdDisplay::OnEnglishSetupScopeClicked, &english_setup_scope_name_);
-        english_setup_count_label_ =
-            make_setup_row(116, "词数", &LcdDisplay::OnEnglishSetupCountClicked);
-        english_setup_interval_label_ =
-            make_setup_row(148, "间隔", &LcdDisplay::OnEnglishSetupIntervalClicked);
-        english_setup_speak_label_ =
-            make_setup_row(180, "播报", &LcdDisplay::OnEnglishSetupSpeakClicked);
-        english_setup_mode_label_ =
-            make_setup_row(212, "模式", &LcdDisplay::OnEnglishSetupModeClicked);
+        english_setup_list_ = lv_obj_create(english_setup_step1_);
+        lv_obj_set_size(english_setup_list_, 172, 196);
+        lv_obj_set_pos(english_setup_list_, 34, 34);
+        lv_obj_set_style_bg_color(english_setup_list_, lv_color_hex(kSkyCard), 0);
+        lv_obj_set_style_bg_opa(english_setup_list_, LV_OPA_COVER, 0);
+        lv_obj_set_style_radius(english_setup_list_, 14, 0);
+        lv_obj_set_style_border_width(english_setup_list_, 1, 0);
+        lv_obj_set_style_border_color(english_setup_list_, lv_color_hex(kSkyBorder), 0);
+        lv_obj_set_style_pad_all(english_setup_list_, 4, 0);
+        lv_obj_set_style_pad_row(english_setup_list_, 3, 0);
+        lv_obj_set_style_shadow_width(english_setup_list_, 0, 0);
+        lv_obj_set_scrollbar_mode(english_setup_list_, LV_SCROLLBAR_MODE_OFF);
+        lv_obj_remove_flag(english_setup_list_, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_set_flex_flow(english_setup_list_, LV_FLEX_FLOW_COLUMN);
 
-        // 开始
-        lv_obj_t* start_btn = lv_button_create(english_setup_panel_);
-        lv_obj_set_size(start_btn, 140, 44);
-        lv_obj_align(start_btn, LV_ALIGN_BOTTOM_MID, 0, -12);
-        lv_obj_set_style_bg_color(start_btn, lv_color_hex(0x2A6E4F), 0);
-        lv_obj_set_style_bg_opa(start_btn, LV_OPA_COVER, 0);
-        lv_obj_set_style_radius(start_btn, 12, 0);
-        lv_obj_set_style_border_width(start_btn, 0, 0);
-        lv_obj_set_style_shadow_width(start_btn, 0, 0);
-        lv_obj_set_style_pad_all(start_btn, 0, 0);
-        lv_obj_set_style_bg_opa(start_btn, LV_OPA_30, LV_STATE_PRESSED);
-        lv_obj_set_ext_click_area(start_btn, 8);
-        lv_obj_add_event_cb(start_btn, &LcdDisplay::OnEnglishSetupStartClicked, LV_EVENT_PRESSED,
+        // 左右翻页按钮：替代列表滑动，点选不再和滑动抢手势。
+        auto make_page_btn = [this, icon_font](lv_align_t align, int x, int delta,
+                                               const char* icon) {
+            lv_obj_t* btn = lv_button_create(english_setup_step1_);
+            lv_obj_set_size(btn, 30, 48);
+            lv_obj_align(btn, align, x, 108);
+            lv_obj_set_style_bg_color(btn, lv_color_hex(kSkyCard), 0);
+            lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
+            lv_obj_set_style_radius(btn, 14, 0);
+            lv_obj_set_style_border_width(btn, 1, 0);
+            lv_obj_set_style_border_color(btn, lv_color_hex(kSkyBorder), 0);
+            lv_obj_set_style_shadow_width(btn, 0, 0);
+            lv_obj_set_style_pad_all(btn, 0, 0);
+            lv_obj_set_style_bg_color(btn, lv_color_hex(kSkySelect), LV_STATE_PRESSED);
+            lv_obj_set_ext_click_area(btn, 6);
+            lv_obj_set_user_data(btn, reinterpret_cast<void*>(static_cast<intptr_t>(delta)));
+            lv_obj_add_event_cb(btn, &LcdDisplay::OnEnglishSetupPageClicked, LV_EVENT_PRESSED,
+                                this);
+            lv_obj_t* label = lv_label_create(btn);
+            lv_obj_set_style_text_font(label, icon_font, 0);
+            lv_obj_set_style_text_color(label, lv_color_hex(kSkyAccentDeep), 0);
+            lv_label_set_text(label, icon);
+            lv_obj_center(label);
+            return label;
+        };
+        english_setup_page_left_icon_ =
+            make_page_btn(LV_ALIGN_TOP_LEFT, 2, -1, MATERIAL_SYMBOLS_KEYBOARD_ARROW_LEFT);
+        english_setup_page_left_ = lv_obj_get_parent(english_setup_page_left_icon_);
+        english_setup_page_right_icon_ =
+            make_page_btn(LV_ALIGN_TOP_RIGHT, -2, 1, MATERIAL_SYMBOLS_KEYBOARD_ARROW_RIGHT);
+        english_setup_page_right_ = lv_obj_get_parent(english_setup_page_right_icon_);
+
+        // 第二排：播报配置，点选即生效（不再逐个循环）
+        static const char* kChipNames[4][6] = {
+            {"5", "10", "20", "30", "全部", nullptr},
+            {"5s", "10s", "15s", "20s", "30s", "手动"},
+            {"英文", "中文", "中英", nullptr, nullptr, nullptr},
+            {"听写", "词卡", nullptr, nullptr, nullptr, nullptr},
+        };
+        static const int kChipValues[4][6] = {
+            {5, 10, 20, 30, 0, 0}, {5, 10, 15, 20, 30, 0}, {0, 1, 2, 0, 0, 0}, {0, 1, 0, 0, 0, 0}};
+        static const char* kGroupNames[4] = {"词数", "间隔", "播报", "模式"};
+        static const int kGroupRows[4] = {2, 2, 1, 1};
+        static const int kGroupY[4] = {0, 60, 120, 150};
+        for (int group = 0; group < 4; ++group) {
+            const int count = static_cast<int>(kGroupRows[group] * 3);
+            lv_obj_t* name = lv_label_create(english_setup_step2_);
+            lv_obj_set_style_text_font(name, small_font, 0);
+            lv_obj_set_style_text_color(name, lv_color_hex(kSkyMuted), 0);
+            lv_label_set_text(name, kGroupNames[group]);
+            lv_obj_set_pos(name, 8, kGroupY[group] + 2);
+            english_setup_labels_.push_back(name);
+
+            for (int i = 0; i < count; ++i) {
+                if (kChipNames[group][i] == nullptr) {
+                    continue;
+                }
+                const int col = i % 3;
+                const int row = i / 3;
+                lv_obj_t* chip = lv_button_create(english_setup_step2_);
+                lv_obj_set_size(chip, 58, 24);
+                lv_obj_set_pos(chip, 54 + col * 60, kGroupY[group] + row * 30);
+                lv_obj_set_style_radius(chip, 12, 0);
+                lv_obj_set_style_border_width(chip, 1, 0);
+                lv_obj_set_style_shadow_width(chip, 0, 0);
+                lv_obj_set_style_pad_all(chip, 0, 0);
+                lv_obj_set_ext_click_area(chip, 4);
+                lv_obj_set_user_data(
+                    chip, reinterpret_cast<void*>(static_cast<intptr_t>((group << 8) |
+                                                                        kChipValues[group][i])));
+                lv_obj_add_event_cb(chip, &LcdDisplay::OnEnglishSetupChipClicked,
+                                    LV_EVENT_PRESSED, this);
+                lv_obj_t* label = lv_label_create(chip);
+                lv_obj_set_style_text_font(label, small_font, 0);
+                lv_label_set_text(label, kChipNames[group][i]);
+                lv_obj_center(label);
+                english_setup_labels_.push_back(label);
+                english_setup_chip_values_[group][english_setup_chip_count_[group]] =
+                    kChipValues[group][i];
+                english_setup_chip_labels_[group][english_setup_chip_count_[group]++] = label;
+            }
+        }
+
+        lv_obj_t* setup_next = lv_button_create(english_setup_panel_);
+        lv_obj_set_size(setup_next, 150, 40);
+        lv_obj_align(setup_next, LV_ALIGN_BOTTOM_MID, 0, -6);
+        lv_obj_set_style_bg_color(setup_next, lv_color_hex(kSkyAccent), 0);
+        lv_obj_set_style_bg_opa(setup_next, LV_OPA_COVER, 0);
+        lv_obj_set_style_radius(setup_next, 12, 0);
+        lv_obj_set_style_border_width(setup_next, 0, 0);
+        lv_obj_set_style_shadow_width(setup_next, 0, 0);
+        lv_obj_set_style_pad_all(setup_next, 0, 0);
+        lv_obj_set_style_bg_color(setup_next, lv_color_hex(kSkyAccentDeep), LV_STATE_PRESSED);
+        lv_obj_set_ext_click_area(setup_next, 6);
+        lv_obj_add_event_cb(setup_next, &LcdDisplay::OnEnglishSetupNextClicked, LV_EVENT_PRESSED,
                             this);
-        lv_obj_t* start_label = lv_label_create(start_btn);
-        lv_obj_set_style_text_font(start_label, text_font, 0);
-        english_setup_start_label_ = start_label;
-        lv_obj_set_style_text_color(start_label, lv_color_hex(0xFFFFFF), 0);
-        lv_label_set_text(start_label, "开始");
-        lv_obj_center(start_label);
-
-        stroke_entry_btn_ = lv_button_create(screen);
-        lv_obj_set_size(stroke_entry_btn_, 36, 36);
-        lv_obj_align(stroke_entry_btn_, LV_ALIGN_BOTTOM_RIGHT, -4, -4);
-        lv_obj_set_style_bg_color(stroke_entry_btn_, lv_color_hex(0x30303C), 0);
-        lv_obj_set_style_bg_opa(stroke_entry_btn_, LV_OPA_COVER, 0);
-        lv_obj_set_style_radius(stroke_entry_btn_, 10, 0);
-        lv_obj_set_style_border_width(stroke_entry_btn_, 0, 0);
-        lv_obj_set_style_shadow_width(stroke_entry_btn_, 0, 0);
-        lv_obj_set_style_pad_all(stroke_entry_btn_, 0, 0);
-        lv_obj_add_flag(stroke_entry_btn_, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_set_ext_click_area(stroke_entry_btn_, 10);
-        lv_obj_add_event_cb(stroke_entry_btn_, &LcdDisplay::OnStrokeEntryClicked, LV_EVENT_PRESSED,
-                            this);
-        lv_obj_t* entry_label = lv_label_create(stroke_entry_btn_);
-        stroke_entry_label_ = entry_label;
-        lv_obj_set_style_text_font(entry_label, text_font, 0);
-        lv_obj_set_style_text_color(entry_label, lv_color_hex(0xE8E8F0), 0);
-        lv_label_set_text(entry_label, "笔");
-        lv_obj_center(entry_label);
+        english_setup_next_label_ = lv_label_create(setup_next);
+        lv_obj_set_style_text_font(english_setup_next_label_, small_font, 0);
+        lv_obj_set_style_text_color(english_setup_next_label_, lv_color_hex(0xFFFFFF), 0);
+        lv_label_set_text(english_setup_next_label_, "下一步");
+        lv_obj_center(english_setup_next_label_);
 
         stroke_anim_timer_ = lv_timer_create(&LcdDisplay::StrokeAnimTimerCb, 60, this);
         lv_timer_pause(stroke_anim_timer_);
@@ -1980,85 +2089,327 @@ void LcdDisplay::SetupUI() {
 
     // Volume
     settings_volume_label_ = make_text_label(settings_screen_, "音量");
-    lv_obj_set_pos(settings_volume_label_, 12, 48);
+    lv_obj_set_pos(settings_volume_label_, 12, 44);
     settings_volume_value_ = make_text_label(settings_screen_, "70");
     lv_obj_set_width(settings_volume_value_, 52);
     lv_obj_set_style_text_align(settings_volume_value_, LV_TEXT_ALIGN_RIGHT, 0);
-    lv_obj_set_pos(settings_volume_value_, 64, 48);
+    lv_obj_set_pos(settings_volume_value_, 64, 44);
     settings_vol_minus_icon_ =
-        make_adjust_button(settings_screen_, 122, 42, "-", &LcdDisplay::OnVolumeDownClicked);
+        make_adjust_button(settings_screen_, 122, 38, "-", &LcdDisplay::OnVolumeDownClicked);
     settings_vol_plus_icon_ =
-        make_adjust_button(settings_screen_, 170, 42, "+", &LcdDisplay::OnVolumeUpClicked);
+        make_adjust_button(settings_screen_, 170, 38, "+", &LcdDisplay::OnVolumeUpClicked);
 
     // Brightness
     settings_bright_label_ = make_text_label(settings_screen_, "亮度");
-    lv_obj_set_pos(settings_bright_label_, 12, 94);
+    lv_obj_set_pos(settings_bright_label_, 12, 84);
     settings_bright_value_ = make_text_label(settings_screen_, "100");
     lv_obj_set_width(settings_bright_value_, 52);
     lv_obj_set_style_text_align(settings_bright_value_, LV_TEXT_ALIGN_RIGHT, 0);
-    lv_obj_set_pos(settings_bright_value_, 64, 94);
+    lv_obj_set_pos(settings_bright_value_, 64, 84);
     settings_bright_minus_icon_ =
-        make_adjust_button(settings_screen_, 122, 88, "-", &LcdDisplay::OnBrightnessDownClicked);
+        make_adjust_button(settings_screen_, 122, 78, "-", &LcdDisplay::OnBrightnessDownClicked);
     settings_bright_plus_icon_ =
-        make_adjust_button(settings_screen_, 170, 88, "+", &LcdDisplay::OnBrightnessUpClicked);
+        make_adjust_button(settings_screen_, 170, 78, "+", &LcdDisplay::OnBrightnessUpClicked);
 
     // Microphone gain (ES8311 ADC gain, 0..36 dB in 6 dB steps)
     settings_mic_label_ = make_text_label(settings_screen_, "麦克风");
-    lv_obj_set_pos(settings_mic_label_, 12, 140);
+    lv_obj_set_pos(settings_mic_label_, 12, 124);
     settings_mic_value_ = make_text_label(settings_screen_, "30");
     lv_obj_set_width(settings_mic_value_, 52);
     lv_obj_set_style_text_align(settings_mic_value_, LV_TEXT_ALIGN_RIGHT, 0);
-    lv_obj_set_pos(settings_mic_value_, 64, 140);
+    lv_obj_set_pos(settings_mic_value_, 64, 124);
     settings_mic_minus_icon_ =
-        make_adjust_button(settings_screen_, 122, 134, "-", &LcdDisplay::OnMicGainDownClicked);
+        make_adjust_button(settings_screen_, 122, 118, "-", &LcdDisplay::OnMicGainDownClicked);
     settings_mic_plus_icon_ =
-        make_adjust_button(settings_screen_, 170, 134, "+", &LcdDisplay::OnMicGainUpClicked);
+        make_adjust_button(settings_screen_, 170, 118, "+", &LcdDisplay::OnMicGainUpClicked);
 
     // WiFi
     settings_wifi_label_ = make_text_label(settings_screen_, "WiFi");
-    lv_obj_set_pos(settings_wifi_label_, 12, 186);
+    lv_obj_set_pos(settings_wifi_label_, 12, 164);
     settings_wifi_status_ = make_text_label(settings_screen_, "");
     lv_obj_set_width(settings_wifi_status_, 100);
     lv_obj_set_style_text_align(settings_wifi_status_, LV_TEXT_ALIGN_LEFT, 0);
-    lv_obj_set_pos(settings_wifi_status_, 58, 186);
+    lv_obj_set_pos(settings_wifi_status_, 58, 164);
     settings_wifi_btn_label_ =
-        make_wide_button(settings_screen_, 166, 180, 62, "配网", &LcdDisplay::OnWifiConfigClicked);
+        make_wide_button(settings_screen_, 166, 158, 62, "配网", &LcdDisplay::OnWifiConfigClicked);
+
+    // IP (read-only; the file transfer entry lives in the drawer)
+    settings_ip_label_ = make_text_label(settings_screen_, "IP");
+    lv_obj_set_pos(settings_ip_label_, 12, 204);
+    settings_ip_value_ = make_text_label(settings_screen_, "--");
+    lv_obj_set_width(settings_ip_value_, 176);
+    lv_obj_set_style_text_align(settings_ip_value_, LV_TEXT_ALIGN_LEFT, 0);
+    lv_label_set_long_mode(settings_ip_value_, LV_LABEL_LONG_DOT);
+    lv_obj_set_pos(settings_ip_value_, 52, 204);
 
     // Bluetooth
     settings_bt_label_ = make_text_label(settings_screen_, "蓝牙");
-    lv_obj_set_pos(settings_bt_label_, 12, 232);
+    lv_obj_set_pos(settings_bt_label_, 12, 244);
     settings_bt_status_ = make_text_label(settings_screen_, "");
     lv_obj_set_width(settings_bt_status_, 66);
     lv_obj_set_style_text_align(settings_bt_status_, LV_TEXT_ALIGN_LEFT, 0);
-    lv_obj_set_pos(settings_bt_status_, 58, 232);
-    settings_bt_disconnect_label_ = make_wide_button(settings_screen_, 126, 226, 50, "断开",
+    lv_obj_set_pos(settings_bt_status_, 58, 244);
+    settings_bt_disconnect_label_ = make_wide_button(settings_screen_, 126, 238, 50, "断开",
                                                      &LcdDisplay::OnSettingsBtDisconnectClicked);
-    settings_bt_forget_label_ = make_wide_button(settings_screen_, 182, 226, 46, "清空",
+    settings_bt_forget_label_ = make_wide_button(settings_screen_, 182, 238, 46, "清空",
                                                  &LcdDisplay::OnSettingsBtForgetClicked);
 
     // Reboot
     settings_reboot_label_ =
-        make_wide_button(settings_screen_, 60, 272, 120, "重启设备", &LcdDisplay::OnRebootClicked);
+        make_wide_button(settings_screen_, 60, 284, 120, "重启设备", &LcdDisplay::OnRebootClicked);
 
-    // Gear entry (bottom-left, idle only)
-    settings_entry_btn_ = lv_button_create(screen);
-    lv_obj_set_size(settings_entry_btn_, 36, 36);
-    lv_obj_align(settings_entry_btn_, LV_ALIGN_BOTTOM_LEFT, 4, -4);
-    lv_obj_set_style_bg_color(settings_entry_btn_, lv_color_hex(0x30303C), 0);
-    lv_obj_set_style_bg_opa(settings_entry_btn_, LV_OPA_COVER, 0);
-    lv_obj_set_style_radius(settings_entry_btn_, 10, 0);
-    lv_obj_set_style_border_width(settings_entry_btn_, 0, 0);
-    lv_obj_set_style_shadow_width(settings_entry_btn_, 0, 0);
-    lv_obj_set_style_pad_all(settings_entry_btn_, 0, 0);
-    lv_obj_add_flag(settings_entry_btn_, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_set_ext_click_area(settings_entry_btn_, 10);
-    lv_obj_add_event_cb(settings_entry_btn_, &LcdDisplay::OnSettingsEntryClicked, LV_EVENT_PRESSED,
-                        this);
-    settings_entry_icon_ = lv_label_create(settings_entry_btn_);
-    lv_obj_set_style_text_font(settings_entry_icon_, icon_font, 0);
-    lv_obj_set_style_text_color(settings_entry_icon_, lv_color_hex(0xE8E8F0), 0);
-    lv_label_set_text(settings_entry_icon_, MATERIAL_SYMBOLS_SETTINGS);
-    lv_obj_center(settings_entry_icon_);
+#if CONFIG_WEB_FILE_SERVER
+    /* File transfer screen: URL, run state, free space and upload progress */
+    file_service_screen_ = lv_obj_create(screen);
+    lv_obj_set_size(file_service_screen_, LV_HOR_RES, LV_VER_RES);
+    lv_obj_set_style_radius(file_service_screen_, 0, 0);
+    lv_obj_set_style_bg_color(file_service_screen_, lvgl_theme->background_color(), 0);
+    lv_obj_set_style_bg_opa(file_service_screen_, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(file_service_screen_, 0, 0);
+    lv_obj_set_style_pad_all(file_service_screen_, 0, 0);
+    lv_obj_remove_flag(file_service_screen_, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollbar_mode(file_service_screen_, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_add_flag(file_service_screen_, LV_OBJ_FLAG_HIDDEN);
+
+    lv_obj_t* file_back = lv_button_create(file_service_screen_);
+    lv_obj_set_size(file_back, 44, 36);
+    lv_obj_align(file_back, LV_ALIGN_TOP_LEFT, 4, 2);
+    lv_obj_set_style_bg_opa(file_back, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(file_back, 0, 0);
+    lv_obj_set_style_pad_all(file_back, 0, 0);
+    lv_obj_set_style_shadow_width(file_back, 0, 0);
+    lv_obj_set_ext_click_area(file_back, 8);
+    lv_obj_add_event_cb(file_back, &LcdDisplay::OnFileServiceBackClicked, LV_EVENT_PRESSED, this);
+    file_back_icon_ = lv_label_create(file_back);
+    lv_obj_set_style_text_font(file_back_icon_, icon_font, 0);
+    lv_obj_set_style_text_color(file_back_icon_, lvgl_theme->text_color(), 0);
+    lv_label_set_text(file_back_icon_, MATERIAL_SYMBOLS_ARROW_BACK);
+    lv_obj_center(file_back_icon_);
+
+    file_title_label_ = lv_label_create(file_service_screen_);
+    lv_obj_set_style_text_font(file_title_label_, text_font, 0);
+    lv_obj_set_style_text_color(file_title_label_, lvgl_theme->text_color(), 0);
+    lv_label_set_text(file_title_label_, "文件传输");
+    lv_obj_align(file_title_label_, LV_ALIGN_TOP_MID, 0, 10);
+
+    file_url_label_ = lv_label_create(file_service_screen_);
+    lv_obj_set_style_text_font(file_url_label_, text_font, 0);
+    lv_obj_set_style_text_color(file_url_label_, lv_color_hex(0x5B8CFF), 0);
+    lv_obj_set_width(file_url_label_, 224);
+    lv_obj_set_style_text_align(file_url_label_, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_long_mode(file_url_label_, LV_LABEL_LONG_DOT);
+    lv_label_set_text(file_url_label_, "http://--");
+    lv_obj_align(file_url_label_, LV_ALIGN_TOP_MID, 0, 48);
+
+    file_hint_label_ = lv_label_create(file_service_screen_);
+    lv_obj_set_style_text_font(file_hint_label_, text_font, 0);
+    lv_obj_set_style_text_color(file_hint_label_, lv_color_hex(0x9A9AA6), 0);
+    lv_obj_set_width(file_hint_label_, 224);
+    lv_obj_set_style_text_align(file_hint_label_, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_text(file_hint_label_, "浏览器打开此地址");
+    lv_obj_align(file_hint_label_, LV_ALIGN_TOP_MID, 0, 78);
+
+    file_status_dot_ = lv_obj_create(file_service_screen_);
+    lv_obj_set_size(file_status_dot_, 10, 10);
+    lv_obj_set_style_radius(file_status_dot_, 5, 0);
+    lv_obj_set_style_bg_color(file_status_dot_, lv_color_hex(0x777777), 0);
+    lv_obj_set_style_bg_opa(file_status_dot_, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(file_status_dot_, 0, 0);
+    lv_obj_set_style_pad_all(file_status_dot_, 0, 0);
+    lv_obj_remove_flag(file_status_dot_, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_pos(file_status_dot_, 20, 118);
+
+    file_status_label_ = lv_label_create(file_service_screen_);
+    lv_obj_set_style_text_font(file_status_label_, text_font, 0);
+    lv_obj_set_style_text_color(file_status_label_, lv_color_hex(0x9A9AA6), 0);
+    lv_obj_set_width(file_status_label_, 116);
+    lv_label_set_long_mode(file_status_label_, LV_LABEL_LONG_DOT);
+    lv_label_set_text(file_status_label_, "等待网络");
+    lv_obj_set_pos(file_status_label_, 38, 112);
+
+    lv_obj_t* file_toggle = lv_button_create(file_service_screen_);
+    lv_obj_set_size(file_toggle, 62, 32);
+    lv_obj_set_pos(file_toggle, 166, 112);
+    lv_obj_set_style_radius(file_toggle, 8, 0);
+    lv_obj_set_style_bg_color(file_toggle, lv_color_hex(0x2A2A34), 0);
+    lv_obj_set_style_bg_opa(file_toggle, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(file_toggle, 0, 0);
+    lv_obj_set_style_shadow_width(file_toggle, 0, 0);
+    lv_obj_set_style_pad_all(file_toggle, 0, 0);
+    lv_obj_set_ext_click_area(file_toggle, 8);
+    lv_obj_add_event_cb(file_toggle, &LcdDisplay::OnFileServiceToggleClicked, LV_EVENT_PRESSED, this);
+    file_toggle_label_ = lv_label_create(file_toggle);
+    lv_obj_set_style_text_font(file_toggle_label_, text_font, 0);
+    lv_obj_set_style_text_color(file_toggle_label_, lvgl_theme->text_color(), 0);
+    lv_label_set_text(file_toggle_label_, "启动");
+    lv_obj_center(file_toggle_label_);
+
+    file_storage_label_ = lv_label_create(file_service_screen_);
+    lv_obj_set_style_text_font(file_storage_label_, text_font, 0);
+    lv_obj_set_style_text_color(file_storage_label_, lv_color_hex(0x9A9AA6), 0);
+    lv_obj_set_width(file_storage_label_, 224);
+    lv_obj_set_style_text_align(file_storage_label_, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_text(file_storage_label_, "SD --");
+    lv_obj_align(file_storage_label_, LV_ALIGN_TOP_MID, 0, 156);
+
+    lv_obj_t* file_divider = lv_obj_create(file_service_screen_);
+    lv_obj_set_size(file_divider, 216, 1);
+    lv_obj_set_pos(file_divider, 12, 188);
+    lv_obj_set_style_bg_color(file_divider, lv_color_hex(0x2A2A34), 0);
+    lv_obj_set_style_bg_opa(file_divider, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(file_divider, 0, 0);
+    lv_obj_set_style_radius(file_divider, 0, 0);
+    lv_obj_set_style_pad_all(file_divider, 0, 0);
+    lv_obj_remove_flag(file_divider, LV_OBJ_FLAG_SCROLLABLE);
+
+    file_activity_label_ = lv_label_create(file_service_screen_);
+    lv_obj_set_style_text_font(file_activity_label_, text_font, 0);
+    lv_obj_set_style_text_color(file_activity_label_, lvgl_theme->text_color(), 0);
+    lv_obj_set_width(file_activity_label_, 216);
+    lv_label_set_long_mode(file_activity_label_, LV_LABEL_LONG_DOT);
+    lv_label_set_text(file_activity_label_, "");
+    lv_obj_set_pos(file_activity_label_, 12, 196);
+    lv_obj_add_flag(file_activity_label_, LV_OBJ_FLAG_HIDDEN);
+
+    file_progress_bar_ = lv_bar_create(file_service_screen_);
+    lv_obj_set_size(file_progress_bar_, 200, 8);
+    lv_obj_set_pos(file_progress_bar_, 20, 224);
+    lv_bar_set_range(file_progress_bar_, 0, 100);
+    lv_obj_set_style_bg_color(file_progress_bar_, lv_color_hex(0x2A2A34), LV_PART_MAIN);
+    lv_obj_set_style_bg_grad_color(file_progress_bar_, lv_color_hex(0x2A2A34), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(file_progress_bar_, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_radius(file_progress_bar_, 4, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(file_progress_bar_, lv_color_hex(0x5B8CFF), LV_PART_INDICATOR);
+    lv_obj_set_style_bg_grad_color(file_progress_bar_, lv_color_hex(0x5B8CFF), LV_PART_INDICATOR);
+    lv_obj_set_style_bg_opa(file_progress_bar_, LV_OPA_COVER, LV_PART_INDICATOR);
+    lv_obj_set_style_radius(file_progress_bar_, 4, LV_PART_INDICATOR);
+    lv_obj_add_flag(file_progress_bar_, LV_OBJ_FLAG_HIDDEN);
+
+    file_foot_label_ = lv_label_create(file_service_screen_);
+    lv_obj_set_style_text_font(file_foot_label_, text_font, 0);
+    lv_obj_set_style_text_color(file_foot_label_, lv_color_hex(0x8A8A96), 0);
+    lv_obj_set_width(file_foot_label_, 224);
+    lv_obj_set_style_text_align(file_foot_label_, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_text(file_foot_label_, "仅限同一 Wi-Fi 局域网\n删除后不可恢复");
+    lv_obj_align(file_foot_label_, LV_ALIGN_BOTTOM_MID, 0, -12);
+#endif
+
+    /* 功能抽屉：底部点状把手展开的全屏彩色图标宫格。 */
+    drawer_screen_ = lv_obj_create(screen);
+    lv_obj_set_size(drawer_screen_, LV_HOR_RES, LV_VER_RES);
+    lv_obj_set_style_radius(drawer_screen_, 0, 0);
+    lv_obj_set_style_bg_color(drawer_screen_, lvgl_theme->background_color(), 0);
+    lv_obj_set_style_bg_opa(drawer_screen_, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(drawer_screen_, 0, 0);
+    lv_obj_set_style_pad_all(drawer_screen_, 0, 0);
+    lv_obj_remove_flag(drawer_screen_, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollbar_mode(drawer_screen_, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_add_flag(drawer_screen_, LV_OBJ_FLAG_HIDDEN);
+
+    lv_obj_t* drawer_back = lv_button_create(drawer_screen_);
+    lv_obj_set_size(drawer_back, 44, 36);
+    lv_obj_align(drawer_back, LV_ALIGN_TOP_LEFT, 4, 2);
+    lv_obj_set_style_bg_opa(drawer_back, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(drawer_back, 0, 0);
+    lv_obj_set_style_pad_all(drawer_back, 0, 0);
+    lv_obj_set_style_shadow_width(drawer_back, 0, 0);
+    lv_obj_set_ext_click_area(drawer_back, 12);
+    lv_obj_add_event_cb(drawer_back, &LcdDisplay::OnDrawerBackClicked, LV_EVENT_CLICKED, this);
+    drawer_back_icon_ = lv_label_create(drawer_back);
+    lv_obj_set_style_text_font(drawer_back_icon_, icon_font, 0);
+    lv_obj_set_style_text_color(drawer_back_icon_, lvgl_theme->text_color(), 0);
+    lv_label_set_text(drawer_back_icon_, MATERIAL_SYMBOLS_ARROW_BACK);
+    lv_obj_center(drawer_back_icon_);
+
+    drawer_title_ = lv_label_create(drawer_screen_);
+    lv_obj_set_style_text_font(drawer_title_, text_font, 0);
+    lv_obj_set_style_text_color(drawer_title_, lvgl_theme->text_color(), 0);
+    lv_label_set_text(drawer_title_, "功能");
+    lv_obj_align(drawer_title_, LV_ALIGN_TOP_MID, 0, 10);
+
+    lv_obj_t* drawer_grid = lv_obj_create(drawer_screen_);
+    lv_obj_set_pos(drawer_grid, 0, 50);
+    lv_obj_set_size(drawer_grid, LV_HOR_RES, LV_VER_RES - 50);
+    lv_obj_set_style_bg_opa(drawer_grid, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(drawer_grid, 0, 0);
+    lv_obj_set_style_radius(drawer_grid, 0, 0);
+    lv_obj_set_style_shadow_width(drawer_grid, 0, 0);
+    lv_obj_set_style_pad_all(drawer_grid, 0, 0);
+    lv_obj_set_scroll_dir(drawer_grid, LV_DIR_VER);
+    lv_obj_set_scrollbar_mode(drawer_grid, LV_SCROLLBAR_MODE_OFF);
+    const int drawer_start_y = 8;
+    for (int i = 0; i < kDrawerTileCount; ++i) {
+        const DrawerTileSpec& spec = kDrawerSpecs[i];
+        const int col = i % 4;
+        const int row = i / 4;
+        lv_obj_t* tile = lv_obj_create(drawer_grid);
+        lv_obj_set_size(tile, 50, 76);
+        lv_obj_set_pos(tile, 8 + col * 58, drawer_start_y + row * 84);
+        lv_obj_set_style_bg_opa(tile, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_border_width(tile, 0, 0);
+        lv_obj_set_style_radius(tile, 0, 0);
+        lv_obj_set_style_shadow_width(tile, 0, 0);
+        lv_obj_set_style_pad_all(tile, 0, 0);
+        lv_obj_set_style_opa(tile, LV_OPA_50, LV_STATE_PRESSED);
+        lv_obj_remove_flag(tile, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_add_flag(tile, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_add_flag(tile, LV_OBJ_FLAG_OVERFLOW_VISIBLE);
+        lv_obj_set_ext_click_area(tile, 4);
+        lv_obj_set_user_data(tile, reinterpret_cast<void*>(static_cast<intptr_t>(i)));
+        lv_obj_add_event_cb(tile, &LcdDisplay::OnDrawerTileClicked, LV_EVENT_CLICKED, this);
+
+        lv_obj_t* box = lv_obj_create(tile);
+        lv_obj_set_size(box, 46, 46);
+        lv_obj_align(box, LV_ALIGN_TOP_MID, 0, 0);
+        lv_obj_set_style_radius(box, 13, 0);
+        lv_obj_set_style_bg_color(box, lv_color_hex(spec.color_top), 0);
+        lv_obj_set_style_bg_grad_color(box, lv_color_hex(spec.color_bottom), 0);
+        lv_obj_set_style_bg_grad_dir(box, LV_GRAD_DIR_VER, 0);
+        lv_obj_set_style_bg_opa(box, LV_OPA_COVER, 0);
+        lv_obj_set_style_border_width(box, 0, 0);
+        lv_obj_set_style_pad_all(box, 0, 0);
+        lv_obj_set_style_shadow_color(box, lv_color_hex(0x000000), 0);
+        lv_obj_set_style_shadow_width(box, 7, 0);
+        lv_obj_set_style_shadow_ofs_y(box, 3, 0);
+        lv_obj_set_style_shadow_opa(box, LV_OPA_30, 0);
+        lv_obj_remove_flag(box, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_remove_flag(box, LV_OBJ_FLAG_CLICKABLE);
+
+        lv_obj_t* icon = lv_label_create(box);
+        lv_obj_set_style_text_font(icon, large_icon_font, 0);
+        lv_obj_set_style_text_color(icon, lv_color_hex(0xFFFFFF), 0);
+        lv_label_set_text(icon, spec.icon);
+        lv_obj_center(icon);
+
+        lv_obj_t* label = lv_label_create(tile);
+        lv_obj_set_style_text_font(label, text_font, 0);
+        lv_obj_set_style_text_color(label, lvgl_theme->text_color(), 0);
+        lv_obj_set_width(label, 50);
+        lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
+        lv_label_set_long_mode(label, LV_LABEL_LONG_DOT);
+        lv_label_set_text(label, spec.label);
+        lv_obj_align(label, LV_ALIGN_TOP_MID, 0, 49);
+
+        drawer_tiles_[i] = tile;
+        drawer_tile_boxes_[i] = box;
+        drawer_tile_icons_[i] = icon;
+        drawer_tile_labels_[i] = label;
+    }
+
+    drawer_hint_ = lv_label_create(drawer_screen_);
+    lv_obj_set_width(drawer_hint_, LV_HOR_RES - 32);
+    lv_obj_set_style_text_font(drawer_hint_, text_font, 0);
+    lv_obj_set_style_text_align(drawer_hint_, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_style_text_color(drawer_hint_, lv_color_hex(0xF0F0F0), 0);
+    lv_obj_set_style_bg_color(drawer_hint_, lv_color_hex(0x22222A), 0);
+    lv_obj_set_style_bg_opa(drawer_hint_, LV_OPA_90, 0);
+    lv_obj_set_style_radius(drawer_hint_, 14, 0);
+    lv_obj_set_style_pad_ver(drawer_hint_, 7, 0);
+    lv_obj_set_style_pad_hor(drawer_hint_, 12, 0);
+    lv_obj_align(drawer_hint_, LV_ALIGN_BOTTOM_MID, 0, -16);
+    lv_label_set_text(drawer_hint_, "");
+    lv_obj_add_flag(drawer_hint_, LV_OBJ_FLAG_HIDDEN);
+
 
     lv_obj_add_event_cb(screen, &LcdDisplay::OnUserActivity, LV_EVENT_PRESSED, this);
     lv_obj_add_event_cb(screen, &LcdDisplay::OnUserActivity, LV_EVENT_CLICKED, this);
@@ -2080,6 +2431,29 @@ void LcdDisplay::SetupUI() {
         });
     });
     MediaBle::GetInstance().Start();
+
+#if CONFIG_WEB_FILE_SERVER
+    // File transfer page mirrors the server state and upload progress.
+    WebFileServer::GetInstance().SetStatusCallback([this](bool running) {
+        Application::GetInstance().Schedule([this, running]() {
+            DisplayLockGuard lock(this);
+            (void)running;
+            if (file_service_visible_) {
+                UpdateFileServiceValues();
+            }
+        });
+    });
+    WebFileServer::GetInstance().SetActivityCallback(
+        [this](const std::string& name, size_t sent, size_t total, bool done, bool error) {
+            const int percent = total > 0 ? static_cast<int>(sent * 100 / total) : -1;
+            Application::GetInstance().Schedule([this, name, percent, done, error]() {
+                DisplayLockGuard lock(this);
+                if (file_service_visible_) {
+                    UpdateFileTransferActivity(name, percent, done, error);
+                }
+            });
+        });
+#endif
 
     // 25 fps avatar animation: breathing, blink and state-driven motion.
     avatar_anim_epoch_ = lv_tick_get();
@@ -2235,27 +2609,9 @@ const lv_font_t* LcdDisplay::SafeTextFont() const {
 }
 
 const lv_font_t* LcdDisplay::GetChatFont() {
-    auto lvgl_theme = static_cast<LvglTheme*>(current_theme_);
-    const lv_font_t* theme_font = lvgl_theme != nullptr && lvgl_theme->text_font() != nullptr
-                                      ? lvgl_theme->text_font()->font()
-                                      : nullptr;
-    if (chat_font_ == nullptr) {
-        void* data = nullptr;
-        size_t size = 0;
-        if (Assets::GetInstance().GetAssetData("font_chat_common_18_4.bin", data, size)) {
-            chat_font_ = new LvglCBinFont(data);
-            ESP_LOGI(TAG, "Chat font loaded: font_chat_common_18_4.bin (%u bytes)", (unsigned)size);
-        }
-    }
-    if (chat_font_ != nullptr && chat_font_->font() != nullptr) {
-        if (theme_font != nullptr) {
-            // Rare glyphs the 18px Common subset does not cover fall back to
-            // the 20px UI font.
-            chat_font_->SetFallback(theme_font);
-        }
-        return chat_font_->font();
-    }
-    return theme_font;
+    // Chat now renders with the same 16px UI font: the dedicated 18px chat
+    // font cost 1.09 MB of the assets partition for no real benefit.
+    return SafeTextFont();
 }
 
 void LcdDisplay::RewrapMessage(size_t index) {
@@ -2385,7 +2741,8 @@ void LcdDisplay::ApplyChatLayout() {
         font, lvgl_theme->icon_font() != nullptr ? lvgl_theme->icon_font()->font() : nullptr,
         lvgl_theme->large_icon_font() != nullptr ? lvgl_theme->large_icon_font()->font() : nullptr);
     RebindSettingsFonts(
-        font, lvgl_theme->icon_font() != nullptr ? lvgl_theme->icon_font()->font() : nullptr);
+        font, lvgl_theme->icon_font() != nullptr ? lvgl_theme->icon_font()->font() : nullptr,
+        lvgl_theme->large_icon_font() != nullptr ? lvgl_theme->large_icon_font()->font() : nullptr);
     RebindEnglishFonts(
         font, lvgl_theme->icon_font() != nullptr ? lvgl_theme->icon_font()->font() : nullptr);
     /* Portrait 240x320 canvas: top bar (one line), avatar, then five text lines.
@@ -2503,7 +2860,7 @@ void LcdDisplay::RebindStrokeFonts(const lv_font_t* text_font, const lv_font_t* 
     // moment.  When assets reload and the old fonts are freed we must move all
     // of its labels to the new fonts *before* any style change triggers a
     // label relayout, otherwise LVGL calls through a stale font pointer.
-    lv_obj_t* text_labels[] = {stroke_pinyin_label_, stroke_info_label_, stroke_entry_label_};
+    lv_obj_t* text_labels[] = {stroke_pinyin_label_, stroke_info_label_};
     for (lv_obj_t* label : text_labels) {
         if (label != nullptr && text_font != nullptr) {
             lv_obj_set_style_text_font(label, text_font, 0);
@@ -2516,11 +2873,6 @@ void LcdDisplay::RebindStrokeFonts(const lv_font_t* text_font, const lv_font_t* 
     }
     if (stroke_close_icon_ != nullptr && icon_font != nullptr) {
         lv_obj_set_style_text_font(stroke_close_icon_, icon_font, 0);
-    }
-    for (int i = 0; i < 3; ++i) {
-        if (stroke_key_icons_[i] != nullptr && large_icon_font != nullptr) {
-            lv_obj_set_style_text_font(stroke_key_icons_[i], large_icon_font, 0);
-        }
     }
 }
 
@@ -2566,9 +2918,152 @@ void LcdDisplay::UpdateSettingsValues() {
         lv_label_set_text(settings_bt_status_,
                           MediaBle::GetInstance().IsConnected() ? "已连接" : "未连接");
     }
+    if (settings_ip_value_ != nullptr) {
+        auto& wifi = WifiManager::GetInstance();
+        const std::string ip = wifi.IsConnected() ? wifi.GetIpAddress() : std::string();
+        if (ip.empty()) {
+            lv_label_set_text(settings_ip_value_, "--");
+            lv_obj_set_style_text_color(settings_ip_value_, lv_color_hex(0x8A8A96), 0);
+        } else {
+            lv_label_set_text(settings_ip_value_, ip.c_str());
+            lv_obj_set_style_text_color(settings_ip_value_,
+                                        static_cast<LvglTheme*>(current_theme_)->text_color(), 0);
+        }
+    }
 }
 
-void LcdDisplay::RebindSettingsFonts(const lv_font_t* text_font, const lv_font_t* icon_font) {
+void LcdDisplay::ShowFileServiceScreen(bool show) {
+    if (file_service_screen_ == nullptr) {
+        return;
+    }
+    DisplayLockGuard lock(this);
+    file_service_visible_ = show;
+    if (show) {
+        UpdateFileServiceValues();
+        if (file_activity_label_ != nullptr) {
+            lv_obj_add_flag(file_activity_label_, LV_OBJ_FLAG_HIDDEN);
+        }
+        if (file_progress_bar_ != nullptr) {
+            lv_bar_set_value(file_progress_bar_, 0, LV_ANIM_OFF);
+            lv_obj_add_flag(file_progress_bar_, LV_OBJ_FLAG_HIDDEN);
+        }
+        lv_obj_remove_flag(file_service_screen_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_move_foreground(file_service_screen_);
+    } else {
+        lv_obj_add_flag(file_service_screen_, LV_OBJ_FLAG_HIDDEN);
+    }
+    UpdateMediaBarVisibility();
+}
+
+void LcdDisplay::UpdateFileServiceValues() {
+    if (file_service_screen_ == nullptr) {
+        return;
+    }
+#if CONFIG_WEB_FILE_SERVER
+    auto& server = WebFileServer::GetInstance();
+    auto& wifi = WifiManager::GetInstance();
+    const bool running = server.IsRunning();
+    const bool online = wifi.IsConnected();
+    const std::string url = server.Url();
+    if (file_url_label_ != nullptr) {
+        lv_label_set_text(file_url_label_, url.empty() ? (online ? "服务已停止" : "未联网") : url.c_str());
+    }
+    if (file_status_dot_ != nullptr) {
+        lv_obj_set_style_bg_color(file_status_dot_, lv_color_hex(running ? 0x4CD964 : 0x777777), 0);
+    }
+    if (file_status_label_ != nullptr) {
+        lv_label_set_text(file_status_label_,
+                          running ? "服务运行中" : (online ? "服务已停止" : "等待网络"));
+    }
+    if (file_toggle_label_ != nullptr) {
+        lv_label_set_text(file_toggle_label_, running ? "停止" : "启动");
+    }
+    if (file_storage_label_ != nullptr) {
+        uint64_t total_bytes = 0;
+        uint64_t free_bytes = 0;
+        char text[64];
+        if (esp_vfs_fat_info("/sdcard", &total_bytes, &free_bytes) == ESP_OK &&
+            total_bytes > 0) {
+            const double gb = 1024.0 * 1024 * 1024;
+            snprintf(text, sizeof(text), "SD %.1f / %.1f GB 可用",
+                     static_cast<double>(free_bytes) / gb, static_cast<double>(total_bytes) / gb);
+            lv_label_set_text(file_storage_label_, text);
+        } else {
+            lv_label_set_text(file_storage_label_, "未插入 SD 卡");
+        }
+    }
+#endif
+}
+
+void LcdDisplay::UpdateFileTransferActivity(const std::string& name, int percent, bool done,
+                                            bool error) {
+    if (file_activity_label_ == nullptr) {
+        return;
+    }
+    char text[192];
+    if (error) {
+        snprintf(text, sizeof(text), "传输失败: %s", name.c_str());
+    } else if (done) {
+        snprintf(text, sizeof(text), "已保存: %s", name.c_str());
+    } else if (percent >= 0) {
+        snprintf(text, sizeof(text), "%s  %d%%", name.c_str(), percent);
+    } else {
+        snprintf(text, sizeof(text), "%s", name.c_str());
+    }
+    lv_label_set_text(file_activity_label_, text);
+    lv_obj_remove_flag(file_activity_label_, LV_OBJ_FLAG_HIDDEN);
+    if (file_progress_bar_ != nullptr) {
+        const int value = error ? 0 : (done ? 100 : (percent > 0 ? percent : 0));
+        if (!error && !done && value == 0) {
+            // Nothing received yet: keep the bar hidden instead of showing an
+            // empty indicator sliver.
+            lv_obj_add_flag(file_progress_bar_, LV_OBJ_FLAG_HIDDEN);
+            return;
+        }
+        lv_obj_remove_flag(file_progress_bar_, LV_OBJ_FLAG_HIDDEN);
+        lv_bar_set_value(file_progress_bar_, value, LV_ANIM_OFF);
+    }
+}
+
+void LcdDisplay::OnFileServiceBackClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self != nullptr) {
+        self->ShowFileServiceScreen(false);
+        self->CloseSubPageToDrawer();
+    }
+}
+
+void LcdDisplay::OnFileServiceToggleClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self == nullptr) {
+        return;
+    }
+#if CONFIG_WEB_FILE_SERVER
+    auto& server = WebFileServer::GetInstance();
+    if (server.IsRunning()) {
+        server.Stop();
+    } else {
+        server.Start();
+    }
+#endif
+    self->UpdateFileServiceValues();
+}
+
+void LcdDisplay::SetIpAddress(const std::string& ip) {
+    (void)ip;
+    Application::GetInstance().Schedule([this]() {
+        DisplayLockGuard lock(this);
+        if (settings_screen_visible_) {
+            UpdateSettingsValues();
+        }
+        if (file_service_visible_) {
+            UpdateFileServiceValues();
+        }
+    });
+}
+
+void LcdDisplay::RebindSettingsFonts(const lv_font_t* text_font, const lv_font_t* icon_font,
+                                     const lv_font_t* large_icon_font) {
     lv_obj_t* text_labels[] = {settings_title_,
                                settings_volume_label_,
                                settings_volume_value_,
@@ -2589,13 +3084,33 @@ void LcdDisplay::RebindSettingsFonts(const lv_font_t* text_font, const lv_font_t
                                settings_wifi_btn_label_,
                                settings_bt_disconnect_label_,
                                settings_bt_forget_label_,
-                               settings_reboot_label_};
+                               settings_reboot_label_,
+                               settings_ip_label_,
+                               settings_ip_value_,
+                               file_title_label_,
+                               file_url_label_,
+                               file_hint_label_,
+                               file_status_label_,
+                               file_toggle_label_,
+                               file_storage_label_,
+                               file_activity_label_,
+                               file_foot_label_,
+                               drawer_title_,
+                               drawer_hint_};
     for (lv_obj_t* label : text_labels) {
         if (label != nullptr && text_font != nullptr) {
             lv_obj_set_style_text_font(label, text_font, 0);
         }
     }
-    lv_obj_t* icon_labels[] = {settings_back_icon_, settings_entry_icon_};
+    for (int i = 0; i < kDrawerTileCount; ++i) {
+        if (drawer_tile_labels_[i] != nullptr && text_font != nullptr) {
+            lv_obj_set_style_text_font(drawer_tile_labels_[i], text_font, 0);
+        }
+        if (drawer_tile_icons_[i] != nullptr && large_icon_font != nullptr) {
+            lv_obj_set_style_text_font(drawer_tile_icons_[i], large_icon_font, 0);
+        }
+    }
+    lv_obj_t* icon_labels[] = {settings_back_icon_, drawer_back_icon_, file_back_icon_};
     for (lv_obj_t* label : icon_labels) {
         if (label != nullptr && icon_font != nullptr) {
             lv_obj_set_style_text_font(label, icon_font, 0);
@@ -2603,18 +3118,20 @@ void LcdDisplay::RebindSettingsFonts(const lv_font_t* text_font, const lv_font_t
     }
 }
 
-void LcdDisplay::OnSettingsEntryClicked(lv_event_t* e) {
-    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
-    if (self != nullptr) {
-        self->ShowSettingsScreen(true);
-    }
-}
-
 void LcdDisplay::OnSettingsBackClicked(lv_event_t* e) {
     auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
     if (self != nullptr) {
         self->ShowSettingsScreen(false);
+        self->CloseSubPageToDrawer();
     }
+}
+
+void LcdDisplay::CloseSubPageToDrawer() {
+    if (!return_to_drawer_) {
+        return;
+    }
+    return_to_drawer_ = false;
+    ShowDrawerScreen(true);
 }
 
 void LcdDisplay::OnVolumeDownClicked(lv_event_t* e) {
@@ -2734,11 +3251,15 @@ void LcdDisplay::OnWakeWordDetected() {
     DisplayLockGuard lock(this);
     ESP_LOGI(TAG, "wake/new-turn hook: stroke=%d settings=%d", stroke_screen_visible_,
              settings_screen_visible_);
+    return_to_drawer_ = false;
     if (stroke_screen_visible_) {
         ShowStrokeScreen(false);
     }
     if (settings_screen_visible_) {
         ShowSettingsScreen(false);
+    }
+    if (drawer_screen_visible_) {
+        ShowDrawerScreen(false);
     }
 }
 
@@ -2800,6 +3321,9 @@ void LcdDisplay::OnMicButtonClicked(lv_event_t* e) {
         }
         if (self->settings_screen_visible_) {
             self->ShowSettingsScreen(false);
+        }
+        if (self->drawer_screen_visible_) {
+            self->ShowDrawerScreen(false);
         }
     }
     if (self != nullptr && !self->chat_pages_.empty()) {
@@ -2906,6 +3430,9 @@ void LcdDisplay::SetAvatarMood(AvatarMood mood) {
             ShowSettingsScreen(false);
         }
         ShowEnglishSetup(false);
+        if (drawer_screen_visible_) {
+            ShowDrawerScreen(false);
+        }
     }
     UpdateChatViewport();
 }
@@ -3346,43 +3873,20 @@ void LcdDisplay::UpdateMediaBarVisibility() {
     if (media_bar_ != nullptr) {
         const bool show = chat_lines_per_page_ == 5 && !media_screen_visible_ &&
                           !bluetooth_screen_visible_ && !stroke_screen_visible_ &&
-                          avatar_mood_ == kAvatarMoodIdle;
+                          !file_service_visible_ && avatar_mood_ == kAvatarMoodIdle;
         if (show) {
             lv_obj_remove_flag(media_bar_, LV_OBJ_FLAG_HIDDEN);
         } else {
             lv_obj_add_flag(media_bar_, LV_OBJ_FLAG_HIDDEN);
         }
     }
-    const bool page_clear = chat_lines_per_page_ == 5 && !media_screen_visible_ &&
-                            !bluetooth_screen_visible_ && !stroke_screen_visible_ &&
-                            !english_screen_visible_ && avatar_mood_ == kAvatarMoodIdle;
-    if (stroke_entry_btn_ != nullptr) {
-        const bool entry_show =
-            page_clear && StrokeStore::GetInstance().Ready() && !english_setup_visible_;
-        if (entry_show) {
-            lv_obj_remove_flag(stroke_entry_btn_, LV_OBJ_FLAG_HIDDEN);
-        } else {
-            lv_obj_add_flag(stroke_entry_btn_, LV_OBJ_FLAG_HIDDEN);
-        }
-    }
-    if (english_entry_btn_ != nullptr) {
-        const bool entry_show = page_clear && EnglishPlayer::Available() && !english_setup_visible_;
-        if (entry_show) {
-            lv_obj_remove_flag(english_entry_btn_, LV_OBJ_FLAG_HIDDEN);
-        } else {
-            lv_obj_add_flag(english_entry_btn_, LV_OBJ_FLAG_HIDDEN);
-        }
-    }
-    if (settings_entry_btn_ != nullptr) {
-        const bool settings_show = chat_lines_per_page_ == 5 && !media_screen_visible_ &&
-                                   !bluetooth_screen_visible_ && !stroke_screen_visible_ &&
-                                   !english_screen_visible_ && !settings_screen_visible_ &&
-                                   !english_setup_visible_ && avatar_mood_ == kAvatarMoodIdle;
-        if (settings_show) {
-            lv_obj_remove_flag(settings_entry_btn_, LV_OBJ_FLAG_HIDDEN);
-        } else {
-            lv_obj_add_flag(settings_entry_btn_, LV_OBJ_FLAG_HIDDEN);
-        }
+    // 抽屉只在首页空闲态可用；离开空闲或任意二级页时自动收起。
+    const bool drawer_available =
+        chat_lines_per_page_ == 5 && !media_screen_visible_ && !bluetooth_screen_visible_ &&
+        !stroke_screen_visible_ && !english_screen_visible_ && !settings_screen_visible_ &&
+        !english_setup_visible_ && !file_service_visible_ && avatar_mood_ == kAvatarMoodIdle;
+    if (drawer_screen_visible_ && !drawer_available) {
+        ShowDrawerScreen(false);
     }
 }
 
@@ -3532,6 +4036,14 @@ void LcdDisplay::StrokeFillCanvas(lv_color_t color) {
     for (int i = 0; i < count; ++i) {
         raw[i] = v;
     }
+    const uint16_t grid = lv_color_to_u16(lv_color_hex(kPaperGrid));
+    const int mid = kStrokeCanvasSide / 2;
+    for (int i = kStrokeCanvasMargin / 2; i < kStrokeCanvasSide - kStrokeCanvasMargin / 2; ++i) {
+        if ((i / 6) % 2 == 0) {
+            raw[mid * kStrokeCanvasSide + i] = grid;
+            raw[i * kStrokeCanvasSide + mid] = grid;
+        }
+    }
     lv_obj_invalidate(stroke_canvas_);
 }
 
@@ -3591,7 +4103,7 @@ void LcdDisplay::StrokeStartStroke(int s) {
     stroke_speed_ = len > 0.5f ? len / (25.0f * seconds) : 2.0f;
 
     StrokeStampDot(static_cast<int>(lroundf(stroke_pos_x_)),
-                   static_cast<int>(lroundf(stroke_pos_y_)), stroke_radius_, stroke_color_active_);
+                   static_cast<int>(lroundf(stroke_pos_y_)), stroke_radius_, stroke_color_done_);
     if (s < kStrokeMaxStrokes && stroke_badges_[s] != nullptr) {
         lv_obj_t* b = stroke_badges_[s];
         lv_obj_clear_flag(b, LV_OBJ_FLAG_HIDDEN);
@@ -3633,11 +4145,9 @@ void LcdDisplay::StrokeLoadChar(int idx) {
         }
     }
 
-    auto* theme = static_cast<LvglTheme*>(current_theme_);
-    stroke_color_bg_ = theme->background_color();
-    stroke_color_dim_ = lv_color_mix(lv_color_hex(0xFFFFFF), stroke_color_bg_, LV_OPA_30);
-    stroke_color_done_ = lv_color_mix(lv_color_hex(0xFFFFFF), stroke_color_bg_, LV_OPA_60);
-    stroke_color_active_ = lv_color_hex(0xFFFFFF);
+    stroke_color_bg_ = lv_color_hex(kPaperSheet);
+    stroke_color_dim_ = lv_color_hex(kPaperGuide);
+    stroke_color_done_ = lv_color_hex(kPaperInk);
 
     lv_label_set_text(stroke_title_label_, store.PinyinOf(idx).c_str());
 
@@ -3664,7 +4174,7 @@ void LcdDisplay::StrokeLoadChar(int idx) {
             lv_line_set_points(stroke_lines_[i], pts.data(), static_cast<uint32_t>(pts.size()));
             lv_obj_set_style_line_width(stroke_lines_[i],
                                         LV_MAX(2, static_cast<int>(lroundf(radius * 2))), 0);
-            lv_obj_set_style_line_color(stroke_lines_[i], stroke_color_active_, 0);
+            lv_obj_set_style_line_color(stroke_lines_[i], stroke_color_done_, 0);
             lv_obj_remove_flag(stroke_lines_[i], LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(stroke_lines_[i], LV_OBJ_FLAG_HIDDEN);
         } else {
@@ -3886,12 +4396,11 @@ void LcdDisplay::UpdateEnglishScreen() {
 }
 
 void LcdDisplay::RebindEnglishFonts(const lv_font_t* text_font, const lv_font_t* icon_font) {
-    lv_obj_t* text_labels[] = {
-        english_word_label_,        english_meaning_label_,        english_progress_label_,
-        english_entry_label_,       english_setup_unit_label_,     english_setup_source_label_,
-        english_setup_count_label_, english_setup_interval_label_, english_setup_mode_label_,
-        english_score_label_,       english_setup_speak_label_,    english_title_label_,
-        english_setup_title_label_, english_setup_start_label_};
+    lv_obj_t* text_labels[] = {english_word_label_,        english_meaning_label_,
+                               english_progress_label_,    english_score_label_,
+                               english_title_label_,       english_setup_title_label_,
+                               english_setup_next_label_,  english_setup_tab_text_,
+                               english_setup_tab_topic_};
     for (lv_obj_t* label : text_labels) {
         if (label != nullptr && text_font != nullptr) {
             lv_obj_set_style_text_font(label, text_font, 0);
@@ -3906,28 +4415,40 @@ void LcdDisplay::RebindEnglishFonts(const lv_font_t* text_font, const lv_font_t*
             lv_obj_set_style_text_font(label, &ui_font_16_4, 0);
         }
     }
+    for (int i = 0; i < english_setup_row_count_; ++i) {
+        if (english_setup_row_names_[i] != nullptr) {
+            lv_obj_set_style_text_font(english_setup_row_names_[i], &ui_font_16_4, 0);
+        }
+        if (english_setup_row_counts_[i] != nullptr) {
+            lv_obj_set_style_text_font(english_setup_row_counts_[i], &ui_font_16_4, 0);
+        }
+    }
+    for (int group = 0; group < 4; ++group) {
+        for (int i = 0; i < english_setup_chip_count_[group]; ++i) {
+            if (english_setup_chip_labels_[group][i] != nullptr) {
+                lv_obj_set_style_text_font(english_setup_chip_labels_[group][i], &ui_font_16_4,
+                                           0);
+            }
+        }
+    }
     if (english_setup_close_icon_ != nullptr && icon_font != nullptr) {
         lv_obj_set_style_text_font(english_setup_close_icon_, icon_font, 0);
     }
-    for (lv_obj_t* label : english_key_labels_) {
-        if (label != nullptr) {
-            lv_obj_set_style_text_font(label, &ui_font_16_4, 0);
+    lv_obj_t* icon_labels[] = {english_back_icon_, english_reset_icon_,
+                               english_setup_page_left_icon_, english_setup_page_right_icon_};
+    for (lv_obj_t* label : icon_labels) {
+        if (label != nullptr && icon_font != nullptr) {
+            lv_obj_set_style_text_font(label, icon_font, 0);
         }
     }
-    lv_obj_t* small_labels[] = {english_mode_label_,  english_interval_label_,
-                                english_speak_label_, english_progress_label_,
-                                english_score_label_, english_title_label_};
+    lv_obj_t* small_labels[] = {english_mode_label_, english_interval_label_,
+                                english_speak_label_};
     for (lv_obj_t* label : small_labels) {
         if (label != nullptr) {
             lv_obj_set_style_text_font(label, &ui_font_16_4, 0);
         }
     }
-    if (english_close_icon_ != nullptr && icon_font != nullptr) {
-        lv_obj_set_style_text_font(english_close_icon_, icon_font, 0);
-    }
 }
-
-// ---- 英语学习启动面板 ----
 
 void LcdDisplay::ShowEnglishSetup(bool show) {
     if (english_setup_panel_ == nullptr) {
@@ -3936,6 +4457,7 @@ void LcdDisplay::ShowEnglishSetup(bool show) {
     DisplayLockGuard lock(this);
     english_setup_visible_ = show;
     if (show) {
+        EnglishSetupRebuildScopeList();
         UpdateEnglishSetup();
         lv_obj_clear_flag(english_setup_panel_, LV_OBJ_FLAG_HIDDEN);
     } else {
@@ -3944,54 +4466,218 @@ void LcdDisplay::ShowEnglishSetup(bool show) {
     UpdateMediaBarVisibility();
 }
 
-void LcdDisplay::UpdateEnglishSetup() {
+void LcdDisplay::EnglishSetupShowStep(int step) {
+    english_setup_step_ = step;
+    if (english_setup_step1_ != nullptr) {
+        if (step == 0) {
+            lv_obj_clear_flag(english_setup_step1_, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(english_setup_step1_, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+    if (english_setup_step2_ != nullptr) {
+        if (step == 1) {
+            lv_obj_clear_flag(english_setup_step2_, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(english_setup_step2_, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+    if (english_setup_title_label_ != nullptr) {
+        if (step == 0 && english_setup_page_count_ > 1) {
+            char buf[48];
+            snprintf(buf, sizeof(buf), "选择内容 %d/%d", english_setup_page_ + 1,
+                     english_setup_page_count_);
+            lv_label_set_text(english_setup_title_label_, buf);
+        } else {
+            lv_label_set_text(english_setup_title_label_, step == 0 ? "选择内容" : "播报设置");
+        }
+    }
+    if (english_setup_next_label_ != nullptr) {
+        lv_label_set_text(english_setup_next_label_, step == 0 ? "下一步" : "开始听写");
+    }
+}
+
+void LcdDisplay::EnglishSetupRebuildScopeList() {
+    if (english_setup_list_ == nullptr) {
+        return;
+    }
+    lv_obj_clean(english_setup_list_);
+    english_setup_row_count_ = 0;
     auto& store = EnglishStore::GetInstance();
-    char buf[64];
-    if (english_setup_source_label_ != nullptr) {
-        lv_label_set_text(english_setup_source_label_,
-                          english_setup_source_ == 0 ? "课文" : "分类");
+
+    struct ScopeItem {
+        int value;
+        std::string name;
+        int words;
+    };
+    std::vector<ScopeItem> items;
+    const bool by_unit = english_setup_source_ == 0;
+    int total = 0;
+    if (by_unit) {
+        for (int unit = 1; unit < 35; ++unit) {
+            total += store.UnitCount(unit);
+        }
+    } else {
+        for (int topic = 1; topic < 28; ++topic) {
+            total += store.TopicCount(topic);
+        }
     }
-    if (english_setup_scope_name_ != nullptr) {
-        lv_label_set_text(english_setup_scope_name_, english_setup_source_ == 0 ? "单元" : "分类");
-    }
-    if (english_setup_unit_label_ != nullptr) {
-        if (english_setup_source_ == 0) {
-            if (english_setup_unit_ == 0) {
-                lv_label_set_text(english_setup_unit_label_, "全部");
-            } else {
-                lv_label_set_text(english_setup_unit_label_,
-                                  store.UnitName(english_setup_unit_).c_str());
+    items.push_back({0, "全部", total});
+    if (by_unit) {
+        for (int unit = 1; unit < 35; ++unit) {
+            const int words = store.UnitCount(unit);
+            if (words > 0) {
+                items.push_back({unit, store.UnitName(unit), words});
             }
-        } else {
-            lv_label_set_text(
-                english_setup_unit_label_,
-                english_setup_topic_ == 0 ? "全部" : EnglishStore::TopicName(english_setup_topic_));
+        }
+    } else {
+        for (int topic = 1; topic < 28; ++topic) {
+            const int words = store.TopicCount(topic);
+            if (words > 0) {
+                items.push_back({topic, EnglishStore::TopicName(topic), words});
+            }
         }
     }
-    if (english_setup_count_label_ != nullptr) {
-        if (english_setup_count_ <= 0) {
-            lv_label_set_text(english_setup_count_label_, "全部");
-        } else {
-            snprintf(buf, sizeof(buf), "%d 个", english_setup_count_);
-            lv_label_set_text(english_setup_count_label_, buf);
+
+    const int item_count = static_cast<int>(items.size());
+    english_setup_page_count_ = std::max(1, (item_count + kEnglishSetupRowsPerPage - 1) /
+                                                kEnglishSetupRowsPerPage);
+    english_setup_page_ =
+        std::max(0, std::min(english_setup_page_, english_setup_page_count_ - 1));
+    const int begin = english_setup_page_ * kEnglishSetupRowsPerPage;
+    const int end = std::min(begin + kEnglishSetupRowsPerPage, item_count);
+    for (int i = begin; i < end; ++i) {
+        const ScopeItem& item = items[i];
+        const int slot = english_setup_row_count_;
+        lv_obj_t* row = lv_button_create(english_setup_list_);
+        lv_obj_set_size(row, LV_PCT(100), 28);
+        lv_obj_set_style_radius(row, 9, 0);
+        lv_obj_set_style_border_width(row, 0, 0);
+        lv_obj_set_style_shadow_width(row, 0, 0);
+        lv_obj_set_style_pad_all(row, 0, 0);
+        lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
+        lv_obj_set_ext_click_area(row, 2);
+        lv_obj_set_user_data(row, reinterpret_cast<void*>(static_cast<intptr_t>(item.value)));
+        lv_obj_add_event_cb(row, &LcdDisplay::OnEnglishSetupScopeRowClicked, LV_EVENT_PRESSED,
+                            this);
+        lv_obj_t* left = lv_label_create(row);
+        lv_obj_set_style_text_font(left, &ui_font_16_4, 0);
+        lv_obj_set_style_text_color(left, lv_color_hex(kSkyMuted), 0);
+        lv_obj_set_width(left, 112);
+        lv_label_set_long_mode(left, LV_LABEL_LONG_DOT);
+        lv_label_set_text(left, item.name.c_str());
+        lv_obj_align(left, LV_ALIGN_LEFT_MID, 8, 0);
+        lv_obj_t* right = lv_label_create(row);
+        lv_obj_set_style_text_font(right, &ui_font_16_4, 0);
+        lv_obj_set_style_text_color(right, lv_color_hex(kSkyMuted), 0);
+        char buf[24];
+        snprintf(buf, sizeof(buf), "%d", item.words);
+        lv_label_set_text(right, buf);
+        lv_obj_align(right, LV_ALIGN_RIGHT_MID, -8, 0);
+        english_setup_rows_[slot] = row;
+        english_setup_row_names_[slot] = left;
+        english_setup_row_counts_[slot] = right;
+        english_setup_row_values_[slot] = item.value;
+        english_setup_row_count_++;
+    }
+    lv_obj_update_layout(english_setup_list_);
+}
+
+void LcdDisplay::UpdateEnglishSetup() {
+    EnglishSetupShowStep(english_setup_step_);
+
+    const bool text_source = english_setup_source_ == 0;
+    lv_obj_t* tabs[2] = {nullptr, nullptr};
+    if (english_setup_tab_text_ != nullptr) {
+        tabs[0] = lv_obj_get_parent(english_setup_tab_text_);
+    }
+    if (english_setup_tab_topic_ != nullptr) {
+        tabs[1] = lv_obj_get_parent(english_setup_tab_topic_);
+    }
+    for (int i = 0; i < 2; ++i) {
+        if (tabs[i] == nullptr) {
+            continue;
+        }
+        const bool active = (i == 0) == text_source;
+        lv_obj_set_style_bg_color(tabs[i],
+                                  lv_color_hex(active ? kSkyAccent : kSkyCard), 0);
+        lv_obj_set_style_bg_opa(tabs[i], LV_OPA_COVER, 0);
+        lv_obj_set_style_border_color(tabs[i],
+                                      lv_color_hex(active ? kSkyAccent : kSkyBorder), 0);
+        lv_obj_t* label = lv_obj_get_child(tabs[i], 0);
+        if (label != nullptr) {
+            lv_obj_set_style_text_color(label, lv_color_hex(active ? 0xFFFFFF : kSkyMuted), 0);
         }
     }
-    if (english_setup_interval_label_ != nullptr) {
-        if (english_setup_interval_ > 0) {
-            snprintf(buf, sizeof(buf), "%d 秒", english_setup_interval_);
-            lv_label_set_text(english_setup_interval_label_, buf);
-        } else {
-            lv_label_set_text(english_setup_interval_label_, "手动");
+
+    const int selected = text_source ? english_setup_unit_ : english_setup_topic_;
+    for (int i = 0; i < english_setup_row_count_; ++i) {
+        lv_obj_t* row = english_setup_rows_[i];
+        if (row == nullptr) {
+            continue;
+        }
+        const bool active = english_setup_row_values_[i] == selected;
+        lv_obj_set_style_bg_color(row, lv_color_hex(active ? kSkySelect : kSkyCard), 0);
+        lv_obj_set_style_bg_opa(row, active ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
+        lv_obj_set_style_border_width(row, active ? 1 : 0, 0);
+        lv_obj_set_style_border_color(row, lv_color_hex(kSkySelectEdge), 0);
+        const uint32_t color = active ? 0x11496F : kSkyMuted;
+        if (english_setup_row_names_[i] != nullptr) {
+            lv_obj_set_style_text_color(english_setup_row_names_[i], lv_color_hex(color), 0);
+        }
+        if (english_setup_row_counts_[i] != nullptr) {
+            lv_obj_set_style_text_color(english_setup_row_counts_[i], lv_color_hex(color), 0);
         }
     }
-    if (english_setup_mode_label_ != nullptr) {
-        lv_label_set_text(english_setup_mode_label_,
-                          english_setup_mode_ == 1 ? "单词卡" : "报听写");
+
+    for (int group = 0; group < 4; ++group) {
+        for (int i = 0; i < english_setup_chip_count_[group]; ++i) {
+            lv_obj_t* label = english_setup_chip_labels_[group][i];
+            if (label == nullptr) {
+                continue;
+            }
+            lv_obj_t* chip = lv_obj_get_parent(label);
+            int current = 0;
+            if (group == 0) {
+                current = english_setup_count_;
+            } else if (group == 1) {
+                current = english_setup_interval_;
+            } else if (group == 2) {
+                current = english_setup_speak_;
+            } else {
+                current = english_setup_mode_;
+            }
+            const bool active = english_setup_chip_values_[group][i] == current;
+            lv_obj_set_style_bg_color(chip, lv_color_hex(active ? kSkySelect : kSkyCard), 0);
+            lv_obj_set_style_bg_opa(chip, LV_OPA_COVER, 0);
+            lv_obj_set_style_border_color(
+                chip, lv_color_hex(active ? kSkySelectEdge : kSkyBorder), 0);
+            lv_obj_set_style_text_color(label, lv_color_hex(active ? 0x11496F : kSkyMuted), 0);
+        }
     }
-    if (english_setup_speak_label_ != nullptr) {
-        static const char* kNames[] = {"报英文", "报中文", "中英"};
-        lv_label_set_text(english_setup_speak_label_, kNames[english_setup_speak_ % 3]);
+
+    const bool has_prev = english_setup_page_ > 0;
+    const bool has_next = english_setup_page_ + 1 < english_setup_page_count_;
+    if (english_setup_page_left_ != nullptr) {
+        lv_obj_set_style_opa(english_setup_page_left_, has_prev ? LV_OPA_COVER : LV_OPA_30, 0);
     }
+    if (english_setup_page_right_ != nullptr) {
+        lv_obj_set_style_opa(english_setup_page_right_, has_next ? LV_OPA_COVER : LV_OPA_30, 0);
+    }
+}
+
+void LcdDisplay::OnEnglishSetupBackClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self == nullptr) {
+        return;
+    }
+    if (self->english_setup_step_ == 1) {
+        self->EnglishSetupShowStep(0);
+        self->UpdateEnglishSetup();
+        return;
+    }
+    self->ShowEnglishSetup(false);
+    self->CloseSubPageToDrawer();
 }
 
 void LcdDisplay::OnEnglishSetupSourceClicked(lv_event_t* e) {
@@ -3999,113 +4685,88 @@ void LcdDisplay::OnEnglishSetupSourceClicked(lv_event_t* e) {
     if (self == nullptr) {
         return;
     }
-    self->english_setup_source_ = self->english_setup_source_ == 0 ? 1 : 0;
+    const int source = static_cast<int>(reinterpret_cast<intptr_t>(
+        lv_obj_get_user_data(lv_event_get_target_obj(e))));
+    if (source == self->english_setup_source_) {
+        return;
+    }
+    self->english_setup_source_ = source;
+    self->english_setup_page_ = 0;
+    self->EnglishSetupRebuildScopeList();
     self->UpdateEnglishSetup();
+    lv_obj_t* list = self->english_setup_list_;
+    if (list != nullptr) {
+        lv_obj_scroll_to_y(list, 0, LV_ANIM_OFF);
+    }
 }
 
-void LcdDisplay::OnEnglishSetupScopeClicked(lv_event_t* e) {
+void LcdDisplay::OnEnglishSetupPageClicked(lv_event_t* e) {
     auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
     if (self == nullptr) {
         return;
     }
+    const int delta = static_cast<int>(reinterpret_cast<intptr_t>(
+        lv_obj_get_user_data(lv_event_get_target_obj(e))));
+    const int page = self->english_setup_page_ + delta;
+    if (page < 0 || page >= self->english_setup_page_count_) {
+        return;
+    }
+    self->english_setup_page_ = page;
+    self->EnglishSetupRebuildScopeList();
+    self->UpdateEnglishSetup();
+}
+
+void LcdDisplay::OnEnglishSetupScopeRowClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self == nullptr) {
+        return;
+    }
+    lv_obj_t* row = lv_event_get_target_obj(e);
+    const int value = static_cast<int>(reinterpret_cast<intptr_t>(lv_obj_get_user_data(row)));
     if (self->english_setup_source_ == 0) {
-        OnEnglishSetupUnitClicked(e);
+        self->english_setup_unit_ = value;
     } else {
-        OnEnglishSetupTopicClicked(e);
+        self->english_setup_topic_ = value;
     }
+    self->UpdateEnglishSetup();
 }
 
-void LcdDisplay::OnEnglishSetupUnitClicked(lv_event_t* e) {
+void LcdDisplay::OnEnglishSetupChipClicked(lv_event_t* e) {
     auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
     if (self == nullptr) {
         return;
     }
-    // 0=全部，1..34 各单元：跳过没有词的单元
-    auto& store = EnglishStore::GetInstance();
-    int unit = self->english_setup_unit_;
-    for (int i = 0; i < 35; ++i) {
-        unit = (unit + 1) % 35;
-        if (unit == 0 || store.UnitCount(unit) > 0) {
+    const int packed = static_cast<int>(reinterpret_cast<intptr_t>(
+        lv_obj_get_user_data(lv_event_get_target_obj(e))));
+    const int group = packed >> 8;
+    const int value = packed & 0xFF;
+    switch (group) {
+        case 0:
+            self->english_setup_count_ = value;
             break;
-        }
-    }
-    self->english_setup_unit_ = unit;
-    self->UpdateEnglishSetup();
-}
-
-void LcdDisplay::OnEnglishSetupTopicClicked(lv_event_t* e) {
-    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
-    if (self == nullptr) {
-        return;
-    }
-    auto& store = EnglishStore::GetInstance();
-    int topic = self->english_setup_topic_;
-    for (int i = 0; i < 28; ++i) {
-        topic = (topic + 1) % 28;
-        if (topic == 0 || store.TopicCount(topic) > 0) {
+        case 1:
+            self->english_setup_interval_ = value;
             break;
-        }
-    }
-    self->english_setup_topic_ = topic;
-    self->UpdateEnglishSetup();
-}
-
-void LcdDisplay::OnEnglishSetupCountClicked(lv_event_t* e) {
-    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
-    if (self == nullptr) {
-        return;
-    }
-    static const int kCounts[] = {5, 10, 20, 30, 0};  // 0 = 全部
-    int idx = 0;
-    for (int i = 0; i < 5; ++i) {
-        if (kCounts[i] == self->english_setup_count_) {
-            idx = (i + 1) % 5;
+        case 2:
+            self->english_setup_speak_ = value;
             break;
-        }
-    }
-    self->english_setup_count_ = kCounts[idx];
-    self->UpdateEnglishSetup();
-}
-
-void LcdDisplay::OnEnglishSetupIntervalClicked(lv_event_t* e) {
-    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
-    if (self == nullptr) {
-        return;
-    }
-    static const int kIntervals[] = {5, 10, 15, 20, 30, 0};
-    constexpr int kIntervalCount = sizeof(kIntervals) / sizeof(kIntervals[0]);
-    int idx = 0;
-    for (int i = 0; i < kIntervalCount; ++i) {
-        if (kIntervals[i] == self->english_setup_interval_) {
-            idx = (i + 1) % kIntervalCount;
+        case 3:
+            self->english_setup_mode_ = value;
             break;
-        }
+        default:
+            return;
     }
-    self->english_setup_interval_ = kIntervals[idx];
     self->UpdateEnglishSetup();
 }
 
-void LcdDisplay::OnEnglishSetupSpeakClicked(lv_event_t* e) {
+void LcdDisplay::OnEnglishSetupNextClicked(lv_event_t* e) {
     auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
     if (self == nullptr) {
         return;
     }
-    self->english_setup_speak_ = (self->english_setup_speak_ + 1) % 3;
-    self->UpdateEnglishSetup();
-}
-
-void LcdDisplay::OnEnglishSetupModeClicked(lv_event_t* e) {
-    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
-    if (self == nullptr) {
-        return;
-    }
-    self->english_setup_mode_ = self->english_setup_mode_ == 0 ? 1 : 0;
-    self->UpdateEnglishSetup();
-}
-
-void LcdDisplay::OnEnglishSetupStartClicked(lv_event_t* e) {
-    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
-    if (self == nullptr) {
+    if (self->english_setup_step_ == 0) {
+        self->EnglishSetupShowStep(1);
+        self->UpdateEnglishSetup();
         return;
     }
     if (!EnglishPlayer::Available()) {
@@ -4123,7 +4784,6 @@ void LcdDisplay::OnEnglishSetupStartClicked(lv_event_t* e) {
     // 播放会在音频队列里阻塞，放到主任务执行，避免卡住 LVGL
     Application::GetInstance().Schedule([self, unit, topic, count, interval, mode, speak]() {
         auto& player = EnglishPlayer::GetInstance();
-        // 先设播报语言再开始，避免第一词用错语言
         while (player.CurrentSpeak() != speak) {
             player.CycleSpeak();
         }
@@ -4132,41 +4792,23 @@ void LcdDisplay::OnEnglishSetupStartClicked(lv_event_t* e) {
     });
 }
 
-void LcdDisplay::OnEnglishSetupCloseClicked(lv_event_t* e) {
-    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
-    if (self != nullptr) {
-        self->ShowEnglishSetup(false);
-    }
-}
-
-void LcdDisplay::OnEnglishEntryClicked(lv_event_t* e) {
-    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
-    if (self == nullptr) {
-        return;
-    }
-    if (!EnglishPlayer::Available()) {
-        ESP_LOGW(TAG, "英语词库未就绪");
-        return;
-    }
-    self->ShowEnglishSetup(true);
-}
-
-void LcdDisplay::OnEnglishCloseClicked(lv_event_t* e) {
+void LcdDisplay::OnEnglishBackClicked(lv_event_t* e) {
     auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
     if (self == nullptr) {
         return;
     }
     EnglishPlayer::GetInstance().Stop();
     self->ShowEnglishScreen(false);
+    self->CloseSubPageToDrawer();
 }
 
-void LcdDisplay::OnEnglishRepeatClicked(lv_event_t* e) {
+void LcdDisplay::OnEnglishResetClicked(lv_event_t* e) {
     auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
     if (self == nullptr) {
         return;
     }
     Application::GetInstance().Schedule([self]() {
-        EnglishPlayer::GetInstance().Repeat();
+        EnglishPlayer::GetInstance().Restart();
         self->RefreshEnglishScreen();
     });
 }
@@ -4301,22 +4943,11 @@ void LcdDisplay::StrokeChangeChar(int dir) {
     }
 }
 
-void LcdDisplay::OnStrokeEntryClicked(lv_event_t* e) {
-    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
-    if (self == nullptr) {
-        return;
-    }
-    auto& store = StrokeStore::GetInstance();
-    int idx = self->stroke_char_idx_ >= 0 ? self->stroke_char_idx_ : store.GradeStart(1);
-    if (store.Ready() && idx >= 0) {
-        self->ShowStrokeScreen(idx);
-    }
-}
-
 void LcdDisplay::OnStrokeCloseClicked(lv_event_t* e) {
     auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
     if (self != nullptr) {
         self->ShowStrokeScreen(false);
+        self->CloseSubPageToDrawer();
     }
 }
 
@@ -4341,17 +4972,132 @@ void LcdDisplay::OnStrokeNextClicked(lv_event_t* e) {
     }
 }
 
-void LcdDisplay::OnMediaBarClicked(lv_event_t* e) {
+bool LcdDisplay::DrawerEnglishEnabled() const { return EnglishPlayer::Available(); }
+
+bool LcdDisplay::DrawerStrokeEnabled() const { return StrokeStore::GetInstance().Ready(); }
+
+void LcdDisplay::RefreshDrawerTiles() {
+    for (int i = 0; i < kDrawerTileCount; ++i) {
+        if (drawer_tiles_[i] == nullptr) {
+            continue;
+        }
+        const DrawerTileSpec& spec = kDrawerSpecs[i];
+        const bool enabled = (this->*spec.enabled)();
+        // 未实现（pending）或依赖不满足时整体降透明度，点击给出原因。
+        const lv_opa_t opa = (spec.pending || !enabled) ? LV_OPA_40 : LV_OPA_COVER;
+        lv_obj_set_style_opa(drawer_tiles_[i], opa, 0);
+        lv_obj_set_style_opa(drawer_tile_boxes_[i], opa, 0);
+        lv_obj_set_style_opa(drawer_tile_labels_[i], opa, 0);
+        lv_obj_set_style_opa(drawer_tile_icons_[i], opa, 0);
+    }
+}
+
+void LcdDisplay::ShowDrawerHint(const char* text) {
+    if (drawer_hint_ == nullptr) {
+        return;
+    }
+    lv_label_set_text(drawer_hint_, text != nullptr ? text : "");
+    lv_obj_remove_flag(drawer_hint_, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_move_foreground(drawer_hint_);
+    if (drawer_hint_timer_ == nullptr) {
+        drawer_hint_timer_ = lv_timer_create(&LcdDisplay::OnDrawerHintTimer, 1600, this);
+    } else {
+        lv_timer_reset(drawer_hint_timer_);
+    }
+}
+
+void LcdDisplay::OnDrawerHintTimer(lv_timer_t* timer) {
+    auto* self = static_cast<LcdDisplay*>(lv_timer_get_user_data(timer));
+    if (self == nullptr) {
+        return;
+    }
+    lv_timer_pause(timer);
+    if (self->drawer_hint_ != nullptr) {
+        lv_obj_add_flag(self->drawer_hint_, LV_OBJ_FLAG_HIDDEN);
+    }
+}
+
+void LcdDisplay::ShowDrawerScreen(bool show) {
+    if (drawer_screen_ == nullptr) {
+        return;
+    }
+    DisplayLockGuard lock(this);
+    drawer_screen_visible_ = show;
+    if (show) {
+        RefreshDrawerTiles();
+        lv_obj_remove_flag(drawer_screen_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_move_foreground(drawer_screen_);
+    } else {
+        lv_obj_add_flag(drawer_screen_, LV_OBJ_FLAG_HIDDEN);
+        if (drawer_hint_ != nullptr) {
+            lv_obj_add_flag(drawer_hint_, LV_OBJ_FLAG_HIDDEN);
+        }
+        if (drawer_hint_timer_ != nullptr) {
+            lv_timer_pause(drawer_hint_timer_);
+        }
+    }
+}
+
+void LcdDisplay::OpenSettingsPage() { ShowSettingsScreen(true); }
+
+void LcdDisplay::OpenEnglishPage() { ShowEnglishSetup(true); }
+
+void LcdDisplay::OpenStrokePage() {
+    auto& store = StrokeStore::GetInstance();
+    const int idx = stroke_char_idx_ >= 0 ? stroke_char_idx_ : store.GradeStart(1);
+    if (store.Ready() && idx >= 0) {
+        ShowStrokeScreen(idx);
+    }
+}
+
+void LcdDisplay::OpenMediaPage() { ShowMediaScreen(true); }
+
+void LcdDisplay::OpenFileServicePage() { ShowFileServiceScreen(true); }
+
+void LcdDisplay::OnDrawerHandleClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self == nullptr) {
+        return;
+    }
+    self->MarkUserActivity();
+    self->ShowDrawerScreen(!self->drawer_screen_visible_);
+}
+
+void LcdDisplay::OnDrawerBackClicked(lv_event_t* e) {
     auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
     if (self != nullptr) {
-        self->ShowMediaScreen(true);
+        self->ShowDrawerScreen(false);
     }
+}
+
+void LcdDisplay::OnDrawerTileClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self == nullptr) {
+        return;
+    }
+    const auto idx = static_cast<int>(
+        reinterpret_cast<intptr_t>(lv_obj_get_user_data(lv_event_get_target_obj(e))));
+    if (idx < 0 || idx >= kDrawerTileCount) {
+        return;
+    }
+    const DrawerTileSpec& spec = kDrawerSpecs[idx];
+    self->MarkUserActivity();
+    if (spec.pending || !(self->*spec.enabled)()) {
+        if (spec.hint != nullptr && spec.hint[0] != '\0') {
+            self->ShowDrawerHint(spec.hint);
+        }
+        return;
+    }
+    self->return_to_drawer_ = true;
+    self->ShowDrawerScreen(false);
+    (self->*spec.action)();
 }
 
 void LcdDisplay::OnMediaBackClicked(lv_event_t* e) {
     auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
     if (self != nullptr) {
         self->ShowMediaScreen(false);
+        self->CloseSubPageToDrawer();
     }
 }
 
@@ -4726,7 +5472,7 @@ void LcdDisplay::SetTheme(Theme* theme) {
     // are not part of the chat layout and would still point at freed previous
     // fonts.  This must happen before anything triggers a label relayout.
     RebindStrokeFonts(text_font, icon_font, large_icon_font);
-    RebindSettingsFonts(text_font, icon_font);
+    RebindSettingsFonts(text_font, icon_font, large_icon_font);
     RebindEnglishFonts(text_font, icon_font);
 
     // Labels that use the icon font must follow the new theme font as well:
