@@ -15,6 +15,7 @@
 LV_FONT_DECLARE(font_zzz_30);
 LV_FONT_DECLARE(font_pinyin_20);
 LV_FONT_DECLARE(font_english_20);
+LV_FONT_DECLARE(ui_font_16_4);
 
 #include <cstdio>
 #include <functional>
@@ -1615,8 +1616,8 @@ void LcdDisplay::SetupUI() {
         lv_obj_add_flag(english_screen_, LV_OBJ_FLAG_HIDDEN);
 
         lv_obj_t* en_close = lv_button_create(english_screen_);
-        lv_obj_set_size(en_close, 44, 36);
-        lv_obj_align(en_close, LV_ALIGN_TOP_RIGHT, -4, 2);
+        lv_obj_set_size(en_close, 44, 32);
+        lv_obj_align(en_close, LV_ALIGN_TOP_RIGHT, -4, 0);
         lv_obj_set_style_bg_opa(en_close, LV_OPA_TRANSP, 0);
         lv_obj_set_style_border_width(en_close, 0, 0);
         lv_obj_set_style_shadow_width(en_close, 0, 0);
@@ -1630,27 +1631,35 @@ void LcdDisplay::SetupUI() {
         lv_obj_center(english_close_icon_);
 
         english_progress_label_ = lv_label_create(english_screen_);
-        lv_obj_set_style_text_font(english_progress_label_, text_font, 0);
+        lv_obj_set_style_text_font(english_progress_label_, &ui_font_16_4, 0);
         lv_obj_set_style_text_color(english_progress_label_, lv_color_hex(0x9A9AA8), 0);
         lv_label_set_text(english_progress_label_, "听写");
-        lv_obj_align(english_progress_label_, LV_ALIGN_TOP_MID, 0, 8);
+        lv_obj_set_width(english_progress_label_, 110);
+        lv_label_set_long_mode(english_progress_label_, LV_LABEL_LONG_DOT);
+        lv_obj_align(english_progress_label_, LV_ALIGN_TOP_LEFT, 8, 6);
 
         english_score_label_ = lv_label_create(english_screen_);
-        lv_obj_set_style_text_font(english_score_label_, text_font, 0);
+        lv_obj_set_style_text_font(english_score_label_, &ui_font_16_4, 0);
         lv_obj_set_style_text_color(english_score_label_, lv_color_hex(0x7AB88A), 0);
         lv_label_set_text(english_score_label_, "");
-        lv_obj_align(english_score_label_, LV_ALIGN_TOP_RIGHT, -8, 8);
+        lv_obj_align(english_score_label_, LV_ALIGN_TOP_RIGHT, -48, 6);
 
         english_title_label_ = lv_label_create(english_screen_);
-        lv_obj_set_style_text_font(english_title_label_, text_font, 0);
+        lv_obj_set_style_text_font(english_title_label_, &ui_font_16_4, 0);
         lv_obj_set_style_text_color(english_title_label_, lv_color_hex(0x6A6A78), 0);
         lv_label_set_text(english_title_label_, "");
-        lv_obj_align(english_title_label_, LV_ALIGN_TOP_MID, 0, 30);
+        lv_obj_set_width(english_title_label_, 180);
+        lv_label_set_long_mode(english_title_label_, LV_LABEL_LONG_DOT);
+        lv_obj_set_style_text_align(english_title_label_, LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_align(english_title_label_, LV_ALIGN_TOP_MID, 0, 28);
 
         english_word_label_ = lv_label_create(english_screen_);
         lv_obj_set_style_text_font(english_word_label_, text_font, 0);
         lv_obj_set_style_text_color(english_word_label_, lvgl_theme->text_color(), 0);
         lv_label_set_text(english_word_label_, "");
+        lv_obj_set_width(english_word_label_, 224);
+        lv_label_set_long_mode(english_word_label_, LV_LABEL_LONG_DOT);
+        lv_obj_set_style_text_align(english_word_label_, LV_TEXT_ALIGN_CENTER, 0);
         lv_obj_align(english_word_label_, LV_ALIGN_CENTER, 0, -34);
 
         english_phonetic_label_ = lv_label_create(english_screen_);
@@ -1664,27 +1673,19 @@ void LcdDisplay::SetupUI() {
         lv_obj_set_style_text_font(english_meaning_label_, text_font, 0);
         lv_obj_set_style_text_color(english_meaning_label_, lv_color_hex(0xC8C8D0), 0);
         lv_label_set_text(english_meaning_label_, "");
+        lv_obj_set_width(english_meaning_label_, 224);
+        lv_label_set_long_mode(english_meaning_label_, LV_LABEL_LONG_DOT);
+        lv_obj_set_style_text_align(english_meaning_label_, LV_TEXT_ALIGN_CENTER, 0);
         lv_obj_align(english_meaning_label_, LV_ALIGN_CENTER, 0, 24);
 
-        english_countdown_label_ = lv_label_create(english_screen_);
-        lv_obj_set_style_text_font(english_countdown_label_, text_font, 0);
-        lv_obj_set_style_text_color(english_countdown_label_, lv_color_hex(0x7A7A88), 0);
-        lv_label_set_text(english_countdown_label_, "");
-        lv_obj_align(english_countdown_label_, LV_ALIGN_CENTER, 0, 54);
-
-        // 操作提示：长按"下一个"记为答对
-        lv_obj_t* en_hint = lv_label_create(english_screen_);
-        lv_obj_set_style_text_font(en_hint, text_font, 0);
-        english_setup_labels_.push_back(en_hint);
-        lv_obj_set_style_text_color(en_hint, lv_color_hex(0x4A4A56), 0);
-        lv_label_set_text(en_hint, "长按下一个 = 答对");
-        lv_obj_align(en_hint, LV_ALIGN_CENTER, 0, 82);
+        // 操作提示移到启动面板，避免和底部按钮行重叠
 
         // 底部：重播 / 上一个 / 下一个
-        auto make_en_key = [this, text_font, lvgl_theme](int x, const char* text,
-                                                         lv_event_cb_t cb) -> lv_obj_t* {
+        const lv_font_t* small_font = &ui_font_16_4;
+        auto make_en_key = [this, small_font, lvgl_theme](int x, const char* text,
+                                                          lv_event_cb_t cb) -> lv_obj_t* {
             lv_obj_t* key = lv_button_create(english_screen_);
-            lv_obj_set_size(key, 62, 38);
+            lv_obj_set_size(key, 70, 36);
             lv_obj_align(key, LV_ALIGN_BOTTOM_MID, x, -8);
             lv_obj_set_style_bg_color(key, lv_color_hex(0x1E1E26), 0);
             lv_obj_set_style_bg_opa(key, LV_OPA_COVER, 0);
@@ -1696,25 +1697,26 @@ void LcdDisplay::SetupUI() {
             lv_obj_set_ext_click_area(key, 8);
             lv_obj_add_event_cb(key, cb, LV_EVENT_PRESSED, this);
             lv_obj_t* label = lv_label_create(key);
-            lv_obj_set_style_text_font(label, text_font, 0);
+            lv_obj_set_style_text_font(label, small_font, 0);
             lv_obj_set_style_text_color(label, lvgl_theme->text_color(), 0);
             lv_label_set_text(label, text);
             lv_obj_center(label);
+            english_key_labels_.push_back(label);
             return key;
         };
-        make_en_key(-66, "重播", &LcdDisplay::OnEnglishRepeatClicked);
+        make_en_key(-74, "重播", &LcdDisplay::OnEnglishRepeatClicked);
         make_en_key(0, "上一个", &LcdDisplay::OnEnglishPrevClicked);
-        lv_obj_t* en_next = make_en_key(66, "下一个", &LcdDisplay::OnEnglishNextClicked);
+        lv_obj_t* en_next = make_en_key(74, "下一个", &LcdDisplay::OnEnglishNextClicked);
         // 长按"下一个"= 标记这个单词听写正确
         lv_obj_add_event_cb(en_next, &LcdDisplay::OnEnglishNextLongPressed, LV_EVENT_LONG_PRESSED,
                             this);
 
         // 第二排：显示模式 / 间隔
-        auto make_en_small = [this, text_font, lvgl_theme](int x, const char* text,
-                                                           lv_event_cb_t cb) {
+        auto make_en_small = [this, small_font, lvgl_theme](int x, const char* text,
+                                                            lv_event_cb_t cb) {
             lv_obj_t* key = lv_button_create(english_screen_);
-            lv_obj_set_size(key, 68, 28);
-            lv_obj_align(key, LV_ALIGN_BOTTOM_MID, x, -56);
+            lv_obj_set_size(key, 70, 28);
+            lv_obj_align(key, LV_ALIGN_BOTTOM_MID, x, -52);
             lv_obj_set_style_bg_color(key, lv_color_hex(0x16161C), 0);
             lv_obj_set_style_bg_opa(key, LV_OPA_COVER, 0);
             lv_obj_set_style_radius(key, 8, 0);
@@ -1725,15 +1727,19 @@ void LcdDisplay::SetupUI() {
             lv_obj_set_ext_click_area(key, 6);
             lv_obj_add_event_cb(key, cb, LV_EVENT_PRESSED, this);
             lv_obj_t* label = lv_label_create(key);
-            lv_obj_set_style_text_font(label, text_font, 0);
+            lv_obj_set_style_text_font(label, small_font, 0);
             lv_obj_set_style_text_color(label, lvgl_theme->text_color(), 0);
             lv_label_set_text(label, text);
             lv_obj_center(label);
             return label;
         };
-        english_mode_label_ = make_en_small(-72, "真听写", &LcdDisplay::OnEnglishModeClicked);
+        english_mode_label_ = make_en_small(-74, "真听写", &LcdDisplay::OnEnglishModeClicked);
         english_speak_label_ = make_en_small(0, "报英文", &LcdDisplay::OnEnglishSpeakClicked);
-        english_interval_label_ = make_en_small(72, "10s", &LcdDisplay::OnEnglishIntervalClicked);
+        english_interval_label_ =
+            make_en_small(74, "间隔 10s", &LcdDisplay::OnEnglishIntervalClicked);
+
+        // 播放器推进到下一个词时刷新本页
+        EnglishPlayer::GetInstance().SetRefreshCallback(&LcdDisplay::RefreshEnglishScreenStatic);
 
         english_entry_btn_ = lv_button_create(screen);
         lv_obj_set_size(english_entry_btn_, 36, 36);
@@ -1765,8 +1771,8 @@ void LcdDisplay::SetupUI() {
         lv_obj_add_flag(english_setup_panel_, LV_OBJ_FLAG_HIDDEN);
 
         lv_obj_t* setup_close = lv_button_create(english_setup_panel_);
-        lv_obj_set_size(setup_close, 44, 36);
-        lv_obj_align(setup_close, LV_ALIGN_TOP_RIGHT, -4, 2);
+        lv_obj_set_size(setup_close, 44, 32);
+        lv_obj_align(setup_close, LV_ALIGN_TOP_RIGHT, -4, 0);
         lv_obj_set_style_bg_opa(setup_close, LV_OPA_TRANSP, 0);
         lv_obj_set_style_border_width(setup_close, 0, 0);
         lv_obj_set_style_shadow_width(setup_close, 0, 0);
@@ -1783,23 +1789,37 @@ void LcdDisplay::SetupUI() {
 
         lv_obj_t* setup_title = lv_label_create(english_setup_panel_);
         lv_obj_set_style_text_font(setup_title, text_font, 0);
-        english_setup_labels_.push_back(setup_title);
+        english_setup_title_label_ = setup_title;
         lv_obj_set_style_text_color(setup_title, lvgl_theme->text_color(), 0);
         lv_label_set_text(setup_title, "英语学习");
-        lv_obj_align(setup_title, LV_ALIGN_TOP_MID, 0, 8);
+        lv_obj_align(setup_title, LV_ALIGN_TOP_MID, 0, 2);
 
-        // 一行：一个左标签 + 一个右侧可点击的值
-        auto make_setup_row = [this, text_font, lvgl_theme](int y, const char* label,
-                                                            lv_event_cb_t cb) {
+        lv_obj_t* setup_hint = lv_label_create(english_setup_panel_);
+        lv_obj_set_style_text_font(setup_hint, &ui_font_16_4, 0);
+        english_setup_labels_.push_back(setup_hint);
+        lv_obj_set_style_text_color(setup_hint, lv_color_hex(0x6A6A78), 0);
+        lv_label_set_text(setup_hint, "长按「下一个」=答对");
+        lv_obj_set_width(setup_hint, 224);
+        lv_label_set_long_mode(setup_hint, LV_LABEL_LONG_DOT);
+        lv_obj_set_style_text_align(setup_hint, LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_align(setup_hint, LV_ALIGN_TOP_MID, 0, 28);
+
+        // 一行：一个左标签 + 一个右侧可点击的值（左标签用 16px 次级字重）
+        auto make_setup_row = [this, text_font, small_font, lvgl_theme](
+                                  int y, const char* label, lv_event_cb_t cb,
+                                  lv_obj_t** name_out = nullptr) -> lv_obj_t* {
             lv_obj_t* name = lv_label_create(english_setup_panel_);
-            lv_obj_set_style_text_font(name, text_font, 0);
+            lv_obj_set_style_text_font(name, small_font, 0);
             english_setup_labels_.push_back(name);
             lv_obj_set_style_text_color(name, lv_color_hex(0x9A9AA8), 0);
             lv_label_set_text(name, label);
-            lv_obj_set_pos(name, 16, y + 8);
+            lv_obj_set_pos(name, 16, y + 7);
+            if (name_out != nullptr) {
+                *name_out = name;
+            }
 
             lv_obj_t* value_btn = lv_button_create(english_setup_panel_);
-            lv_obj_set_size(value_btn, 120, 34);
+            lv_obj_set_size(value_btn, 120, 32);
             lv_obj_set_pos(value_btn, 100, y);
             lv_obj_set_style_bg_color(value_btn, lv_color_hex(0x1E1E26), 0);
             lv_obj_set_style_bg_opa(value_btn, LV_OPA_COVER, 0);
@@ -1818,71 +1838,24 @@ void LcdDisplay::SetupUI() {
             return value;
         };
 
-        english_setup_unit_label_ =
-            make_setup_row(52, "单元", &LcdDisplay::OnEnglishSetupUnitClicked);
+        // 先选“测什么”，再选具体范围；单元 / 分类互斥。
+        english_setup_source_label_ =
+            make_setup_row(52, "内容", &LcdDisplay::OnEnglishSetupSourceClicked);
+        english_setup_unit_label_ = make_setup_row(
+            84, "单元", &LcdDisplay::OnEnglishSetupScopeClicked, &english_setup_scope_name_);
         english_setup_count_label_ =
-            make_setup_row(96, "词数", &LcdDisplay::OnEnglishSetupCountClicked);
+            make_setup_row(116, "词数", &LcdDisplay::OnEnglishSetupCountClicked);
         english_setup_interval_label_ =
-            make_setup_row(140, "间隔", &LcdDisplay::OnEnglishSetupIntervalClicked);
-
-        // 播报语言
-        lv_obj_t* speak_name = lv_label_create(english_setup_panel_);
-        lv_obj_set_style_text_font(speak_name, text_font, 0);
-        english_setup_labels_.push_back(speak_name);
-        lv_obj_set_style_text_color(speak_name, lv_color_hex(0x9A9AA8), 0);
-        lv_label_set_text(speak_name, "播报");
-        lv_obj_set_pos(speak_name, 16, 192);
-        lv_obj_t* speak_btn = lv_button_create(english_setup_panel_);
-        lv_obj_set_size(speak_btn, 120, 34);
-        lv_obj_set_pos(speak_btn, 100, 184);
-        lv_obj_set_style_bg_color(speak_btn, lv_color_hex(0x1E1E26), 0);
-        lv_obj_set_style_bg_opa(speak_btn, LV_OPA_COVER, 0);
-        lv_obj_set_style_radius(speak_btn, 8, 0);
-        lv_obj_set_style_border_width(speak_btn, 0, 0);
-        lv_obj_set_style_shadow_width(speak_btn, 0, 0);
-        lv_obj_set_style_pad_all(speak_btn, 0, 0);
-        lv_obj_set_style_bg_opa(speak_btn, LV_OPA_30, LV_STATE_PRESSED);
-        lv_obj_set_ext_click_area(speak_btn, 6);
-        lv_obj_add_event_cb(speak_btn, &LcdDisplay::OnEnglishSetupSpeakClicked, LV_EVENT_PRESSED,
-                            this);
-        lv_obj_t* speak_value = lv_label_create(speak_btn);
-        lv_obj_set_style_text_font(speak_value, text_font, 0);
-        lv_obj_set_style_text_color(speak_value, lvgl_theme->text_color(), 0);
-        lv_label_set_text(speak_value, "报英文");
-        lv_obj_center(speak_value);
-        english_setup_speak_label_ = speak_value;
-
-        // 模式（听写 / 单词卡）
-        lv_obj_t* mode_name = lv_label_create(english_setup_panel_);
-        lv_obj_set_style_text_font(mode_name, text_font, 0);
-        english_setup_labels_.push_back(mode_name);
-        lv_obj_set_style_text_color(mode_name, lv_color_hex(0x9A9AA8), 0);
-        lv_label_set_text(mode_name, "模式");
-        lv_obj_set_pos(mode_name, 16, 234);
-        lv_obj_t* mode_btn = lv_button_create(english_setup_panel_);
-        lv_obj_set_size(mode_btn, 120, 34);
-        lv_obj_set_pos(mode_btn, 100, 226);
-        lv_obj_set_style_bg_color(mode_btn, lv_color_hex(0x1E1E26), 0);
-        lv_obj_set_style_bg_opa(mode_btn, LV_OPA_COVER, 0);
-        lv_obj_set_style_radius(mode_btn, 8, 0);
-        lv_obj_set_style_border_width(mode_btn, 0, 0);
-        lv_obj_set_style_shadow_width(mode_btn, 0, 0);
-        lv_obj_set_style_pad_all(mode_btn, 0, 0);
-        lv_obj_set_style_bg_opa(mode_btn, LV_OPA_30, LV_STATE_PRESSED);
-        lv_obj_set_ext_click_area(mode_btn, 6);
-        lv_obj_add_event_cb(mode_btn, &LcdDisplay::OnEnglishSetupModeClicked, LV_EVENT_PRESSED,
-                            this);
-        lv_obj_t* mode_value = lv_label_create(mode_btn);
-        lv_obj_set_style_text_font(mode_value, text_font, 0);
-        lv_obj_set_style_text_color(mode_value, lvgl_theme->text_color(), 0);
-        lv_label_set_text(mode_value, "报听写");
-        lv_obj_center(mode_value);
-        english_setup_mode_label_ = mode_value;
+            make_setup_row(148, "间隔", &LcdDisplay::OnEnglishSetupIntervalClicked);
+        english_setup_speak_label_ =
+            make_setup_row(180, "播报", &LcdDisplay::OnEnglishSetupSpeakClicked);
+        english_setup_mode_label_ =
+            make_setup_row(212, "模式", &LcdDisplay::OnEnglishSetupModeClicked);
 
         // 开始
         lv_obj_t* start_btn = lv_button_create(english_setup_panel_);
         lv_obj_set_size(start_btn, 140, 44);
-        lv_obj_align(start_btn, LV_ALIGN_BOTTOM_MID, 0, -16);
+        lv_obj_align(start_btn, LV_ALIGN_BOTTOM_MID, 0, -12);
         lv_obj_set_style_bg_color(start_btn, lv_color_hex(0x2A6E4F), 0);
         lv_obj_set_style_bg_opa(start_btn, LV_OPA_COVER, 0);
         lv_obj_set_style_radius(start_btn, 12, 0);
@@ -1895,7 +1868,7 @@ void LcdDisplay::SetupUI() {
                             this);
         lv_obj_t* start_label = lv_label_create(start_btn);
         lv_obj_set_style_text_font(start_label, text_font, 0);
-        english_setup_labels_.push_back(start_label);
+        english_setup_start_label_ = start_label;
         lv_obj_set_style_text_color(start_label, lv_color_hex(0xFFFFFF), 0);
         lv_label_set_text(start_label, "开始");
         lv_obj_center(start_label);
@@ -2250,13 +2223,12 @@ void LcdDisplay::RepairDanglingFonts(const lv_font_t* text_font, const lv_font_t
 }
 
 const lv_font_t* LcdDisplay::SafeTextFont() const {
-    // chat_font_ 是在 assets 分区里常驻的字体（LvglCBinFont 持有数据），
-    // 主题刷新时不会失效；lvgl_theme 里的 text_font 可能是刚被释放的旧字体。
-    if (chat_font_ != nullptr && chat_font_->font() != nullptr) {
-        return chat_font_->font();
-    }
+    // The theme font is kept alive by LvglDisplay::SetTextFont() until every
+    // style has been rebound, so it is the right font to use here.  The chat
+    // font is only a subset (no CJK) and must not be used for the UI.
     auto lvgl_theme = static_cast<LvglTheme*>(current_theme_);
-    if (lvgl_theme != nullptr && lvgl_theme->text_font() != nullptr) {
+    if (lvgl_theme != nullptr && lvgl_theme->text_font() != nullptr &&
+        lvgl_theme->text_font()->font() != nullptr) {
         return lvgl_theme->text_font()->font();
     }
     return nullptr;
@@ -2401,8 +2373,6 @@ void LcdDisplay::ApplyChatLayout() {
         return;
     }
     auto lvgl_theme = static_cast<LvglTheme*>(current_theme_);
-    // The theme's own font may have been freed by a theme refresh, so fall
-    // back to the resident chat font.
     const lv_font_t* font = SafeTextFont();
     if (font == nullptr) {
         auto text_font = lvgl_theme->text_font();
@@ -2914,18 +2884,19 @@ void LcdDisplay::SetAvatarMood(AvatarMood mood) {
             ShowStrokeScreen(false);
         }
     }
-    if (english_screen_visible_ || english_setup_visible_) {
-        // The English page follows the same rule: a new turn or the end of
-        // the session puts the normal chat back in front.
+    if (english_setup_visible_) {
+        // The setup panel is transient; the running dictation page is not.
         const bool new_turn = previous_mood == kAvatarMoodIdle &&
                               (mood == kAvatarMoodListening || mood == kAvatarMoodThinking);
         const bool session_end = mood == kAvatarMoodIdle && previous_mood != kAvatarMoodIdle;
         if (new_turn || session_end) {
-            EnglishPlayer::GetInstance().Stop();
-            ShowEnglishScreen(false);
             ShowEnglishSetup(false);
         }
     }
+    // The dictation page deliberately survives mood changes: it is usually
+    // opened by voice ("开始听写"), and the turn ends right after the answer,
+    // so closing on Speaking->Idle would make it flash away. It is closed by
+    // the close button, self.english.stop, or another full-screen page.
     if (mood != kAvatarMoodIdle) {
         // A conversation started: leave the media/paired/stroke/settings
         // screens so the user sees the dialog immediately.
@@ -2933,10 +2904,6 @@ void LcdDisplay::SetAvatarMood(AvatarMood mood) {
         ShowBluetoothScreen(false);
         if (settings_screen_visible_) {
             ShowSettingsScreen(false);
-        }
-        if (english_screen_visible_) {
-            EnglishPlayer::GetInstance().Stop();
-            ShowEnglishScreen(false);
         }
         ShowEnglishSetup(false);
     }
@@ -2953,7 +2920,8 @@ void LcdDisplay::AvatarAnimTimerCb(lv_timer_t* timer) {
         return;
     }
     if (self->media_screen_visible_ || self->bluetooth_screen_visible_ ||
-        self->settings_screen_visible_ || self->stroke_screen_visible_) {
+        self->settings_screen_visible_ || self->stroke_screen_visible_ ||
+        self->english_screen_visible_) {
         return;  // Overlay covers the AI screen; no need to animate.
     }
 
@@ -3811,58 +3779,79 @@ void LcdDisplay::ShowEnglishScreen(bool show) {
     UpdateMediaBarVisibility();
 }
 
+void LcdDisplay::RefreshEnglishScreen() { UpdateEnglishScreen(); }
+
+void LcdDisplay::RefreshEnglishScreenStatic() {
+    auto* display = Board::GetInstance().GetDisplay();
+    if (display != nullptr) {
+        display->RefreshEnglishScreen();
+    }
+}
+
 void LcdDisplay::UpdateEnglishScreen() {
     if (english_screen_ == nullptr) {
         return;
     }
+    DisplayLockGuard lock(this);
     auto& player = EnglishPlayer::GetInstance();
     auto& store = EnglishStore::GetInstance();
     if (!player.Active()) {
         lv_label_set_text(english_word_label_, "");
         lv_label_set_text(english_phonetic_label_, "");
         lv_label_set_text(english_meaning_label_, "");
-        lv_label_set_text(english_countdown_label_, "");
         lv_label_set_text(english_progress_label_, "听写");
+        if (english_title_label_ != nullptr) {
+            lv_label_set_text(english_title_label_, "");
+        }
+        if (english_score_label_ != nullptr) {
+            lv_label_set_text(english_score_label_, "");
+        }
         return;
     }
     const int idx = player.CurrentIndex();
     const int total = player.Total();
     const int pos = player.Position();
 
-    // 进度：单元名 + 第几个/共几个
+    // 进度：第几个/共几个 + 剩余倒计时（单元名由下一行标题展示，避免换行）
     char buf[96];
     const int unit = store.UnitAt(idx);
-    snprintf(buf, sizeof(buf), "%s  %d / %d", store.UnitName(unit).c_str(), pos < 0 ? 0 : pos,
-             total);
+    const int cd = player.Countdown();
+    if (player.Manual()) {
+        snprintf(buf, sizeof(buf), "%d/%d · 手动", pos < 0 ? 0 : pos, total);
+    } else if (cd >= 0) {
+        snprintf(buf, sizeof(buf), "%d/%d · %ds", pos < 0 ? 0 : pos, total, cd);
+    } else {
+        snprintf(buf, sizeof(buf), "%d/%d · %ds", pos < 0 ? 0 : pos, total, player.Interval());
+    }
     lv_label_set_text(english_progress_label_, buf);
 
-    // 课本单元标题（如 "What's on your plate"），有就显示在进度下方
+    // 标题：按分类练习时显示分类名，否则显示课本单元标题
     if (english_title_label_ != nullptr) {
-        const auto title = store.UnitTitle(unit);
-        if (title.empty()) {
-            lv_label_set_text(english_title_label_, "");
+        const int topic = player.CurrentTopic();
+        if (topic > 0) {
+            lv_label_set_text(english_title_label_, EnglishStore::TopicName(topic));
         } else {
-            lv_label_set_text(english_title_label_, title.data());
+            const auto title = store.UnitTitle(unit);
+            if (title.empty()) {
+                const std::string unit_name = store.UnitName(unit);
+                lv_label_set_text(english_title_label_, unit_name.c_str());
+            } else {
+                lv_label_set_text(english_title_label_, title.data());
+            }
         }
     }
 
-    // 单词卡模式始终显示；听写模式默认只显示问号（真听写）
-    if (player.CurrentMode() == EnglishPlayer::kCards || player.ShowWord()) {
+    // 听写模式：大字显示中文释义，英文拼写由"看词听写"开关控制；
+    // 单词卡模式：大字显示英文，下面是音标和中文。
+    if (player.ShowWord() || player.CurrentMode() == EnglishPlayer::kCards) {
         lv_label_set_text(english_word_label_, store.WordAt(idx).data());
+        lv_label_set_text(english_phonetic_label_, store.PhoneticAt(idx).data());
+        lv_label_set_text(english_meaning_label_, store.MeaningAt(idx).data());
     } else {
-        lv_label_set_text(english_word_label_, "？");
-    }
-    lv_label_set_text(english_phonetic_label_, store.PhoneticAt(idx).data());
-    // 听写时也显示中文释义（提示意思，英文让学生自己写）；
-    // 英文拼写只在"看词听写"和单词卡模式下显示。
-    lv_label_set_text(english_meaning_label_, store.MeaningAt(idx).data());
-
-    const int cd = player.Countdown();
-    if (cd > 0) {
-        snprintf(buf, sizeof(buf), "下一个 %d 秒", cd);
-        lv_label_set_text(english_countdown_label_, buf);
-    } else {
-        lv_label_set_text(english_countdown_label_, "");
+        // 真听写：只给中文提示，英文让孩子自己写
+        lv_label_set_text(english_word_label_, store.MeaningAt(idx).data());
+        lv_label_set_text(english_phonetic_label_, "");
+        lv_label_set_text(english_meaning_label_, "");
     }
 
     // 听写成绩（有作答记录时显示）
@@ -3880,12 +3869,16 @@ void LcdDisplay::UpdateEnglishScreen() {
     if (english_mode_label_ != nullptr) {
         const char* mode_text = player.CurrentMode() == EnglishPlayer::kCards
                                     ? "单词卡"
-                                    : (player.ShowWord() ? "看词听" : "真听写");
+                                    : (player.ShowWord() ? "看词听写" : "真听写");
         lv_label_set_text(english_mode_label_, mode_text);
     }
     if (english_interval_label_ != nullptr) {
-        snprintf(buf, sizeof(buf), "%ds", player.Interval());
-        lv_label_set_text(english_interval_label_, buf);
+        if (player.Manual()) {
+            lv_label_set_text(english_interval_label_, "间隔 手动");
+        } else {
+            snprintf(buf, sizeof(buf), "间隔 %ds", player.Interval());
+            lv_label_set_text(english_interval_label_, buf);
+        }
     }
     if (english_speak_label_ != nullptr) {
         lv_label_set_text(english_speak_label_, EnglishPlayer::SpeakName(player.CurrentSpeak()));
@@ -3894,11 +3887,11 @@ void LcdDisplay::UpdateEnglishScreen() {
 
 void LcdDisplay::RebindEnglishFonts(const lv_font_t* text_font, const lv_font_t* icon_font) {
     lv_obj_t* text_labels[] = {
-        english_word_label_,           english_meaning_label_,     english_progress_label_,
-        english_countdown_label_,      english_entry_label_,       english_mode_label_,
-        english_interval_label_,       english_setup_unit_label_,  english_setup_count_label_,
-        english_setup_interval_label_, english_setup_mode_label_,  english_score_label_,
-        english_speak_label_,          english_setup_speak_label_, english_title_label_};
+        english_word_label_,        english_meaning_label_,        english_progress_label_,
+        english_entry_label_,       english_setup_unit_label_,     english_setup_source_label_,
+        english_setup_count_label_, english_setup_interval_label_, english_setup_mode_label_,
+        english_score_label_,       english_setup_speak_label_,    english_title_label_,
+        english_setup_title_label_, english_setup_start_label_};
     for (lv_obj_t* label : text_labels) {
         if (label != nullptr && text_font != nullptr) {
             lv_obj_set_style_text_font(label, text_font, 0);
@@ -3907,18 +3900,26 @@ void LcdDisplay::RebindEnglishFonts(const lv_font_t* text_font, const lv_font_t*
     if (english_phonetic_label_ != nullptr) {
         lv_obj_set_style_text_font(english_phonetic_label_, &font_english_20, 0);
     }
-    // 启动面板里那些没有单独成员的标签
+    // 启动面板的次级标签 / 底部按钮：统一 16px
     for (lv_obj_t* label : english_setup_labels_) {
-        if (label != nullptr && text_font != nullptr) {
-            lv_obj_set_style_text_font(label, text_font, 0);
+        if (label != nullptr) {
+            lv_obj_set_style_text_font(label, &ui_font_16_4, 0);
         }
     }
     if (english_setup_close_icon_ != nullptr && icon_font != nullptr) {
         lv_obj_set_style_text_font(english_setup_close_icon_, icon_font, 0);
     }
-    for (lv_obj_t* label : english_key_icons_) {
-        if (label != nullptr && icon_font != nullptr) {
-            lv_obj_set_style_text_font(label, icon_font, 0);
+    for (lv_obj_t* label : english_key_labels_) {
+        if (label != nullptr) {
+            lv_obj_set_style_text_font(label, &ui_font_16_4, 0);
+        }
+    }
+    lv_obj_t* small_labels[] = {english_mode_label_,  english_interval_label_,
+                                english_speak_label_, english_progress_label_,
+                                english_score_label_, english_title_label_};
+    for (lv_obj_t* label : small_labels) {
+        if (label != nullptr) {
+            lv_obj_set_style_text_font(label, &ui_font_16_4, 0);
         }
     }
     if (english_close_icon_ != nullptr && icon_font != nullptr) {
@@ -3946,12 +3947,25 @@ void LcdDisplay::ShowEnglishSetup(bool show) {
 void LcdDisplay::UpdateEnglishSetup() {
     auto& store = EnglishStore::GetInstance();
     char buf[64];
+    if (english_setup_source_label_ != nullptr) {
+        lv_label_set_text(english_setup_source_label_,
+                          english_setup_source_ == 0 ? "课文" : "分类");
+    }
+    if (english_setup_scope_name_ != nullptr) {
+        lv_label_set_text(english_setup_scope_name_, english_setup_source_ == 0 ? "单元" : "分类");
+    }
     if (english_setup_unit_label_ != nullptr) {
-        if (english_setup_unit_ == 0) {
-            lv_label_set_text(english_setup_unit_label_, "全部");
+        if (english_setup_source_ == 0) {
+            if (english_setup_unit_ == 0) {
+                lv_label_set_text(english_setup_unit_label_, "全部");
+            } else {
+                lv_label_set_text(english_setup_unit_label_,
+                                  store.UnitName(english_setup_unit_).c_str());
+            }
         } else {
-            lv_label_set_text(english_setup_unit_label_,
-                              store.UnitName(english_setup_unit_).c_str());
+            lv_label_set_text(
+                english_setup_unit_label_,
+                english_setup_topic_ == 0 ? "全部" : EnglishStore::TopicName(english_setup_topic_));
         }
     }
     if (english_setup_count_label_ != nullptr) {
@@ -3963,8 +3977,12 @@ void LcdDisplay::UpdateEnglishSetup() {
         }
     }
     if (english_setup_interval_label_ != nullptr) {
-        snprintf(buf, sizeof(buf), "%d 秒", english_setup_interval_);
-        lv_label_set_text(english_setup_interval_label_, buf);
+        if (english_setup_interval_ > 0) {
+            snprintf(buf, sizeof(buf), "%d 秒", english_setup_interval_);
+            lv_label_set_text(english_setup_interval_label_, buf);
+        } else {
+            lv_label_set_text(english_setup_interval_label_, "手动");
+        }
     }
     if (english_setup_mode_label_ != nullptr) {
         lv_label_set_text(english_setup_mode_label_,
@@ -3976,13 +3994,59 @@ void LcdDisplay::UpdateEnglishSetup() {
     }
 }
 
+void LcdDisplay::OnEnglishSetupSourceClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self == nullptr) {
+        return;
+    }
+    self->english_setup_source_ = self->english_setup_source_ == 0 ? 1 : 0;
+    self->UpdateEnglishSetup();
+}
+
+void LcdDisplay::OnEnglishSetupScopeClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self == nullptr) {
+        return;
+    }
+    if (self->english_setup_source_ == 0) {
+        OnEnglishSetupUnitClicked(e);
+    } else {
+        OnEnglishSetupTopicClicked(e);
+    }
+}
+
 void LcdDisplay::OnEnglishSetupUnitClicked(lv_event_t* e) {
     auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
     if (self == nullptr) {
         return;
     }
-    // 0=全部，1..34 各单元
-    self->english_setup_unit_ = (self->english_setup_unit_ + 1) % 35;
+    // 0=全部，1..34 各单元：跳过没有词的单元
+    auto& store = EnglishStore::GetInstance();
+    int unit = self->english_setup_unit_;
+    for (int i = 0; i < 35; ++i) {
+        unit = (unit + 1) % 35;
+        if (unit == 0 || store.UnitCount(unit) > 0) {
+            break;
+        }
+    }
+    self->english_setup_unit_ = unit;
+    self->UpdateEnglishSetup();
+}
+
+void LcdDisplay::OnEnglishSetupTopicClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self == nullptr) {
+        return;
+    }
+    auto& store = EnglishStore::GetInstance();
+    int topic = self->english_setup_topic_;
+    for (int i = 0; i < 28; ++i) {
+        topic = (topic + 1) % 28;
+        if (topic == 0 || store.TopicCount(topic) > 0) {
+            break;
+        }
+    }
+    self->english_setup_topic_ = topic;
     self->UpdateEnglishSetup();
 }
 
@@ -4008,11 +4072,12 @@ void LcdDisplay::OnEnglishSetupIntervalClicked(lv_event_t* e) {
     if (self == nullptr) {
         return;
     }
-    static const int kIntervals[] = {5, 10, 15, 20, 30};
+    static const int kIntervals[] = {5, 10, 15, 20, 30, 0};
+    constexpr int kIntervalCount = sizeof(kIntervals) / sizeof(kIntervals[0]);
     int idx = 0;
-    for (int i = 0; i < 5; ++i) {
+    for (int i = 0; i < kIntervalCount; ++i) {
         if (kIntervals[i] == self->english_setup_interval_) {
-            idx = (i + 1) % 5;
+            idx = (i + 1) % kIntervalCount;
             break;
         }
     }
@@ -4047,20 +4112,24 @@ void LcdDisplay::OnEnglishSetupStartClicked(lv_event_t* e) {
         ESP_LOGW(TAG, "英语词库未就绪");
         return;
     }
-    const int unit = self->english_setup_unit_;
+    const int unit = self->english_setup_source_ == 0 ? self->english_setup_unit_ : 0;
+    const int topic = self->english_setup_source_ == 1 ? self->english_setup_topic_ : 0;
     const int count = self->english_setup_count_;
     const int interval = self->english_setup_interval_;
     const auto mode = static_cast<EnglishPlayer::Mode>(self->english_setup_mode_);
     const auto speak = static_cast<EnglishPlayer::Speak>(self->english_setup_speak_);
     self->ShowEnglishSetup(false);
     self->ShowEnglishScreen(true);
-    auto& player = EnglishPlayer::GetInstance();
-    // 先设播报语言再开始，避免第一词用错语言
-    while (player.CurrentSpeak() != speak) {
-        player.CycleSpeak();
-    }
-    player.Start(unit, count, interval, mode == EnglishPlayer::kCards, mode);
-    self->UpdateEnglishScreen();
+    // 播放会在音频队列里阻塞，放到主任务执行，避免卡住 LVGL
+    Application::GetInstance().Schedule([self, unit, topic, count, interval, mode, speak]() {
+        auto& player = EnglishPlayer::GetInstance();
+        // 先设播报语言再开始，避免第一词用错语言
+        while (player.CurrentSpeak() != speak) {
+            player.CycleSpeak();
+        }
+        player.Start(unit, topic, count, interval, mode == EnglishPlayer::kCards, mode);
+        self->RefreshEnglishScreen();
+    });
 }
 
 void LcdDisplay::OnEnglishSetupCloseClicked(lv_event_t* e) {
@@ -4093,26 +4162,39 @@ void LcdDisplay::OnEnglishCloseClicked(lv_event_t* e) {
 
 void LcdDisplay::OnEnglishRepeatClicked(lv_event_t* e) {
     auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
-    if (self != nullptr) {
-        EnglishPlayer::GetInstance().Repeat();
-        self->UpdateEnglishScreen();
+    if (self == nullptr) {
+        return;
     }
+    Application::GetInstance().Schedule([self]() {
+        EnglishPlayer::GetInstance().Repeat();
+        self->RefreshEnglishScreen();
+    });
 }
 
 void LcdDisplay::OnEnglishPrevClicked(lv_event_t* e) {
     auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
-    if (self != nullptr) {
-        EnglishPlayer::GetInstance().Prev();
-        self->UpdateEnglishScreen();
+    if (self == nullptr) {
+        return;
     }
+    Application::GetInstance().Schedule([self]() {
+        EnglishPlayer::GetInstance().Prev();
+        self->RefreshEnglishScreen();
+    });
 }
 
 void LcdDisplay::OnEnglishNextClicked(lv_event_t* e) {
     auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
-    if (self != nullptr) {
-        EnglishPlayer::GetInstance().Next();
-        self->UpdateEnglishScreen();
+    if (self == nullptr) {
+        return;
     }
+    // LVGL 长按结束后还会补发一次 CLICKED，这里屏蔽掉，避免"答对"后又跳过一个词
+    if (lv_tick_get() - self->english_long_guard_ < 600) {
+        return;
+    }
+    Application::GetInstance().Schedule([self]() {
+        EnglishPlayer::GetInstance().Next();
+        self->RefreshEnglishScreen();
+    });
 }
 
 void LcdDisplay::OnEnglishNextLongPressed(lv_event_t* e) {
@@ -4121,8 +4203,11 @@ void LcdDisplay::OnEnglishNextLongPressed(lv_event_t* e) {
         return;
     }
     // 长按"下一个"表示这个单词听写正确
-    EnglishPlayer::GetInstance().MarkCorrect();
-    self->UpdateEnglishScreen();
+    self->english_long_guard_ = lv_tick_get();
+    Application::GetInstance().Schedule([self]() {
+        EnglishPlayer::GetInstance().MarkCorrect();
+        self->RefreshEnglishScreen();
+    });
 }
 
 void LcdDisplay::OnEnglishModeClicked(lv_event_t* e) {
@@ -4130,8 +4215,10 @@ void LcdDisplay::OnEnglishModeClicked(lv_event_t* e) {
     if (self == nullptr) {
         return;
     }
-    EnglishPlayer::GetInstance().ToggleMode();
-    self->UpdateEnglishScreen();
+    Application::GetInstance().Schedule([self]() {
+        EnglishPlayer::GetInstance().ToggleMode();
+        self->RefreshEnglishScreen();
+    });
 }
 
 void LcdDisplay::OnEnglishSpeakClicked(lv_event_t* e) {
@@ -4139,8 +4226,10 @@ void LcdDisplay::OnEnglishSpeakClicked(lv_event_t* e) {
     if (self == nullptr) {
         return;
     }
-    EnglishPlayer::GetInstance().CycleSpeak();
-    self->UpdateEnglishScreen();
+    Application::GetInstance().Schedule([self]() {
+        EnglishPlayer::GetInstance().CycleSpeak();
+        self->RefreshEnglishScreen();
+    });
 }
 
 void LcdDisplay::OnEnglishIntervalClicked(lv_event_t* e) {
@@ -4148,8 +4237,10 @@ void LcdDisplay::OnEnglishIntervalClicked(lv_event_t* e) {
     if (self == nullptr) {
         return;
     }
-    EnglishPlayer::GetInstance().CycleInterval();
-    self->UpdateEnglishScreen();
+    Application::GetInstance().Schedule([self]() {
+        EnglishPlayer::GetInstance().CycleInterval();
+        self->RefreshEnglishScreen();
+    });
 }
 
 void LcdDisplay::ShowStrokeScreen(bool show) {

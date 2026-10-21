@@ -11,7 +11,7 @@
 // 卡上布局（与 docs/english-wordlib-format.md 一致，勿改动格式）：
 //   /sdcard/english/index.bin  "ENGL" + u16 version + u16 count + u32 reserved；
 //                              条目 16B：u32 audio_off | u32 audio_size |
-//                              u8 unit | u8 flags | u16 reserved | u32 cn_size
+//                              u8 unit | u8 flags | u16 topic | u32 cn_size
 //                              第 i 条对应 audio/w{i+1:04d}.ogg（英文）
 //                              和 audio/c{i+1:04d}.ogg（中文释义，可选）
 //   /sdcard/english/words.csv  源词表：word,phonetic,meaning,unit（UTF-8）
@@ -32,6 +32,12 @@ public:
     std::string_view PhoneticAt(int idx) const;
     std::string_view MeaningAt(int idx) const;
     uint8_t UnitAt(int idx) const;
+    // 主题分类（1..27，0 表示未分类）
+    uint16_t TopicAt(int idx) const;
+    static const char* TopicName(int topic);
+    int TopicCount(int topic) const;
+    // 同时按单元/分类过滤后的词数（0 表示不限）
+    int CountFilter(int unit, int topic) const;
 
     // 词条 ogg 的绝对路径（audio/w0001.ogg）
     std::string AudioPath(int idx) const;
@@ -63,6 +69,7 @@ private:
         uint32_t cn_audio_size;
         uint8_t unit;
         uint8_t flags;
+        uint16_t topic;
     };
 
     bool LoadIndex();

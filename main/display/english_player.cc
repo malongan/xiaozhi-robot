@@ -11,6 +11,8 @@
 
 namespace {
 constexpr const char* TAG = "EnglishPlayer";
+
+uint32_t NowMs() { return static_cast<uint32_t>(esp_timer_get_time() / 1000); }
 }  // namespace
 
 EnglishPlayer& EnglishPlayer::GetInstance() {
@@ -23,52 +25,81 @@ bool EnglishPlayer::Available() {
     return store.Ready() && store.WordCount() > 0;
 }
 
-bool EnglishPlayer::Start(int unit, int count, int interval_seconds, bool show_word, Mode mode) {
+bool EnglishPlayer::Start(int unit, int topic, int count, int interval_seconds, bool show_word,
+                          Mode mode) {
     auto& store = EnglishStore::GetInstance();
     if (!store.Ready() || store.WordCount() == 0) {
         ESP_LOGW(TAG, "英语词库未就绪");
         return false;
     }
-    int start = 0;
-    int end = store.WordCount();
-    if (unit > 0) {
-        start = store.UnitStart(unit);
-        end = store.UnitEnd(unit);
+    order_.clear();
+    if (topic > 0) {
+        for (int i = 0; i < store.WordCount(); ++i) {
+            if (store.TopicAt(i) != topic) {
+                continue;
+            }
+            if (unit > 0 && store.UnitAt(i) != unit) {
+                continue;
+            }
+            order_.push_back(i);
+        }
+    } else if (unit > 0) {
+        const int start = store.UnitStart(unit);
+        const int end = store.UnitEnd(unit);
         if (start < 0 || end <= start) {
             ESP_LOGW(TAG, "单元 %d 没有词", unit);
             return false;
         }
+        for (int i = start; i < end; ++i) {
+            order_.push_back(i);
+        }
+    } else {
+        for (int i = 0; i < store.WordCount(); ++i) {
+            order_.push_back(i);
+        }
     }
-    if (count > 0 && start + count < end) {
-        end = start + count;
+    if (count > 0 && order_.size() > (size_t)count) {
+        order_.resize(count);
     }
-    if (end <= start) {
+    if (order_.empty()) {
+        ESP_LOGW(TAG, "筛选结果为空：单元 %d，分类 %d", unit, topic);
         return false;
     }
-    if (interval_seconds < 1) {
-        interval_seconds = 1;
+    if (interval_seconds < 0) {
+        interval_seconds = 0;
     }
     if (interval_seconds > 120) {
         interval_seconds = 120;
     }
 
     unit_ = unit;
+    topic_ = topic;
     count_ = count;
     interval_ = interval_seconds;
     show_word_ = show_word;
     mode_ = mode;
-    start_ = start;
-    end_ = end;
-    total_ = end - start;
-    current_ = start;
+    total_ = (int)order_.size();
+    pos_ = 0;
+    current_ = order_[0];
     played_ = 0;
     paused_ = false;
     active_ = true;
+    pending_cn_ = false;
     next_tick_ = 0;
 
-    ESP_LOGI(TAG, "开始%s：%d 词，间隔 %d 秒，%s", mode_ == kCards ? "单词卡" : "听写", total_,
-             interval_, show_word_ ? "显示单词" : "只发音");
+    if (interval_ > 0) {
+        ESP_LOGI(TAG, "开始%s：%d 词（单元 %d，分类 %d），间隔 %d 秒，%s",
+                 mode_ == kCards ? "单词卡" : "听写", total_, unit_, topic_, interval_,
+                 show_word_ ? "显示单词" : "只发音");
+    } else {
+        ESP_LOGI(TAG, "开始%s：%d 词（单元 %d，分类 %d），手动翻页，%s",
+                 mode_ == kCards ? "单词卡" : "听写", total_, unit_, topic_,
+                 show_word_ ? "显示单词" : "只发音");
+    }
     PlayCurrent();
+    if (refresh_cb_ != nullptr) {
+        refresh_cb_();
+    }
     return true;
 }
 
@@ -112,19 +143,29 @@ void EnglishPlayer::CycleSpeak() {
 }
 
 void EnglishPlayer::CycleInterval() {
-    static const int kSteps[] = {5, 10, 15, 20, 30};
+    static const int kSteps[] = {5, 10, 15, 20, 30, 0};
+    constexpr int kCount = sizeof(kSteps) / sizeof(kSteps[0]);
     int idx = 0;
-    for (int i = 0; i < 5; ++i) {
+    for (int i = 0; i < kCount; ++i) {
         if (kSteps[i] == interval_) {
-            idx = (i + 1) % 5;
+            idx = (i + 1) % kCount;
             break;
         }
     }
     interval_ = kSteps[idx];
-    ESP_LOGI(TAG, "间隔改为 %d 秒", interval_);
-    // 立刻按新间隔重新计时
+    if (interval_ > 0) {
+        ESP_LOGI(TAG, "间隔改为 %d 秒", interval_);
+    } else {
+        ESP_LOGI(TAG, "间隔改为手动");
+    }
+    // 立刻按新间隔重新计时（next_tick_ 用毫秒）；手动模式不再自动翻页
     if (active_) {
-        next_tick_ = static_cast<uint32_t>(esp_timer_get_time() / 1000) + interval_ + 1;
+        if (pending_cn_) {
+            next_tick_ = NowMs() + 200;
+        } else {
+            next_tick_ =
+                interval_ > 0 ? NowMs() + static_cast<uint32_t>(interval_) * 1000 + 1000 : 0;
+        }
     }
 }
 
@@ -138,14 +179,39 @@ void EnglishPlayer::MarkCorrect() {
     Next();
 }
 
+bool EnglishPlayer::RequestNext() {
+    const uint32_t now = static_cast<uint32_t>(esp_timer_get_time() / 1000);
+    if (now - last_manual_ < 800) {
+        ESP_LOGI(TAG, "忽略过于频繁的翻页请求");
+        return false;
+    }
+    last_manual_ = now;
+    Next();
+    return true;
+}
+
+bool EnglishPlayer::RequestPrev() {
+    const uint32_t now = static_cast<uint32_t>(esp_timer_get_time() / 1000);
+    if (now - last_manual_ < 800) {
+        ESP_LOGI(TAG, "忽略过于频繁的翻页请求");
+        return false;
+    }
+    last_manual_ = now;
+    Prev();
+    return true;
+}
+
 void EnglishPlayer::Stop() {
     if (!active_) {
         return;
     }
     active_ = false;
     paused_ = false;
+    pending_cn_ = false;
     current_ = -1;
     total_ = 0;
+    pos_ = 0;
+    order_.clear();
     played_ = 0;
     if (answered_ > 0) {
         ESP_LOGI(TAG, "停止听写，本次成绩 %d/%d", correct_, answered_);
@@ -159,11 +225,38 @@ void EnglishPlayer::Next() {
     if (!active_) {
         return;
     }
-    if (current_ + 1 < end_) {
-        current_++;
+    if (pos_ + 1 < total_) {
+        pos_++;
+        current_ = order_[pos_];
+        ESP_LOGI(TAG, "推进到第 %d 词", pos_ + 1);
         PlayCurrent();
+        if (refresh_cb_ != nullptr) {
+            refresh_cb_();
+        }
     } else {
         ESP_LOGI(TAG, "已是最后一个词");
+    }
+}
+
+void EnglishPlayer::Advance() {
+    // 设备自己按间隔推进，不受手动翻页防抖限制
+    if (!active_) {
+        return;
+    }
+    if (pos_ + 1 < total_) {
+        pos_++;
+        current_ = order_[pos_];
+        if (!PlayCurrent()) {
+            pos_--;
+            current_ = order_[pos_];
+            return;
+        }
+        if (refresh_cb_ != nullptr) {
+            refresh_cb_();
+        }
+    } else {
+        ESP_LOGI(TAG, "学习完成：共 %d 词", played_);
+        Stop();
     }
 }
 
@@ -171,8 +264,9 @@ void EnglishPlayer::Prev() {
     if (!active_) {
         return;
     }
-    if (current_ > start_) {
-        current_--;
+    if (pos_ > 0) {
+        pos_--;
+        current_ = order_[pos_];
         PlayCurrent();
     } else {
         ESP_LOGI(TAG, "已是第一个词");
@@ -187,7 +281,7 @@ void EnglishPlayer::Repeat() {
 }
 
 int EnglishPlayer::Countdown() const {
-    if (!active_ || paused_ || next_tick_ == 0) {
+    if (!active_ || paused_ || next_tick_ == 0 || interval_ <= 0) {
         return -1;
     }
     const int64_t remain =
@@ -198,22 +292,25 @@ int EnglishPlayer::Countdown() const {
     return static_cast<int>((remain + 999) / 1000);
 }
 
-void EnglishPlayer::PlayCurrent() {
+bool EnglishPlayer::PlayCurrent() {
     auto& store = EnglishStore::GetInstance();
     if (current_ < 0 || current_ >= store.WordCount()) {
-        return;
+        return false;
     }
-    // 播放前先确保服务器语音已放完、设备空闲，避免抢麦
+    // 播放前先确保服务器语音已放完、设备空闲，避免抢麦。
+    // 忙时只做短间隔重试（不推进词），真正播成功后 interval 才重新起算，
+    // 这样既不会丢词，也不会把间隔压缩成连播。
     auto& app = Application::GetInstance();
     const bool server_busy = !app.GetAudioService().IsPlaybackIdle();
     const bool state_busy =
         app.GetDeviceState() != kDeviceStateIdle && app.GetDeviceState() != kDeviceStateListening;
     if (server_busy || state_busy) {
-        // 服务器还在说话或设备正在对话，稍后由 Tick 重试
-        next_tick_ = static_cast<uint32_t>(esp_timer_get_time() / 1000) + 1;
-        return;
+        ESP_LOGI(TAG, "设备忙，稍后重试：%s", store.WordAt(current_).data());
+        next_tick_ = NowMs() + 500;
+        return false;
     }
-    // 按播报语言决定播放哪一段
+    // 按播报语言决定播放哪一段（重播/切换语言时清掉上一词的待播中文）
+    pending_cn_ = false;
     bool want_en = (speak_ == kSpeakEnglish || speak_ == kSpeakBoth);
     bool want_cn = (speak_ == kSpeakChinese || speak_ == kSpeakBoth);
 
@@ -227,8 +324,8 @@ void EnglishPlayer::PlayCurrent() {
                 std::string_view(reinterpret_cast<const char*>(audio_.data()), audio_.size()));
         }
         played_++;
-        next_tick_ = static_cast<uint32_t>(esp_timer_get_time() / 1000) + interval_ + 1;
-        return;
+        next_tick_ = interval_ > 0 ? NowMs() + static_cast<uint32_t>(interval_) * 1000 + 1000 : 0;
+        return true;
     }
 
     // 英文（和中英双语的第一段）
@@ -240,43 +337,67 @@ void EnglishPlayer::PlayCurrent() {
             std::string_view(reinterpret_cast<const char*>(audio_.data()), audio_.size()));
     }
     played_++;
+    ESP_LOGI(TAG, "播放第 %d/%d 词：%s", pos_ + 1, total_, store.WordAt(current_).data());
 
     if (want_cn) {
-        // 中英双语：英文播完后再播中文（由 Tick 接力）
+        // 中英双语：等英文真正播完后再播中文（Tick 轮询播放队列）
         pending_cn_ = true;
-        // 留出英文发音的播放时间，稍后播中文
-        next_tick_ = static_cast<uint32_t>(esp_timer_get_time() / 1000) + 1;
-        return;
+        next_tick_ = NowMs() + 200;
+        return true;
     }
-    // 发音播放完（约 0.5s）后开始倒计时等待；单词卡模式整张卡停留 interval 秒
-    next_tick_ = static_cast<uint32_t>(esp_timer_get_time() / 1000) + interval_ + 1;
+    // 发音约 1 秒，之后再等 interval 秒到下一个词；手动模式下等用户翻页
+    next_tick_ = interval_ > 0 ? NowMs() + static_cast<uint32_t>(interval_) * 1000 + 1000 : 0;
+    return true;
 }
 
 void EnglishPlayer::Tick() {
     if (!active_) {
         return;
     }
-    const uint32_t now = static_cast<uint32_t>(esp_timer_get_time() / 1000);
+    const uint32_t now = NowMs();
     if (next_tick_ == 0 || now < next_tick_) {
         return;
     }
     if (pending_cn_) {
-        // 英文已播完，接着播中文释义
+        // 等英文播完再播中文释义，避免两段叠在一起
+        if (!Application::GetInstance().GetAudioService().IsPlaybackIdle()) {
+            next_tick_ = now + 200;
+            return;
+        }
         pending_cn_ = false;
         auto& store = EnglishStore::GetInstance();
         if (store.ReadChineseAudio(current_, audio_)) {
             Application::GetInstance().PlaySound(
                 std::string_view(reinterpret_cast<const char*>(audio_.data()), audio_.size()));
         }
-        // 中文播完后才开始倒计时
-        next_tick_ = now + interval_ + 1;
+        // 中文播完后才开始倒计时；手动模式下停在这里等用户翻页
+        next_tick_ = interval_ > 0 ? now + static_cast<uint32_t>(interval_) * 1000 + 1000 : 0;
+        if (refresh_cb_ != nullptr) {
+            refresh_cb_();
+        }
         return;
     }
-    if (current_ + 1 < end_) {
-        current_++;
-        PlayCurrent();
-    } else {
+    if (interval_ <= 0) {
+        // 手动模式：不自动推进
+        return;
+    }
+    if (pos_ + 1 >= total_) {
         ESP_LOGI(TAG, "学习完成：共 %d 词", played_);
         Stop();
+        if (refresh_cb_ != nullptr) {
+            refresh_cb_();
+        }
+        return;
+    }
+    pos_++;
+    current_ = order_[pos_];
+    if (!PlayCurrent()) {
+        // 设备忙：退回当前词，稍后重试，避免跳词
+        pos_--;
+        current_ = order_[pos_];
+        return;
+    }
+    if (refresh_cb_ != nullptr) {
+        refresh_cb_();
     }
 }

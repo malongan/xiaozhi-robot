@@ -87,7 +87,7 @@ protected:
     lv_obj_t* english_phonetic_label_ = nullptr;
     lv_obj_t* english_meaning_label_ = nullptr;
     lv_obj_t* english_progress_label_ = nullptr;
-    lv_obj_t* english_countdown_label_ = nullptr;
+
     lv_obj_t* english_mode_label_ = nullptr;
     lv_obj_t* english_speak_label_ = nullptr;
     lv_obj_t* english_score_label_ = nullptr;
@@ -96,6 +96,10 @@ protected:
     // 启动选择面板
     lv_obj_t* english_setup_panel_ = nullptr;
     lv_obj_t* english_setup_unit_label_ = nullptr;
+    lv_obj_t* english_setup_source_label_ = nullptr;
+    lv_obj_t* english_setup_scope_name_ = nullptr;
+    lv_obj_t* english_setup_title_label_ = nullptr;
+    lv_obj_t* english_setup_start_label_ = nullptr;
     lv_obj_t* english_setup_count_label_ = nullptr;
     lv_obj_t* english_setup_interval_label_ = nullptr;
     lv_obj_t* english_setup_mode_label_ = nullptr;
@@ -103,8 +107,10 @@ protected:
     // 启动面板里所有用主题字体的标签（主题刷新时必须一起重绑）
     std::vector<lv_obj_t*> english_setup_labels_;
     lv_obj_t* english_setup_close_icon_ = nullptr;
-    std::vector<lv_obj_t*> english_key_icons_;
+    std::vector<lv_obj_t*> english_key_labels_;
     int english_setup_unit_ = 1;
+    int english_setup_topic_ = 0;
+    int english_setup_source_ = 0;  // 0=课文（按单元） 1=分类（按主题）
     int english_setup_count_ = 10;
     int english_setup_interval_ = 10;
     int english_setup_mode_ = 0;   // 0=报听写 1=单词卡
@@ -149,6 +155,7 @@ protected:
     bool stroke_screen_visible_ = false;
     bool english_screen_visible_ = false;
     bool english_setup_visible_ = false;
+    uint32_t english_long_guard_ = 0;  // 长按"下一个"后抑制同一次松手产生的 CLICKED
     lv_timer_t* stroke_anim_timer_ = nullptr;
 
     float avatar_face_scale_ = 1.0f;  // 1.0 = 80px, 1.875 = 150px idle face
@@ -315,6 +322,9 @@ protected:
     static void OnEnglishSetupModeClicked(lv_event_t* e);
     static void OnEnglishSetupSpeakClicked(lv_event_t* e);
     static void OnEnglishSetupUnitClicked(lv_event_t* e);
+    static void OnEnglishSetupTopicClicked(lv_event_t* e);
+    static void OnEnglishSetupSourceClicked(lv_event_t* e);
+    static void OnEnglishSetupScopeClicked(lv_event_t* e);
     static void OnEnglishSetupCountClicked(lv_event_t* e);
     static void OnEnglishSetupIntervalClicked(lv_event_t* e);
     static void OnEnglishSetupStartClicked(lv_event_t* e);
@@ -353,6 +363,10 @@ public:
     // 英语听写页
     void ShowEnglishScreen(bool show);
     void UpdateEnglishScreen();
+    // 播放器的界面刷新回调（静态，因为播放器不持有 display）
+    static void RefreshEnglishScreenStatic();
+    // 覆盖基类：刷新英语页
+    virtual void RefreshEnglishScreen() override;
     void RebindEnglishFonts(const lv_font_t* text_font, const lv_font_t* icon_font);
     // 当前有效的主题字体。主题刷新时 lvgl_theme 里的旧字体已被释放，
     // 必须优先用常驻的 chat_font_，否则标签会指向野指针。

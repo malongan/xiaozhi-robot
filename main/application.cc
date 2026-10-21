@@ -308,6 +308,8 @@ void Application::Run() {
 
             // 英语听写：每秒推进一次（发下一个词 / 倒计时）
             EnglishPlayer::GetInstance().Tick();
+            // 倒计时每秒变化，界面也要跟着刷新
+            display->RefreshEnglishScreen();
 
             // Print debug info every 10 seconds
             if (clock_ticks_ % 10 == 0) {

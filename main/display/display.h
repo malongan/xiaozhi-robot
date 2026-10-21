@@ -68,6 +68,8 @@ public:
     // A wake word starts a new conversation turn; pages that belong to the
     // previous turn (e.g. the stroke demo) can close themselves here.
     virtual void OnWakeWordDetected() {}
+    // 英语学习页的界面刷新（每秒更新倒计时）
+    virtual void RefreshEnglishScreen() {}
     virtual void SetChatMessage(const char* role, const char* content);
     virtual void ClearChatMessages();
     // Whether this display keeps chat history across idle/notification events.

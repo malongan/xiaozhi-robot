@@ -83,11 +83,23 @@ bool EnglishStore::LoadIndex() {
                        ((uint32_t)rec[7] << 24);
         e.unit = rec[8];
         e.flags = rec[9];
+        e.topic = (uint16_t)rec[10] | ((uint16_t)rec[11] << 8);
         e.cn_audio_size = (uint32_t)rec[12] | ((uint32_t)rec[13] << 8) | ((uint32_t)rec[14] << 16) |
                           ((uint32_t)rec[15] << 24);
     }
     fclose(f);
     count_ = count;
+    int tagged = 0;
+    uint16_t max_topic = 0;
+    for (const auto& e : entries_) {
+        if (e.topic != 0) {
+            tagged++;
+            if (e.topic > max_topic) {
+                max_topic = e.topic;
+            }
+        }
+    }
+    ESP_LOGI(TAG, "分类标签：%d 词已分类，最大分类号 %u", tagged, max_topic);
 
     // 词库名（可选）
     snprintf(path, sizeof(path), "%s/meta.txt", kRoot);
@@ -113,12 +125,15 @@ bool EnglishStore::LoadIndex() {
 }
 
 // 解析 CSV 行：支持双引号包裹的字段（RFC4180）
+// 按字段分别写入 out[]，out 会被清空。
 static void ParseCsvLine(const std::string& line, std::string* out, int max_fields) {
-    out->clear();
+    for (int i = 0; i < max_fields; ++i) {
+        out[i].clear();
+    }
     std::string field;
     int fields = 0;
     bool in_quotes = false;
-    for (size_t i = 0; i < line.size() && fields < max_fields; ++i) {
+    for (size_t i = 0; i < line.size(); ++i) {
         const char c = line[i];
         if (in_quotes) {
             if (c == '"') {
@@ -134,15 +149,17 @@ static void ParseCsvLine(const std::string& line, std::string* out, int max_fiel
         } else if (c == '"') {
             in_quotes = true;
         } else if (c == ',') {
-            out->append(field);
+            if (fields < max_fields) {
+                out[fields] = field;
+            }
             field.clear();
             ++fields;
-        } else if (c != '\r') {
+        } else if (c != '\r' && c != '\n') {
             field += c;
         }
     }
     if (fields < max_fields) {
-        out->append(field);
+        out[fields] = field;
     }
 }
 
@@ -160,12 +177,13 @@ bool EnglishStore::LoadWords() {
         fclose(f);
         return false;
     }
-    std::string fields[4];
+    // word, phonetic, meaning, unit, unit_title
+    std::string fields[5];
     while (fgets(line, sizeof(line), f) != nullptr) {
         if (line[0] == '\0' || line[0] == '\n' || line[0] == '\r') {
             continue;
         }
-        ParseCsvLine(line, fields, 4);
+        ParseCsvLine(line, fields, 5);
         if (fields[0].empty()) {
             continue;
         }
@@ -182,9 +200,18 @@ bool EnglishStore::LoadWords() {
         text_pool_.insert(text_pool_.end(), fields[2].begin(), fields[2].end());
         text_pool_.push_back('\0');
 
-        title_offsets_.push_back(static_cast<uint32_t>(text_pool_.size()));
-        text_pool_.insert(text_pool_.end(), fields[3].begin(), fields[3].end());
-        text_pool_.push_back('\0');
+        // 单元标题按单元号索引：同一个单元的标题只存一次
+        const int unit_no = atoi(fields[3].c_str());
+        if (unit_no >= 0 && unit_no < 64) {
+            if (title_offsets_.size() <= (size_t)unit_no) {
+                title_offsets_.resize(unit_no + 1, 0);
+            }
+            if (title_offsets_[unit_no] == 0) {
+                title_offsets_[unit_no] = static_cast<uint32_t>(text_pool_.size());
+                text_pool_.insert(text_pool_.end(), fields[4].begin(), fields[4].end());
+                text_pool_.push_back('\0');
+            }
+        }
     }
     fclose(f);
     ESP_LOGI(TAG, "词表文本：%u 条，字符池 %u B", (unsigned)word_offsets_.size(),
@@ -218,6 +245,50 @@ uint8_t EnglishStore::UnitAt(int idx) const {
         return 0;
     }
     return entries_[idx].unit;
+}
+
+uint16_t EnglishStore::TopicAt(int idx) const {
+    if (idx < 0 || idx >= (int)entries_.size()) {
+        return 0;
+    }
+    return entries_[idx].topic;
+}
+
+const char* EnglishStore::TopicName(int topic) {
+    static const char* kNames[] = {
+        "",         "水果",     "蔬菜",     "食物饮料", "身体部位", "颜色",     "数字",
+        "时间日期", "动物",     "学校学习", "场所地点", "家居物品", "人物职业", "家人朋友",
+        "情绪感受", "动作",     "形容词",   "自然天气", "交通出行", "运动爱好", "节日文化",
+        "科技通信", "购物金钱", "健康安全", "服装",     "国家语言", "其他",     "形状",
+    };
+    if (topic < 0 || topic >= (int)(sizeof(kNames) / sizeof(kNames[0]))) {
+        return "";
+    }
+    return kNames[topic];
+}
+
+int EnglishStore::TopicCount(int topic) const {
+    int n = 0;
+    for (const auto& e : entries_) {
+        if (e.topic == topic) {
+            n++;
+        }
+    }
+    return n;
+}
+
+int EnglishStore::CountFilter(int unit, int topic) const {
+    int n = 0;
+    for (int i = 0; i < count_; ++i) {
+        if (unit > 0 && entries_[i].unit != unit) {
+            continue;
+        }
+        if (topic > 0 && entries_[i].topic != topic) {
+            continue;
+        }
+        n++;
+    }
+    return n;
 }
 
 std::string EnglishStore::AudioPath(int idx) const {
@@ -309,13 +380,17 @@ std::string_view EnglishStore::UnitTitle(int unit) const {
     if (unit <= 0 || unit >= (int)title_offsets_.size()) {
         return std::string_view();
     }
-    return std::string_view(text_pool_.data() + title_offsets_[unit]);
+    const uint32_t offset = title_offsets_[unit];
+    if (offset == 0) {
+        return std::string_view();
+    }
+    return std::string_view(text_pool_.data() + offset);
 }
 
 std::string EnglishStore::UnitName(int unit) const {
     switch (unit) {
         case 0:
-            return "复习";
+            return "全部词库";
         case 1:
             return "Unit 1";
         case 2:
@@ -338,9 +413,24 @@ std::string EnglishStore::UnitName(int unit) const {
             return "动物场所物品";
         case 11:
             return "日常动作形容";
+        case 34:
+            return "拓展";
         default:
-            return "Unit " + std::to_string(unit);
+            break;
     }
+    if (unit >= 12 && unit <= 17) {
+        return "五上 U" + std::to_string(unit - 11);
+    }
+    if (unit >= 18 && unit <= 23) {
+        return "五下 U" + std::to_string(unit - 17);
+    }
+    if (unit >= 24 && unit <= 29) {
+        return "六上 U" + std::to_string(unit - 23);
+    }
+    if (unit >= 30 && unit <= 33) {
+        return "六下 U" + std::to_string(unit - 29);
+    }
+    return "Unit " + std::to_string(unit);
 }
 
 int EnglishStore::ChineseCount() const {

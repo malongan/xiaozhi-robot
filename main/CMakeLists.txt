@@ -47,6 +47,7 @@ set(SOURCES "audio/audio_codec.cc"
             "device_state_machine.cc"
             "assets.cc"
             "assets/font_puhui_16_4.c"
+            "assets/ui_font_16_4.c"
             "main.cc"
             "media_ble.cc"
             )
