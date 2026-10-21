@@ -69,6 +69,17 @@ protected:
     lv_obj_t* media_keys_[16] = {};
     lv_obj_t* shortcut_labels_[10] = {};
     int shortcut_label_count_ = 0;
+    lv_obj_t* keyboard_panel_ = nullptr;
+    lv_obj_t* numpad_panel_ = nullptr;
+    lv_obj_t* keyboard_labels_[42] = {};
+    int keyboard_label_count_ = 0;
+    lv_obj_t* numpad_labels_[20] = {};
+    int numpad_label_count_ = 0;
+    lv_obj_t* numpad_icon_labels_[4] = {};
+    int numpad_icon_label_count_ = 0;
+    lv_obj_t* kb_shift_btn_ = nullptr;
+    int media_panel_ = 0;
+    bool shift_active_ = false;
     lv_timer_t* media_feedback_timer_ = nullptr;
     lv_obj_t* media_key_icons_[9] = {};
     lv_timer_t* media_repeat_timer_ = nullptr;
@@ -183,6 +194,8 @@ protected:
     lv_obj_t* settings_mic_plus_icon_ = nullptr;
     lv_obj_t* settings_wifi_label_ = nullptr;
     lv_obj_t* settings_wifi_status_ = nullptr;
+    lv_obj_t* settings_wifi_ssid_ = nullptr;
+    lv_obj_t* settings_wifi_dot_ = nullptr;
     lv_obj_t* settings_ip_label_ = nullptr;
     lv_obj_t* settings_ip_value_ = nullptr;
     lv_obj_t* settings_bt_label_ = nullptr;
@@ -196,21 +209,30 @@ protected:
     lv_obj_t* settings_bt_disconnect_label_ = nullptr;
     lv_obj_t* settings_bt_forget_label_ = nullptr;
     lv_obj_t* settings_reboot_label_ = nullptr;
+    std::vector<lv_obj_t*> settings_icon_labels_;
     bool settings_screen_visible_ = false;
 
-    // 文件传输页：显示网址、启停、SD 容量与上传进度
+    // 网络页：文件服务、WiFi、SD 容量与上传进度
     lv_obj_t* file_service_screen_ = nullptr;
     lv_obj_t* file_back_icon_ = nullptr;
     lv_obj_t* file_title_label_ = nullptr;
+    lv_obj_t* file_service_name_label_ = nullptr;
     lv_obj_t* file_url_label_ = nullptr;
     lv_obj_t* file_hint_label_ = nullptr;
     lv_obj_t* file_status_dot_ = nullptr;
     lv_obj_t* file_status_label_ = nullptr;
     lv_obj_t* file_toggle_label_ = nullptr;
+    lv_obj_t* file_wifi_dot_ = nullptr;
+    lv_obj_t* file_wifi_label_ = nullptr;
+    lv_obj_t* file_ip_label_ = nullptr;
+    lv_obj_t* file_storage_title_label_ = nullptr;
     lv_obj_t* file_storage_label_ = nullptr;
+    lv_obj_t* file_storage_bar_ = nullptr;
     lv_obj_t* file_activity_label_ = nullptr;
+    lv_obj_t* file_transfer_state_label_ = nullptr;
     lv_obj_t* file_progress_bar_ = nullptr;
     lv_obj_t* file_foot_label_ = nullptr;
+    std::vector<lv_obj_t*> file_icon_labels_;
     bool file_service_visible_ = false;
     // 从功能抽屉进入二级页时置位；返回时据此回到抽屉而不是待机画面。
     bool return_to_drawer_ = false;
@@ -347,8 +369,12 @@ protected:
     static void OnChatAreaClicked(lv_event_t* e);
     static void OnMediaBackClicked(lv_event_t* e);
     static void OnMediaKeyClicked(lv_event_t* e);
+    static void OnMediaPanelCycle(lv_event_t* e);
+    static void OnKeyboardKeyClicked(lv_event_t* e);
     static void MediaFeedbackTimerCb(lv_timer_t* timer);
     void ShowMediaFeedback(const char* text);
+    void SetMediaPanel(int panel);
+    void UpdateMediaPanelTitle();
     static void MediaRepeatTimerCb(lv_timer_t* timer);
     void HandleMediaKeyDown(int index);
     void HandleMediaKeyUp();

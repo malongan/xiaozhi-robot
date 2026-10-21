@@ -66,6 +66,20 @@ constexpr uint32_t kSkyAccentDeep = 0x2B6FAE;
 constexpr uint32_t kSkySelect = 0xBFE0FA;
 constexpr uint32_t kSkySelectEdge = 0x7FB6E6;
 constexpr uint32_t kSkyGood = 0x3E9B6B;
+constexpr uint32_t kDarkTeal = 0x2FB6A8;
+constexpr uint32_t kDarkTealDeep = 0x1E8E86;
+constexpr uint32_t kDarkTealInk = 0x04201D;
+constexpr uint32_t kDarkCard = 0x14161D;
+constexpr uint32_t kDarkCardControl = 0x242733;
+constexpr uint32_t kDarkCardBorder = 0x262A36;
+constexpr uint32_t kDarkDivider = 0x232733;
+constexpr uint32_t kDarkBlue = 0x4A8FE8;
+constexpr uint32_t kDarkOrange = 0xF0A03C;
+constexpr uint32_t kDarkPurple = 0x8B6FE8;
+constexpr uint32_t kDarkMuted = 0x939BAA;
+constexpr uint32_t kDarkDim = 0x6D7585;
+constexpr uint32_t kDarkGood = 0x4CD964;
+constexpr uint32_t kDarkDanger = 0xE06C75;
 // 内容列表每页行数；列表改成翻页后不再滚动，避免滑动与点选冲突。
 constexpr int kEnglishSetupRowsPerPage = 6;
 }  // namespace
@@ -1473,6 +1487,148 @@ void LcdDisplay::SetupUI() {
         }
         lv_obj_center(label);
     }
+    struct KeyDef {
+        const char* label;
+        uint8_t code;
+        uint8_t mods;
+        int16_t x;
+        int16_t y;
+        int16_t w;
+        int16_t h;
+        bool icon;
+    };
+    static const KeyDef kFullKeys[] = {
+        {"A", 0x04, 0, 2, 44, 36, 37, false},   {"B", 0x05, 0, 42, 44, 36, 37, false},
+        {"C", 0x06, 0, 82, 44, 36, 37, false},  {"D", 0x07, 0, 122, 44, 36, 37, false},
+        {"E", 0x08, 0, 162, 44, 36, 37, false}, {"F", 0x09, 0, 202, 44, 36, 37, false},
+        {"G", 0x0A, 0, 2, 83, 36, 37, false},   {"H", 0x0B, 0, 42, 83, 36, 37, false},
+        {"I", 0x0C, 0, 82, 83, 36, 37, false},  {"J", 0x0D, 0, 122, 83, 36, 37, false},
+        {"K", 0x0E, 0, 162, 83, 36, 37, false}, {"L", 0x0F, 0, 202, 83, 36, 37, false},
+        {"M", 0x10, 0, 2, 122, 36, 37, false},  {"N", 0x11, 0, 42, 122, 36, 37, false},
+        {"O", 0x12, 0, 82, 122, 36, 37, false}, {"P", 0x13, 0, 122, 122, 36, 37, false},
+        {"Q", 0x14, 0, 162, 122, 36, 37, false}, {"R", 0x15, 0, 202, 122, 36, 37, false},
+        {"S", 0x16, 0, 2, 161, 36, 37, false},  {"T", 0x17, 0, 42, 161, 36, 37, false},
+        {"U", 0x18, 0, 82, 161, 36, 37, false}, {"V", 0x19, 0, 122, 161, 36, 37, false},
+        {"W", 0x1A, 0, 162, 161, 36, 37, false}, {"X", 0x1B, 0, 202, 161, 36, 37, false},
+        {"Y", 0x1C, 0, 2, 200, 36, 37, false},  {"Z", 0x1D, 0, 42, 200, 36, 37, false},
+        {":", 0x33, 0x02, 82, 200, 36, 37, false}, {"@", 0x1F, 0x02, 122, 200, 36, 37, false},
+        {",", 0x36, 0, 162, 200, 36, 37, false}, {".", 0x37, 0, 202, 200, 36, 37, false},
+        {"?", 0x38, 0x02, 2, 239, 36, 37, false}, {"!", 0x1E, 0x02, 42, 239, 36, 37, false},
+        {"'", 0x34, 0, 82, 239, 36, 37, false}, {"-", 0x2D, 0, 122, 239, 36, 37, false},
+        {"/", 0x38, 0, 162, 239, 36, 37, false}, {";", 0x33, 0, 202, 239, 36, 37, false},
+        {"SH", 0xFF, 0, 2, 278, 36, 37, false}, {"中", 0xFE, 0, 42, 278, 36, 37, false},
+        {"BSP", 0x2A, 0, 82, 278, 36, 37, false}, {"SPC", 0x2C, 0, 122, 278, 36, 37, false},
+        {"发送", 0x28, 0, 162, 278, 76, 37, false},
+    };
+    static const KeyDef kNumpadKeys[] = {
+        {"BSP", 0x2A, 0, 5, 44, 52, 40, false},  {"/", 0x38, 0, 64, 44, 52, 40, false},
+        {"*", 0x25, 0x02, 123, 44, 52, 40, false}, {"-", 0x2D, 0, 182, 44, 52, 40, false},
+        {"7", 0x24, 0, 5, 89, 52, 40, false},    {"8", 0x25, 0, 64, 89, 52, 40, false},
+        {"9", 0x26, 0, 123, 89, 52, 40, false},  {"+", 0x2E, 0x02, 182, 89, 52, 85, false},
+        {"4", 0x21, 0, 5, 134, 52, 40, false},   {"5", 0x22, 0, 64, 134, 52, 40, false},
+        {"6", 0x23, 0, 123, 134, 52, 40, false}, {"1", 0x1E, 0, 5, 179, 52, 40, false},
+        {"2", 0x1F, 0, 64, 179, 52, 40, false},  {"3", 0x20, 0, 123, 179, 52, 40, false},
+        {"ENT", 0x28, 0, 182, 179, 52, 85, false}, {"0", 0x27, 0, 5, 224, 111, 40, false},
+        {".", 0x37, 0, 123, 224, 52, 40, false},
+        {MATERIAL_SYMBOLS_KEYBOARD_ARROW_LEFT, 0x50, 0, 5, 269, 52, 40, true},
+        {MATERIAL_SYMBOLS_KEYBOARD_ARROW_UP, 0x52, 0, 64, 269, 52, 40, true},
+        {MATERIAL_SYMBOLS_KEYBOARD_ARROW_DOWN, 0x51, 0, 123, 269, 52, 40, true},
+        {MATERIAL_SYMBOLS_KEYBOARD_ARROW_RIGHT, 0x4F, 0, 182, 269, 52, 40, true},
+    };
+
+    keyboard_label_count_ = 0;
+    numpad_label_count_ = 0;
+    numpad_icon_label_count_ = 0;
+    auto build_keyboard = [&](lv_obj_t* panel, const KeyDef* keys, int count, bool numpad) {
+        for (int i = 0; i < count; ++i) {
+            const KeyDef& def = keys[i];
+            const bool is_mode = !numpad && (def.code == 0xFD || def.code == 0xFE || def.code == 0xFF);
+            const bool is_primary = !numpad && def.code == 0x28;
+            const bool is_numpad_op =
+                numpad && (def.code == 0x38 || def.code == 0x2D ||
+                           (def.code == 0x25 && def.mods == 0x02) || (def.code == 0x2E && def.mods == 0x02));
+            lv_obj_t* key = lv_button_create(panel);
+            lv_obj_set_size(key, def.w, def.h);
+            lv_obj_set_pos(key, def.x, def.y);
+            lv_obj_set_style_radius(key, numpad ? 10 : 6, 0);
+            lv_obj_set_style_bg_opa(key, LV_OPA_TRANSP, 0);
+            lv_obj_set_style_border_width(key, 1, 0);
+            lv_obj_set_style_border_color(key, (is_mode || is_primary || is_numpad_op)
+                                                   ? lv_color_hex(kDarkTeal)
+                                                   : lvgl_theme->text_color(),
+                                           0);
+            lv_obj_set_style_shadow_width(key, 0, 0);
+            lv_obj_set_style_pad_all(key, 0, 0);
+            lv_obj_set_style_bg_opa(key, LV_OPA_20, LV_STATE_PRESSED);
+            lv_obj_set_style_bg_color(key, lvgl_theme->text_color(), LV_STATE_PRESSED);
+            if (is_primary) {
+                lv_obj_set_style_bg_opa(key, LV_OPA_COVER, 0);
+                lv_obj_set_style_bg_color(key, lv_color_hex(kDarkTeal), 0);
+                lv_obj_set_style_bg_opa(key, LV_OPA_COVER, LV_STATE_PRESSED);
+                lv_obj_set_style_bg_color(key, lv_color_hex(kDarkTealDeep), LV_STATE_PRESSED);
+            }
+            lv_obj_set_user_data(
+                key, reinterpret_cast<void*>(static_cast<uintptr_t>(def.mods) << 8 | def.code));
+            if (def.code == 0xFF) {
+                kb_shift_btn_ = key;
+            }
+            lv_obj_add_event_cb(key, &LcdDisplay::OnKeyboardKeyClicked, LV_EVENT_PRESSED, this);
+            lv_obj_t* label = lv_label_create(key);
+            if (def.icon) {
+                lv_obj_set_style_text_font(label, large_icon_font, 0);
+                lv_obj_set_style_text_color(label, lvgl_theme->text_color(), 0);
+                if (numpad && numpad_icon_label_count_ < 4) {
+                    numpad_icon_labels_[numpad_icon_label_count_++] = label;
+                }
+            } else {
+                lv_color_t label_color = lvgl_theme->text_color();
+                if (is_primary) {
+                    label_color = lv_color_hex(kDarkTealInk);
+                } else if (is_mode || is_numpad_op) {
+                    label_color = lv_color_hex(kDarkTeal);
+                }
+                lv_obj_set_style_text_font(label, text_font, 0);
+                lv_obj_set_style_text_color(label, label_color, 0);
+                if (numpad) {
+                    if (numpad_label_count_ < 20) {
+                        numpad_labels_[numpad_label_count_++] = label;
+                    }
+                } else if (keyboard_label_count_ < 42) {
+                    keyboard_labels_[keyboard_label_count_++] = label;
+                }
+            }
+            lv_label_set_text(label, def.label);
+            lv_obj_center(label);
+        }
+    };
+
+    keyboard_panel_ = lv_obj_create(media_screen_);
+    lv_obj_set_size(keyboard_panel_, LV_HOR_RES, LV_VER_RES);
+    lv_obj_set_pos(keyboard_panel_, 0, 0);
+    lv_obj_set_style_bg_opa(keyboard_panel_, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(keyboard_panel_, 0, 0);
+    lv_obj_set_style_pad_all(keyboard_panel_, 0, 0);
+    lv_obj_remove_flag(keyboard_panel_, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_remove_flag(keyboard_panel_, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_flag(keyboard_panel_, LV_OBJ_FLAG_HIDDEN);
+    build_keyboard(keyboard_panel_, kFullKeys, sizeof(kFullKeys) / sizeof(kFullKeys[0]), false);
+
+    numpad_panel_ = lv_obj_create(media_screen_);
+    lv_obj_set_size(numpad_panel_, LV_HOR_RES, LV_VER_RES);
+    lv_obj_set_pos(numpad_panel_, 0, 0);
+    lv_obj_set_style_bg_opa(numpad_panel_, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(numpad_panel_, 0, 0);
+    lv_obj_set_style_pad_all(numpad_panel_, 0, 0);
+    lv_obj_remove_flag(numpad_panel_, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_remove_flag(numpad_panel_, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_flag(numpad_panel_, LV_OBJ_FLAG_HIDDEN);
+    build_keyboard(numpad_panel_, kNumpadKeys, sizeof(kNumpadKeys) / sizeof(kNumpadKeys[0]), true);
+    lv_obj_move_to_index(keyboard_panel_, 0);
+    lv_obj_move_to_index(numpad_panel_, 0);
+
+    lv_obj_add_flag(media_title_, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(media_title_, &LcdDisplay::OnMediaPanelCycle, LV_EVENT_CLICKED, this);
+
     media_repeat_timer_ = lv_timer_create(&LcdDisplay::MediaRepeatTimerCb, 60, this);
     lv_timer_pause(media_repeat_timer_);
     media_feedback_timer_ = lv_timer_create(&LcdDisplay::MediaFeedbackTimerCb, 900, this);
@@ -2046,18 +2202,56 @@ void LcdDisplay::SetupUI() {
         lv_label_set_text(label, text);
         return label;
     };
+    auto make_card = [](lv_obj_t* parent, lv_coord_t x, lv_coord_t y, lv_coord_t w,
+                        lv_coord_t h) {
+        lv_obj_t* card = lv_obj_create(parent);
+        lv_obj_set_pos(card, x, y);
+        lv_obj_set_size(card, w, h);
+        lv_obj_set_style_radius(card, 12, 0);
+        lv_obj_set_style_bg_color(card, lv_color_hex(kDarkCard), 0);
+        lv_obj_set_style_bg_opa(card, LV_OPA_COVER, 0);
+        lv_obj_set_style_border_width(card, 1, 0);
+        lv_obj_set_style_border_color(card, lv_color_hex(kDarkCardBorder), 0);
+        lv_obj_set_style_pad_all(card, 0, 0);
+        lv_obj_set_style_shadow_width(card, 0, 0);
+        lv_obj_remove_flag(card, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_set_scrollbar_mode(card, LV_SCROLLBAR_MODE_OFF);
+        return card;
+    };
+    auto make_divider = [](lv_obj_t* parent, lv_coord_t x, lv_coord_t y, lv_coord_t w) {
+        lv_obj_t* divider = lv_obj_create(parent);
+        lv_obj_set_pos(divider, x, y);
+        lv_obj_set_size(divider, w, 1);
+        lv_obj_set_style_bg_color(divider, lv_color_hex(kDarkDivider), 0);
+        lv_obj_set_style_bg_opa(divider, LV_OPA_COVER, 0);
+        lv_obj_set_style_border_width(divider, 0, 0);
+        lv_obj_set_style_radius(divider, 0, 0);
+        lv_obj_set_style_pad_all(divider, 0, 0);
+        lv_obj_remove_flag(divider, LV_OBJ_FLAG_SCROLLABLE);
+        return divider;
+    };
+    auto make_icon = [this, icon_font](lv_obj_t* parent, lv_coord_t x, lv_coord_t y,
+                                       const char* glyph, uint32_t color) {
+        lv_obj_t* label = lv_label_create(parent);
+        lv_obj_set_style_text_font(label, icon_font, 0);
+        lv_obj_set_style_text_color(label, lv_color_hex(color), 0);
+        lv_label_set_text(label, glyph);
+        lv_obj_set_pos(label, x, y);
+        settings_icon_labels_.push_back(label);
+        return label;
+    };
     auto make_adjust_button = [this, lvgl_theme](lv_obj_t* parent, lv_coord_t x, lv_coord_t y,
                                                  const char* text, lv_event_cb_t cb) {
         lv_obj_t* btn = lv_button_create(parent);
-        lv_obj_set_size(btn, 40, 36);
+        lv_obj_set_size(btn, 34, 34);
         lv_obj_set_pos(btn, x, y);
         lv_obj_set_style_radius(btn, 8, 0);
-        lv_obj_set_style_bg_color(btn, lv_color_hex(0x2A2A34), 0);
+        lv_obj_set_style_bg_color(btn, lv_color_hex(kDarkCardControl), 0);
         lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
         lv_obj_set_style_border_width(btn, 0, 0);
         lv_obj_set_style_shadow_width(btn, 0, 0);
         lv_obj_set_style_pad_all(btn, 0, 0);
-        lv_obj_set_ext_click_area(btn, 8);
+        lv_obj_set_ext_click_area(btn, 2);
         lv_obj_add_event_cb(btn, cb, LV_EVENT_PRESSED, this);
         lv_obj_t* label = lv_label_create(btn);
         lv_obj_set_style_text_font(label, lvgl_theme->text_font()->font(), 0);
@@ -2066,18 +2260,18 @@ void LcdDisplay::SetupUI() {
         lv_obj_center(label);
         return label;
     };
-    auto make_wide_button = [this, lvgl_theme](lv_obj_t* parent, lv_coord_t x, lv_coord_t y,
-                                               lv_coord_t w, const char* text, lv_event_cb_t cb) {
+    auto make_small_button = [this, lvgl_theme](lv_obj_t* parent, lv_coord_t x, lv_coord_t y,
+                                                lv_coord_t w, const char* text,
+                                                lv_event_cb_t cb) {
         lv_obj_t* btn = lv_button_create(parent);
-        lv_obj_set_size(btn, w, 36);
+        lv_obj_set_size(btn, w, 30);
         lv_obj_set_pos(btn, x, y);
         lv_obj_set_style_radius(btn, 8, 0);
-        lv_obj_set_style_bg_color(btn, lv_color_hex(0x2A2A34), 0);
+        lv_obj_set_style_bg_color(btn, lv_color_hex(kDarkCardControl), 0);
         lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
         lv_obj_set_style_border_width(btn, 0, 0);
         lv_obj_set_style_shadow_width(btn, 0, 0);
         lv_obj_set_style_pad_all(btn, 0, 0);
-        lv_obj_set_ext_click_area(btn, 8);
         lv_obj_add_event_cb(btn, cb, LV_EVENT_PRESSED, this);
         lv_obj_t* label = lv_label_create(btn);
         lv_obj_set_style_text_font(label, lvgl_theme->text_font()->font(), 0);
@@ -2086,77 +2280,132 @@ void LcdDisplay::SetupUI() {
         lv_obj_center(label);
         return label;
     };
+    auto make_outline_button = [this, lvgl_theme](lv_obj_t* parent, lv_coord_t x, lv_coord_t y,
+                                                  lv_coord_t w, lv_coord_t h, const char* text,
+                                                  lv_event_cb_t cb) {
+        lv_obj_t* btn = lv_button_create(parent);
+        lv_obj_set_size(btn, w, h);
+        lv_obj_set_pos(btn, x, y);
+        lv_obj_set_style_radius(btn, 8, 0);
+        lv_obj_set_style_bg_opa(btn, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_border_width(btn, 1, 0);
+        lv_obj_set_style_border_color(btn, lv_color_hex(kDarkTeal), 0);
+        lv_obj_set_style_shadow_width(btn, 0, 0);
+        lv_obj_set_style_pad_all(btn, 0, 0);
+        lv_obj_add_event_cb(btn, cb, LV_EVENT_PRESSED, this);
+        lv_obj_t* label = lv_label_create(btn);
+        lv_obj_set_style_text_font(label, lvgl_theme->text_font()->font(), 0);
+        lv_obj_set_style_text_color(label, lv_color_hex(kDarkTeal), 0);
+        lv_label_set_text(label, text);
+        lv_obj_center(label);
+        return label;
+    };
 
-    // Volume
-    settings_volume_label_ = make_text_label(settings_screen_, "音量");
-    lv_obj_set_pos(settings_volume_label_, 12, 44);
-    settings_volume_value_ = make_text_label(settings_screen_, "70");
-    lv_obj_set_width(settings_volume_value_, 52);
+    /* Sound and display card */
+    lv_obj_t* settings_sound_card = make_card(settings_screen_, 8, 42, 224, 120);
+    make_divider(settings_sound_card, 10, 40, 204);
+    make_divider(settings_sound_card, 10, 80, 204);
+
+    settings_volume_label_ = make_text_label(settings_sound_card, "音量");
+    lv_obj_set_pos(settings_volume_label_, 34, 10);
+    settings_volume_value_ = make_text_label(settings_sound_card, "70%");
+    lv_obj_set_width(settings_volume_value_, 44);
     lv_obj_set_style_text_align(settings_volume_value_, LV_TEXT_ALIGN_RIGHT, 0);
-    lv_obj_set_pos(settings_volume_value_, 64, 44);
-    settings_vol_minus_icon_ =
-        make_adjust_button(settings_screen_, 122, 38, "-", &LcdDisplay::OnVolumeDownClicked);
-    settings_vol_plus_icon_ =
-        make_adjust_button(settings_screen_, 170, 38, "+", &LcdDisplay::OnVolumeUpClicked);
+    lv_obj_set_pos(settings_volume_value_, 94, 10);
+    make_icon(settings_sound_card, 10, 11, MATERIAL_SYMBOLS_VOLUME_UP, kDarkTeal);
+    settings_vol_minus_icon_ = make_adjust_button(settings_sound_card, 142, 3, "-",
+                                                  &LcdDisplay::OnVolumeDownClicked);
+    settings_vol_plus_icon_ = make_adjust_button(settings_sound_card, 180, 3, "+",
+                                                 &LcdDisplay::OnVolumeUpClicked);
 
-    // Brightness
-    settings_bright_label_ = make_text_label(settings_screen_, "亮度");
-    lv_obj_set_pos(settings_bright_label_, 12, 84);
-    settings_bright_value_ = make_text_label(settings_screen_, "100");
-    lv_obj_set_width(settings_bright_value_, 52);
+    settings_bright_label_ = make_text_label(settings_sound_card, "亮度");
+    lv_obj_set_pos(settings_bright_label_, 34, 50);
+    settings_bright_value_ = make_text_label(settings_sound_card, "100%");
+    lv_obj_set_width(settings_bright_value_, 44);
     lv_obj_set_style_text_align(settings_bright_value_, LV_TEXT_ALIGN_RIGHT, 0);
-    lv_obj_set_pos(settings_bright_value_, 64, 84);
-    settings_bright_minus_icon_ =
-        make_adjust_button(settings_screen_, 122, 78, "-", &LcdDisplay::OnBrightnessDownClicked);
-    settings_bright_plus_icon_ =
-        make_adjust_button(settings_screen_, 170, 78, "+", &LcdDisplay::OnBrightnessUpClicked);
+    lv_obj_set_pos(settings_bright_value_, 94, 50);
+    make_icon(settings_sound_card, 10, 51, MATERIAL_SYMBOLS_BRIGHTNESS_6, kDarkOrange);
+    settings_bright_minus_icon_ = make_adjust_button(settings_sound_card, 142, 43, "-",
+                                                     &LcdDisplay::OnBrightnessDownClicked);
+    settings_bright_plus_icon_ = make_adjust_button(settings_sound_card, 180, 43, "+",
+                                                    &LcdDisplay::OnBrightnessUpClicked);
 
-    // Microphone gain (ES8311 ADC gain, 0..36 dB in 6 dB steps)
-    settings_mic_label_ = make_text_label(settings_screen_, "麦克风");
-    lv_obj_set_pos(settings_mic_label_, 12, 124);
-    settings_mic_value_ = make_text_label(settings_screen_, "30");
-    lv_obj_set_width(settings_mic_value_, 52);
+    settings_mic_label_ = make_text_label(settings_sound_card, "麦克风");
+    lv_obj_set_pos(settings_mic_label_, 34, 90);
+    settings_mic_value_ = make_text_label(settings_sound_card, "30dB");
+    lv_obj_set_width(settings_mic_value_, 44);
     lv_obj_set_style_text_align(settings_mic_value_, LV_TEXT_ALIGN_RIGHT, 0);
-    lv_obj_set_pos(settings_mic_value_, 64, 124);
-    settings_mic_minus_icon_ =
-        make_adjust_button(settings_screen_, 122, 118, "-", &LcdDisplay::OnMicGainDownClicked);
-    settings_mic_plus_icon_ =
-        make_adjust_button(settings_screen_, 170, 118, "+", &LcdDisplay::OnMicGainUpClicked);
+    lv_obj_set_pos(settings_mic_value_, 94, 90);
+    make_icon(settings_sound_card, 10, 91, MATERIAL_SYMBOLS_MIC, kDarkPurple);
+    settings_mic_minus_icon_ = make_adjust_button(settings_sound_card, 142, 83, "-",
+                                                  &LcdDisplay::OnMicGainDownClicked);
+    settings_mic_plus_icon_ = make_adjust_button(settings_sound_card, 180, 83, "+",
+                                                 &LcdDisplay::OnMicGainUpClicked);
 
-    // WiFi
-    settings_wifi_label_ = make_text_label(settings_screen_, "WiFi");
-    lv_obj_set_pos(settings_wifi_label_, 12, 164);
-    settings_wifi_status_ = make_text_label(settings_screen_, "");
-    lv_obj_set_width(settings_wifi_status_, 100);
-    lv_obj_set_style_text_align(settings_wifi_status_, LV_TEXT_ALIGN_LEFT, 0);
-    lv_obj_set_pos(settings_wifi_status_, 58, 164);
-    settings_wifi_btn_label_ =
-        make_wide_button(settings_screen_, 166, 158, 62, "配网", &LcdDisplay::OnWifiConfigClicked);
+    /* Connection card */
+    lv_obj_t* settings_conn_card = make_card(settings_screen_, 8, 168, 224, 106);
+    make_divider(settings_conn_card, 10, 64, 204);
 
-    // IP (read-only; the file transfer entry lives in the drawer)
-    settings_ip_label_ = make_text_label(settings_screen_, "IP");
-    lv_obj_set_pos(settings_ip_label_, 12, 204);
-    settings_ip_value_ = make_text_label(settings_screen_, "--");
-    lv_obj_set_width(settings_ip_value_, 176);
-    lv_obj_set_style_text_align(settings_ip_value_, LV_TEXT_ALIGN_LEFT, 0);
+    make_icon(settings_conn_card, 10, 23, MATERIAL_SYMBOLS_WIFI, kDarkBlue);
+    settings_wifi_dot_ = lv_obj_create(settings_conn_card);
+    lv_obj_set_size(settings_wifi_dot_, 8, 8);
+    lv_obj_set_pos(settings_wifi_dot_, 34, 10);
+    lv_obj_set_style_radius(settings_wifi_dot_, 4, 0);
+    lv_obj_set_style_bg_color(settings_wifi_dot_, lv_color_hex(kDarkGood), 0);
+    lv_obj_set_style_bg_opa(settings_wifi_dot_, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(settings_wifi_dot_, 0, 0);
+    lv_obj_set_style_pad_all(settings_wifi_dot_, 0, 0);
+    lv_obj_remove_flag(settings_wifi_dot_, LV_OBJ_FLAG_SCROLLABLE);
+
+    settings_wifi_label_ = make_text_label(settings_conn_card, "WiFi");
+    lv_obj_set_pos(settings_wifi_label_, 48, 4);
+    settings_wifi_status_ = make_text_label(settings_conn_card, "已连接");
+    lv_obj_set_width(settings_wifi_status_, 76);
+    lv_obj_set_style_text_color(settings_wifi_status_, lv_color_hex(kDarkMuted), 0);
+    lv_obj_set_pos(settings_wifi_status_, 86, 4);
+    settings_wifi_ssid_ = make_text_label(settings_conn_card, "--");
+    lv_obj_set_width(settings_wifi_ssid_, 128);
+    lv_label_set_long_mode(settings_wifi_ssid_, LV_LABEL_LONG_DOT);
+    lv_obj_set_style_text_color(settings_wifi_ssid_, lv_color_hex(kDarkMuted), 0);
+    lv_obj_set_pos(settings_wifi_ssid_, 34, 24);
+    settings_ip_value_ = make_text_label(settings_conn_card, "--");
+    lv_obj_set_width(settings_ip_value_, 128);
     lv_label_set_long_mode(settings_ip_value_, LV_LABEL_LONG_DOT);
-    lv_obj_set_pos(settings_ip_value_, 52, 204);
+    lv_obj_set_style_text_color(settings_ip_value_, lv_color_hex(kDarkMuted), 0);
+    lv_obj_set_pos(settings_ip_value_, 34, 44);
+    settings_wifi_btn_label_ = make_outline_button(
+        settings_conn_card, 164, 9, 50, 30, "配网", &LcdDisplay::OnWifiConfigClicked);
 
-    // Bluetooth
-    settings_bt_label_ = make_text_label(settings_screen_, "蓝牙");
-    lv_obj_set_pos(settings_bt_label_, 12, 244);
-    settings_bt_status_ = make_text_label(settings_screen_, "");
-    lv_obj_set_width(settings_bt_status_, 66);
-    lv_obj_set_style_text_align(settings_bt_status_, LV_TEXT_ALIGN_LEFT, 0);
-    lv_obj_set_pos(settings_bt_status_, 58, 244);
-    settings_bt_disconnect_label_ = make_wide_button(settings_screen_, 126, 238, 50, "断开",
-                                                     &LcdDisplay::OnSettingsBtDisconnectClicked);
-    settings_bt_forget_label_ = make_wide_button(settings_screen_, 182, 238, 46, "清空",
-                                                 &LcdDisplay::OnSettingsBtForgetClicked);
+    make_icon(settings_conn_card, 10, 76, MATERIAL_SYMBOLS_BLUETOOTH, kDarkPurple);
+    settings_bt_label_ = make_text_label(settings_conn_card, "蓝牙");
+    lv_obj_set_width(settings_bt_label_, 40);
+    lv_obj_set_pos(settings_bt_label_, 34, 74);
+    settings_bt_status_ = make_text_label(settings_conn_card, "未连接");
+    lv_obj_set_width(settings_bt_status_, 54);
+    lv_obj_set_style_text_color(settings_bt_status_, lv_color_hex(kDarkMuted), 0);
+    lv_obj_set_pos(settings_bt_status_, 80, 74);
+    settings_bt_disconnect_label_ = make_small_button(
+        settings_conn_card, 136, 70, 38, "断开", &LcdDisplay::OnSettingsBtDisconnectClicked);
+    settings_bt_forget_label_ = make_small_button(
+        settings_conn_card, 176, 70, 38, "清空", &LcdDisplay::OnSettingsBtForgetClicked);
 
-    // Reboot
-    settings_reboot_label_ =
-        make_wide_button(settings_screen_, 60, 284, 120, "重启设备", &LcdDisplay::OnRebootClicked);
+    /* Reboot */
+    lv_obj_t* settings_reboot = lv_button_create(settings_screen_);
+    lv_obj_set_size(settings_reboot, 224, 34);
+    lv_obj_set_pos(settings_reboot, 8, 280);
+    lv_obj_set_style_radius(settings_reboot, 10, 0);
+    lv_obj_set_style_bg_color(settings_reboot, lv_color_hex(0x17151A), 0);
+    lv_obj_set_style_bg_opa(settings_reboot, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(settings_reboot, 1, 0);
+    lv_obj_set_style_border_color(settings_reboot, lv_color_hex(kDarkDanger), 0);
+    lv_obj_set_style_border_opa(settings_reboot, LV_OPA_60, 0);
+    lv_obj_set_style_shadow_width(settings_reboot, 0, 0);
+    lv_obj_set_style_pad_all(settings_reboot, 0, 0);
+    lv_obj_add_event_cb(settings_reboot, &LcdDisplay::OnRebootClicked, LV_EVENT_PRESSED, this);
+    make_icon(settings_reboot, 69, 9, MATERIAL_SYMBOLS_POWER_SETTINGS_NEW, kDarkDanger);
+    settings_reboot_label_ = make_text_label(settings_reboot, "重启设备");
+    lv_obj_set_style_text_color(settings_reboot_label_, lv_color_hex(kDarkDanger), 0);
+    lv_obj_set_pos(settings_reboot_label_, 91, 7);
 
 #if CONFIG_WEB_FILE_SERVER
     /* File transfer screen: URL, run state, free space and upload progress */
@@ -2189,54 +2438,37 @@ void LcdDisplay::SetupUI() {
     file_title_label_ = lv_label_create(file_service_screen_);
     lv_obj_set_style_text_font(file_title_label_, text_font, 0);
     lv_obj_set_style_text_color(file_title_label_, lvgl_theme->text_color(), 0);
-    lv_label_set_text(file_title_label_, "文件传输");
+    lv_label_set_text(file_title_label_, "网络");
     lv_obj_align(file_title_label_, LV_ALIGN_TOP_MID, 0, 10);
 
-    file_url_label_ = lv_label_create(file_service_screen_);
-    lv_obj_set_style_text_font(file_url_label_, text_font, 0);
-    lv_obj_set_style_text_color(file_url_label_, lv_color_hex(0x5B8CFF), 0);
-    lv_obj_set_width(file_url_label_, 224);
-    lv_obj_set_style_text_align(file_url_label_, LV_TEXT_ALIGN_CENTER, 0);
-    lv_label_set_long_mode(file_url_label_, LV_LABEL_LONG_DOT);
-    lv_label_set_text(file_url_label_, "http://--");
-    lv_obj_align(file_url_label_, LV_ALIGN_TOP_MID, 0, 48);
-
-    file_hint_label_ = lv_label_create(file_service_screen_);
-    lv_obj_set_style_text_font(file_hint_label_, text_font, 0);
-    lv_obj_set_style_text_color(file_hint_label_, lv_color_hex(0x9A9AA6), 0);
-    lv_obj_set_width(file_hint_label_, 224);
-    lv_obj_set_style_text_align(file_hint_label_, LV_TEXT_ALIGN_CENTER, 0);
-    lv_label_set_text(file_hint_label_, "浏览器打开此地址");
-    lv_obj_align(file_hint_label_, LV_ALIGN_TOP_MID, 0, 78);
-
-    file_status_dot_ = lv_obj_create(file_service_screen_);
-    lv_obj_set_size(file_status_dot_, 10, 10);
-    lv_obj_set_style_radius(file_status_dot_, 5, 0);
-    lv_obj_set_style_bg_color(file_status_dot_, lv_color_hex(0x777777), 0);
+    /* File service card */
+    lv_obj_t* file_service_card = make_card(file_service_screen_, 8, 42, 224, 78);
+    file_status_dot_ = lv_obj_create(file_service_card);
+    lv_obj_set_size(file_status_dot_, 8, 8);
+    lv_obj_set_pos(file_status_dot_, 10, 14);
+    lv_obj_set_style_radius(file_status_dot_, 4, 0);
+    lv_obj_set_style_bg_color(file_status_dot_, lv_color_hex(kDarkDim), 0);
     lv_obj_set_style_bg_opa(file_status_dot_, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(file_status_dot_, 0, 0);
     lv_obj_set_style_pad_all(file_status_dot_, 0, 0);
     lv_obj_remove_flag(file_status_dot_, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_pos(file_status_dot_, 20, 118);
 
-    file_status_label_ = lv_label_create(file_service_screen_);
-    lv_obj_set_style_text_font(file_status_label_, text_font, 0);
-    lv_obj_set_style_text_color(file_status_label_, lv_color_hex(0x9A9AA6), 0);
-    lv_obj_set_width(file_status_label_, 116);
-    lv_label_set_long_mode(file_status_label_, LV_LABEL_LONG_DOT);
-    lv_label_set_text(file_status_label_, "等待网络");
-    lv_obj_set_pos(file_status_label_, 38, 112);
+    file_service_name_label_ = make_text_label(file_service_card, "文件服务");
+    lv_obj_set_pos(file_service_name_label_, 24, 8);
+    file_status_label_ = make_text_label(file_service_card, "等待网络");
+    lv_obj_set_width(file_status_label_, 64);
+    lv_obj_set_style_text_color(file_status_label_, lv_color_hex(kDarkMuted), 0);
+    lv_obj_set_pos(file_status_label_, 94, 8);
 
-    lv_obj_t* file_toggle = lv_button_create(file_service_screen_);
-    lv_obj_set_size(file_toggle, 62, 32);
-    lv_obj_set_pos(file_toggle, 166, 112);
+    lv_obj_t* file_toggle = lv_button_create(file_service_card);
+    lv_obj_set_size(file_toggle, 52, 28);
+    lv_obj_set_pos(file_toggle, 162, 4);
     lv_obj_set_style_radius(file_toggle, 8, 0);
-    lv_obj_set_style_bg_color(file_toggle, lv_color_hex(0x2A2A34), 0);
+    lv_obj_set_style_bg_color(file_toggle, lv_color_hex(kDarkCardControl), 0);
     lv_obj_set_style_bg_opa(file_toggle, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(file_toggle, 0, 0);
     lv_obj_set_style_shadow_width(file_toggle, 0, 0);
     lv_obj_set_style_pad_all(file_toggle, 0, 0);
-    lv_obj_set_ext_click_area(file_toggle, 8);
     lv_obj_add_event_cb(file_toggle, &LcdDisplay::OnFileServiceToggleClicked, LV_EVENT_PRESSED, this);
     file_toggle_label_ = lv_label_create(file_toggle);
     lv_obj_set_style_text_font(file_toggle_label_, text_font, 0);
@@ -2244,54 +2476,99 @@ void LcdDisplay::SetupUI() {
     lv_label_set_text(file_toggle_label_, "启动");
     lv_obj_center(file_toggle_label_);
 
-    file_storage_label_ = lv_label_create(file_service_screen_);
-    lv_obj_set_style_text_font(file_storage_label_, text_font, 0);
-    lv_obj_set_style_text_color(file_storage_label_, lv_color_hex(0x9A9AA6), 0);
-    lv_obj_set_width(file_storage_label_, 224);
-    lv_obj_set_style_text_align(file_storage_label_, LV_TEXT_ALIGN_CENTER, 0);
-    lv_label_set_text(file_storage_label_, "SD --");
-    lv_obj_align(file_storage_label_, LV_ALIGN_TOP_MID, 0, 156);
+    file_url_label_ = make_text_label(file_service_card, "http://--");
+    lv_obj_set_style_text_color(file_url_label_, lv_color_hex(0x5B8CFF), 0);
+    lv_obj_set_width(file_url_label_, 204);
+    lv_obj_set_style_text_align(file_url_label_, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_long_mode(file_url_label_, LV_LABEL_LONG_DOT);
+    lv_obj_set_pos(file_url_label_, 10, 36);
 
-    lv_obj_t* file_divider = lv_obj_create(file_service_screen_);
-    lv_obj_set_size(file_divider, 216, 1);
-    lv_obj_set_pos(file_divider, 12, 188);
-    lv_obj_set_style_bg_color(file_divider, lv_color_hex(0x2A2A34), 0);
-    lv_obj_set_style_bg_opa(file_divider, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_width(file_divider, 0, 0);
-    lv_obj_set_style_radius(file_divider, 0, 0);
-    lv_obj_set_style_pad_all(file_divider, 0, 0);
-    lv_obj_remove_flag(file_divider, LV_OBJ_FLAG_SCROLLABLE);
+    file_hint_label_ = make_text_label(file_service_card, "浏览器打开 · 仅同一 Wi-Fi");
+    lv_obj_set_style_text_color(file_hint_label_, lv_color_hex(kDarkMuted), 0);
+    lv_obj_set_width(file_hint_label_, 204);
+    lv_obj_set_style_text_align(file_hint_label_, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_long_mode(file_hint_label_, LV_LABEL_LONG_DOT);
+    lv_obj_set_pos(file_hint_label_, 10, 56);
 
-    file_activity_label_ = lv_label_create(file_service_screen_);
-    lv_obj_set_style_text_font(file_activity_label_, text_font, 0);
-    lv_obj_set_style_text_color(file_activity_label_, lvgl_theme->text_color(), 0);
-    lv_obj_set_width(file_activity_label_, 216);
+    /* WiFi card */
+    lv_obj_t* file_wifi_card = make_card(file_service_screen_, 8, 126, 224, 50);
+    lv_obj_t* file_wifi_icon = lv_label_create(file_wifi_card);
+    lv_obj_set_style_text_font(file_wifi_icon, icon_font, 0);
+    lv_obj_set_style_text_color(file_wifi_icon, lv_color_hex(kDarkBlue), 0);
+    lv_label_set_text(file_wifi_icon, MATERIAL_SYMBOLS_WIFI);
+    lv_obj_set_pos(file_wifi_icon, 10, 16);
+    file_icon_labels_.push_back(file_wifi_icon);
+
+    file_wifi_label_ = make_text_label(file_wifi_card, "--");
+    lv_obj_set_width(file_wifi_label_, 160);
+    lv_label_set_long_mode(file_wifi_label_, LV_LABEL_LONG_DOT);
+    lv_obj_set_pos(file_wifi_label_, 36, 4);
+    file_ip_label_ = make_text_label(file_wifi_card, "--");
+    lv_obj_set_width(file_ip_label_, 160);
+    lv_obj_set_style_text_color(file_ip_label_, lv_color_hex(kDarkMuted), 0);
+    lv_label_set_long_mode(file_ip_label_, LV_LABEL_LONG_DOT);
+    lv_obj_set_pos(file_ip_label_, 36, 24);
+
+    file_wifi_dot_ = lv_obj_create(file_wifi_card);
+    lv_obj_set_size(file_wifi_dot_, 8, 8);
+    lv_obj_set_pos(file_wifi_dot_, 206, 21);
+    lv_obj_set_style_radius(file_wifi_dot_, 4, 0);
+    lv_obj_set_style_bg_color(file_wifi_dot_, lv_color_hex(kDarkGood), 0);
+    lv_obj_set_style_bg_opa(file_wifi_dot_, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(file_wifi_dot_, 0, 0);
+    lv_obj_set_style_pad_all(file_wifi_dot_, 0, 0);
+    lv_obj_remove_flag(file_wifi_dot_, LV_OBJ_FLAG_SCROLLABLE);
+
+    /* SD storage card */
+    lv_obj_t* file_storage_card = make_card(file_service_screen_, 8, 182, 224, 56);
+    file_storage_title_label_ = make_text_label(file_storage_card, "SD 卡");
+    lv_obj_set_pos(file_storage_title_label_, 10, 8);
+    file_storage_label_ = make_text_label(file_storage_card, "--");
+    lv_obj_set_width(file_storage_label_, 160);
+    lv_obj_set_style_text_align(file_storage_label_, LV_TEXT_ALIGN_RIGHT, 0);
+    lv_obj_set_style_text_color(file_storage_label_, lv_color_hex(kDarkMuted), 0);
+    lv_label_set_long_mode(file_storage_label_, LV_LABEL_LONG_DOT);
+    lv_obj_set_pos(file_storage_label_, 54, 8);
+
+    file_storage_bar_ = lv_bar_create(file_storage_card);
+    lv_obj_set_size(file_storage_bar_, 204, 6);
+    lv_obj_set_pos(file_storage_bar_, 10, 38);
+    lv_bar_set_range(file_storage_bar_, 0, 100);
+    lv_obj_set_style_bg_color(file_storage_bar_, lv_color_hex(kDarkCardControl), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(file_storage_bar_, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_radius(file_storage_bar_, 3, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(file_storage_bar_, lv_color_hex(kDarkTeal), LV_PART_INDICATOR);
+    lv_obj_set_style_bg_opa(file_storage_bar_, LV_OPA_COVER, LV_PART_INDICATOR);
+    lv_obj_set_style_radius(file_storage_bar_, 3, LV_PART_INDICATOR);
+
+    /* Transfer card */
+    lv_obj_t* file_transfer_card = make_card(file_service_screen_, 8, 244, 224, 50);
+    file_activity_label_ = make_text_label(file_transfer_card, "等待文件");
+    lv_obj_set_width(file_activity_label_, 118);
     lv_label_set_long_mode(file_activity_label_, LV_LABEL_LONG_DOT);
-    lv_label_set_text(file_activity_label_, "");
-    lv_obj_set_pos(file_activity_label_, 12, 196);
-    lv_obj_add_flag(file_activity_label_, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_set_pos(file_activity_label_, 10, 8);
+    file_transfer_state_label_ = make_text_label(file_transfer_card, "等待上传");
+    lv_obj_set_width(file_transfer_state_label_, 78);
+    lv_obj_set_style_text_align(file_transfer_state_label_, LV_TEXT_ALIGN_RIGHT, 0);
+    lv_obj_set_style_text_color(file_transfer_state_label_, lv_color_hex(kDarkMuted), 0);
+    lv_obj_set_pos(file_transfer_state_label_, 136, 8);
 
-    file_progress_bar_ = lv_bar_create(file_service_screen_);
-    lv_obj_set_size(file_progress_bar_, 200, 8);
-    lv_obj_set_pos(file_progress_bar_, 20, 224);
+    file_progress_bar_ = lv_bar_create(file_transfer_card);
+    lv_obj_set_size(file_progress_bar_, 204, 6);
+    lv_obj_set_pos(file_progress_bar_, 10, 36);
     lv_bar_set_range(file_progress_bar_, 0, 100);
-    lv_obj_set_style_bg_color(file_progress_bar_, lv_color_hex(0x2A2A34), LV_PART_MAIN);
-    lv_obj_set_style_bg_grad_color(file_progress_bar_, lv_color_hex(0x2A2A34), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(file_progress_bar_, lv_color_hex(kDarkCardControl), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(file_progress_bar_, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_radius(file_progress_bar_, 4, LV_PART_MAIN);
+    lv_obj_set_style_radius(file_progress_bar_, 3, LV_PART_MAIN);
     lv_obj_set_style_bg_color(file_progress_bar_, lv_color_hex(0x5B8CFF), LV_PART_INDICATOR);
-    lv_obj_set_style_bg_grad_color(file_progress_bar_, lv_color_hex(0x5B8CFF), LV_PART_INDICATOR);
     lv_obj_set_style_bg_opa(file_progress_bar_, LV_OPA_COVER, LV_PART_INDICATOR);
-    lv_obj_set_style_radius(file_progress_bar_, 4, LV_PART_INDICATOR);
-    lv_obj_add_flag(file_progress_bar_, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_set_style_radius(file_progress_bar_, 3, LV_PART_INDICATOR);
 
-    file_foot_label_ = lv_label_create(file_service_screen_);
-    lv_obj_set_style_text_font(file_foot_label_, text_font, 0);
-    lv_obj_set_style_text_color(file_foot_label_, lv_color_hex(0x8A8A96), 0);
+    file_foot_label_ = make_text_label(file_service_screen_, "同一 Wi-Fi · 删除不可恢复");
+    lv_obj_set_style_text_color(file_foot_label_, lv_color_hex(kDarkDim), 0);
     lv_obj_set_width(file_foot_label_, 224);
     lv_obj_set_style_text_align(file_foot_label_, LV_TEXT_ALIGN_CENTER, 0);
-    lv_label_set_text(file_foot_label_, "仅限同一 Wi-Fi 局域网\n删除后不可恢复");
-    lv_obj_align(file_foot_label_, LV_ALIGN_BOTTOM_MID, 0, -12);
+    lv_obj_set_pos(file_foot_label_, 8, 300);
 #endif
 
     /* 功能抽屉：底部点状把手展开的全屏彩色图标宫格。 */
@@ -2737,9 +3014,11 @@ void LcdDisplay::ApplyChatLayout() {
         }
         font = text_font->font();
     }
+    const lv_font_t* large_icon_font =
+        lvgl_theme->large_icon_font() != nullptr ? lvgl_theme->large_icon_font()->font() : nullptr;
     RebindStrokeFonts(
         font, lvgl_theme->icon_font() != nullptr ? lvgl_theme->icon_font()->font() : nullptr,
-        lvgl_theme->large_icon_font() != nullptr ? lvgl_theme->large_icon_font()->font() : nullptr);
+        large_icon_font);
     RebindSettingsFonts(
         font, lvgl_theme->icon_font() != nullptr ? lvgl_theme->icon_font()->font() : nullptr,
         lvgl_theme->large_icon_font() != nullptr ? lvgl_theme->large_icon_font()->font() : nullptr);
@@ -2835,6 +3114,39 @@ void LcdDisplay::ApplyChatLayout() {
             lv_obj_set_style_text_color(label, lvgl_theme->text_color(), 0);
         }
     }
+    auto keyboard_label_color = [&](lv_obj_t* label, bool numpad) {
+        lv_obj_t* key = lv_obj_get_parent(label);
+        const uintptr_t encoded =
+            reinterpret_cast<uintptr_t>(lv_obj_get_user_data(key));
+        const uint8_t code = static_cast<uint8_t>(encoded & 0xFF);
+        const uint8_t mods = static_cast<uint8_t>((encoded >> 8) & 0xFF);
+        if (!numpad) {
+            if (code == 0x28) {
+                return lv_color_hex(kDarkTealInk);
+            }
+            if (code == 0xFD || code == 0xFE || code == 0xFF) {
+                return lv_color_hex(kDarkTeal);
+            }
+        } else if (code == 0x38 || code == 0x2D ||
+                   (code == 0x25 && mods == 0x02) || (code == 0x2E && mods == 0x02)) {
+            return lv_color_hex(kDarkTeal);
+        }
+        return lvgl_theme->text_color();
+    };
+    for (int i = 0; i < keyboard_label_count_; ++i) {
+        lv_obj_set_style_text_font(keyboard_labels_[i], font, 0);
+        lv_obj_set_style_text_color(keyboard_labels_[i], keyboard_label_color(keyboard_labels_[i], false), 0);
+    }
+    for (int i = 0; i < numpad_label_count_; ++i) {
+        lv_obj_set_style_text_font(numpad_labels_[i], font, 0);
+        lv_obj_set_style_text_color(numpad_labels_[i], keyboard_label_color(numpad_labels_[i], true), 0);
+    }
+    if (large_icon_font != nullptr) {
+        for (int i = 0; i < numpad_icon_label_count_; ++i) {
+            lv_obj_set_style_text_font(numpad_icon_labels_[i], large_icon_font, 0);
+            lv_obj_set_style_text_color(numpad_icon_labels_[i], lv_color_hex(kDarkTeal), 0);
+        }
+    }
     lv_obj_set_style_text_line_space(chat_message_label_, chat_line_space, 0);
     lv_obj_set_width(chat_message_label_, chat_w);
 
@@ -2895,39 +3207,52 @@ void LcdDisplay::ShowSettingsScreen(bool show) {
 void LcdDisplay::UpdateSettingsValues() {
     auto* codec = Board::GetInstance().GetAudioCodec();
     if (codec != nullptr && settings_volume_value_ != nullptr) {
-        lv_label_set_text_fmt(settings_volume_value_, "%d", codec->output_volume());
+        lv_label_set_text_fmt(settings_volume_value_, "%d%%", codec->output_volume());
     }
     auto* backlight = Board::GetInstance().GetBacklight();
     if (backlight != nullptr && settings_bright_value_ != nullptr) {
-        lv_label_set_text_fmt(settings_bright_value_, "%d", backlight->brightness());
+        lv_label_set_text_fmt(settings_bright_value_, "%d%%", backlight->brightness());
     }
     if (codec != nullptr && settings_mic_value_ != nullptr) {
-        lv_label_set_text_fmt(settings_mic_value_, "%d", static_cast<int>(codec->input_gain()));
+        lv_label_set_text_fmt(settings_mic_value_, "%ddB",
+                              static_cast<int>(codec->input_gain()));
     }
+    auto& wifi = WifiManager::GetInstance();
+    const bool wifi_connected = wifi.IsConnected();
     if (settings_wifi_status_ != nullptr) {
-        auto& wifi = WifiManager::GetInstance();
-        if (wifi.IsConnected()) {
-            lv_label_set_text(settings_wifi_status_, wifi.GetSsid().c_str());
+        if (wifi_connected) {
+            lv_label_set_text(settings_wifi_status_, "已连接");
         } else if (wifi.IsConfigMode()) {
             lv_label_set_text(settings_wifi_status_, "配网模式");
         } else {
             lv_label_set_text(settings_wifi_status_, "未连接");
         }
     }
+    if (settings_wifi_ssid_ != nullptr) {
+        if (wifi_connected) {
+            lv_label_set_text(settings_wifi_ssid_, wifi.GetSsid().c_str());
+            lv_obj_set_style_text_color(settings_wifi_ssid_, lv_color_hex(kDarkMuted), 0);
+        } else {
+            lv_label_set_text(settings_wifi_ssid_, "--");
+            lv_obj_set_style_text_color(settings_wifi_ssid_, lv_color_hex(kDarkDim), 0);
+        }
+    }
+    if (settings_wifi_dot_ != nullptr) {
+        lv_obj_set_style_bg_color(settings_wifi_dot_,
+                                  lv_color_hex(wifi_connected ? kDarkGood : kDarkDim), 0);
+    }
     if (settings_bt_status_ != nullptr) {
         lv_label_set_text(settings_bt_status_,
                           MediaBle::GetInstance().IsConnected() ? "已连接" : "未连接");
     }
     if (settings_ip_value_ != nullptr) {
-        auto& wifi = WifiManager::GetInstance();
-        const std::string ip = wifi.IsConnected() ? wifi.GetIpAddress() : std::string();
+        const std::string ip = wifi_connected ? wifi.GetIpAddress() : std::string();
         if (ip.empty()) {
             lv_label_set_text(settings_ip_value_, "--");
-            lv_obj_set_style_text_color(settings_ip_value_, lv_color_hex(0x8A8A96), 0);
+            lv_obj_set_style_text_color(settings_ip_value_, lv_color_hex(kDarkDim), 0);
         } else {
             lv_label_set_text(settings_ip_value_, ip.c_str());
-            lv_obj_set_style_text_color(settings_ip_value_,
-                                        static_cast<LvglTheme*>(current_theme_)->text_color(), 0);
+            lv_obj_set_style_text_color(settings_ip_value_, lv_color_hex(kDarkMuted), 0);
         }
     }
 }
@@ -2941,11 +3266,15 @@ void LcdDisplay::ShowFileServiceScreen(bool show) {
     if (show) {
         UpdateFileServiceValues();
         if (file_activity_label_ != nullptr) {
-            lv_obj_add_flag(file_activity_label_, LV_OBJ_FLAG_HIDDEN);
+            lv_label_set_text(file_activity_label_, "等待文件");
+            lv_obj_set_style_text_color(file_activity_label_, lv_color_hex(0xFFFFFF), 0);
+        }
+        if (file_transfer_state_label_ != nullptr) {
+            lv_label_set_text(file_transfer_state_label_, "等待上传");
+            lv_obj_set_style_text_color(file_transfer_state_label_, lv_color_hex(kDarkMuted), 0);
         }
         if (file_progress_bar_ != nullptr) {
             lv_bar_set_value(file_progress_bar_, 0, LV_ANIM_OFF);
-            lv_obj_add_flag(file_progress_bar_, LV_OBJ_FLAG_HIDDEN);
         }
         lv_obj_remove_flag(file_service_screen_, LV_OBJ_FLAG_HIDDEN);
         lv_obj_move_foreground(file_service_screen_);
@@ -2966,17 +3295,31 @@ void LcdDisplay::UpdateFileServiceValues() {
     const bool online = wifi.IsConnected();
     const std::string url = server.Url();
     if (file_url_label_ != nullptr) {
-        lv_label_set_text(file_url_label_, url.empty() ? (online ? "服务已停止" : "未联网") : url.c_str());
+        lv_label_set_text(file_url_label_,
+                          url.empty() ? (online ? "服务已停止" : "未联网") : url.c_str());
     }
     if (file_status_dot_ != nullptr) {
-        lv_obj_set_style_bg_color(file_status_dot_, lv_color_hex(running ? 0x4CD964 : 0x777777), 0);
+        lv_obj_set_style_bg_color(file_status_dot_,
+                                  lv_color_hex(running ? kDarkGood : kDarkDim), 0);
     }
     if (file_status_label_ != nullptr) {
         lv_label_set_text(file_status_label_,
-                          running ? "服务运行中" : (online ? "服务已停止" : "等待网络"));
+                          running ? "运行中" : (online ? "已停止" : "等待网络"));
     }
     if (file_toggle_label_ != nullptr) {
         lv_label_set_text(file_toggle_label_, running ? "停止" : "启动");
+    }
+    if (file_wifi_label_ != nullptr) {
+        const std::string ssid = online ? wifi.GetSsid() : std::string();
+        lv_label_set_text(file_wifi_label_, ssid.empty() ? "--" : ssid.c_str());
+    }
+    if (file_ip_label_ != nullptr) {
+        const std::string ip = online ? wifi.GetIpAddress() : std::string();
+        lv_label_set_text(file_ip_label_, ip.empty() ? "--" : ip.c_str());
+    }
+    if (file_wifi_dot_ != nullptr) {
+        lv_obj_set_style_bg_color(file_wifi_dot_,
+                                  lv_color_hex(online ? kDarkGood : kDarkDim), 0);
     }
     if (file_storage_label_ != nullptr) {
         uint64_t total_bytes = 0;
@@ -2985,11 +3328,22 @@ void LcdDisplay::UpdateFileServiceValues() {
         if (esp_vfs_fat_info("/sdcard", &total_bytes, &free_bytes) == ESP_OK &&
             total_bytes > 0) {
             const double gb = 1024.0 * 1024 * 1024;
-            snprintf(text, sizeof(text), "SD %.1f / %.1f GB 可用",
+            snprintf(text, sizeof(text), "%.1f / %.1f GB 可用",
                      static_cast<double>(free_bytes) / gb, static_cast<double>(total_bytes) / gb);
             lv_label_set_text(file_storage_label_, text);
+            lv_obj_set_style_text_color(file_storage_label_, lv_color_hex(kDarkMuted), 0);
+            if (file_storage_bar_ != nullptr) {
+                const uint64_t used_bytes = total_bytes - free_bytes;
+                const int percent =
+                    static_cast<int>((used_bytes * 100) / total_bytes);
+                lv_bar_set_value(file_storage_bar_, percent, LV_ANIM_OFF);
+            }
         } else {
             lv_label_set_text(file_storage_label_, "未插入 SD 卡");
+            lv_obj_set_style_text_color(file_storage_label_, lv_color_hex(kDarkDim), 0);
+            if (file_storage_bar_ != nullptr) {
+                lv_bar_set_value(file_storage_bar_, 0, LV_ANIM_OFF);
+            }
         }
     }
 #endif
@@ -3000,27 +3354,27 @@ void LcdDisplay::UpdateFileTransferActivity(const std::string& name, int percent
     if (file_activity_label_ == nullptr) {
         return;
     }
-    char text[192];
-    if (error) {
-        snprintf(text, sizeof(text), "传输失败: %s", name.c_str());
-    } else if (done) {
-        snprintf(text, sizeof(text), "已保存: %s", name.c_str());
-    } else if (percent >= 0) {
-        snprintf(text, sizeof(text), "%s  %d%%", name.c_str(), percent);
-    } else {
-        snprintf(text, sizeof(text), "%s", name.c_str());
+    lv_label_set_text(file_activity_label_, name.empty() ? "等待文件" : name.c_str());
+    lv_obj_set_style_text_color(file_activity_label_, lv_color_hex(0xFFFFFF), 0);
+    if (file_transfer_state_label_ != nullptr) {
+        char state[32];
+        uint32_t color = kDarkMuted;
+        if (error) {
+            snprintf(state, sizeof(state), "传输失败");
+            color = kDarkDanger;
+        } else if (done) {
+            snprintf(state, sizeof(state), "已保存");
+            color = kDarkGood;
+        } else if (percent >= 0) {
+            snprintf(state, sizeof(state), "上传中 %d%%", percent);
+        } else {
+            snprintf(state, sizeof(state), "等待上传");
+        }
+        lv_label_set_text(file_transfer_state_label_, state);
+        lv_obj_set_style_text_color(file_transfer_state_label_, lv_color_hex(color), 0);
     }
-    lv_label_set_text(file_activity_label_, text);
-    lv_obj_remove_flag(file_activity_label_, LV_OBJ_FLAG_HIDDEN);
     if (file_progress_bar_ != nullptr) {
         const int value = error ? 0 : (done ? 100 : (percent > 0 ? percent : 0));
-        if (!error && !done && value == 0) {
-            // Nothing received yet: keep the bar hidden instead of showing an
-            // empty indicator sliver.
-            lv_obj_add_flag(file_progress_bar_, LV_OBJ_FLAG_HIDDEN);
-            return;
-        }
-        lv_obj_remove_flag(file_progress_bar_, LV_OBJ_FLAG_HIDDEN);
         lv_bar_set_value(file_progress_bar_, value, LV_ANIM_OFF);
     }
 }
@@ -3042,6 +3396,17 @@ void LcdDisplay::OnFileServiceToggleClicked(lv_event_t* e) {
     auto& server = WebFileServer::GetInstance();
     if (server.IsRunning()) {
         server.Stop();
+        if (self->file_activity_label_ != nullptr) {
+            lv_label_set_text(self->file_activity_label_, "等待文件");
+        }
+        if (self->file_transfer_state_label_ != nullptr) {
+            lv_label_set_text(self->file_transfer_state_label_, "等待上传");
+            lv_obj_set_style_text_color(self->file_transfer_state_label_,
+                                        lv_color_hex(kDarkMuted), 0);
+        }
+        if (self->file_progress_bar_ != nullptr) {
+            lv_bar_set_value(self->file_progress_bar_, 0, LV_ANIM_OFF);
+        }
     } else {
         server.Start();
     }
@@ -3073,6 +3438,7 @@ void LcdDisplay::RebindSettingsFonts(const lv_font_t* text_font, const lv_font_t
                                settings_mic_value_,
                                settings_wifi_label_,
                                settings_wifi_status_,
+                               settings_wifi_ssid_,
                                settings_bt_label_,
                                settings_bt_status_,
                                settings_vol_minus_icon_,
@@ -3088,12 +3454,17 @@ void LcdDisplay::RebindSettingsFonts(const lv_font_t* text_font, const lv_font_t
                                settings_ip_label_,
                                settings_ip_value_,
                                file_title_label_,
+                               file_service_name_label_,
                                file_url_label_,
                                file_hint_label_,
                                file_status_label_,
                                file_toggle_label_,
+                               file_wifi_label_,
+                               file_ip_label_,
+                               file_storage_title_label_,
                                file_storage_label_,
                                file_activity_label_,
+                               file_transfer_state_label_,
                                file_foot_label_,
                                drawer_title_,
                                drawer_hint_};
@@ -3112,6 +3483,16 @@ void LcdDisplay::RebindSettingsFonts(const lv_font_t* text_font, const lv_font_t
     }
     lv_obj_t* icon_labels[] = {settings_back_icon_, drawer_back_icon_, file_back_icon_};
     for (lv_obj_t* label : icon_labels) {
+        if (label != nullptr && icon_font != nullptr) {
+            lv_obj_set_style_text_font(label, icon_font, 0);
+        }
+    }
+    for (lv_obj_t* label : settings_icon_labels_) {
+        if (label != nullptr && icon_font != nullptr) {
+            lv_obj_set_style_text_font(label, icon_font, 0);
+        }
+    }
+    for (lv_obj_t* label : file_icon_labels_) {
         if (label != nullptr && icon_font != nullptr) {
             lv_obj_set_style_text_font(label, icon_font, 0);
         }
@@ -3904,6 +4285,7 @@ void LcdDisplay::ShowMediaScreen(bool show) {
             ShowEnglishScreen(false);
         }
         ShowEnglishSetup(false);
+        SetMediaPanel(0);
         lv_obj_remove_flag(media_screen_, LV_OBJ_FLAG_HIDDEN);
         lv_obj_move_foreground(media_screen_);
     } else {
@@ -5125,6 +5507,112 @@ static const MediaShortcut kShortcuts[10] = {
     {"粘贴", 0x08, 0x19},  // Cmd+V
 };
 
+void LcdDisplay::UpdateMediaPanelTitle() {
+    if (media_title_ == nullptr) {
+        return;
+    }
+    const char* title = media_panel_ == 0   ? "媒 体"
+                        : media_panel_ == 1 ? "全键盘"
+                                            : "数字键";
+    lv_label_set_text(media_title_, title);
+}
+
+void LcdDisplay::SetMediaPanel(int panel) {
+    media_panel_ = ((panel % 3) + 3) % 3;
+    for (int i = 0; i < 16; ++i) {
+        if (media_keys_[i] == nullptr) {
+            continue;
+        }
+        if (media_panel_ == 0) {
+            lv_obj_remove_flag(media_keys_[i], LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(media_keys_[i], LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+    if (keyboard_panel_ != nullptr) {
+        if (media_panel_ == 1) {
+            lv_obj_remove_flag(keyboard_panel_, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(keyboard_panel_, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+    if (numpad_panel_ != nullptr) {
+        if (media_panel_ == 2) {
+            lv_obj_remove_flag(numpad_panel_, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(numpad_panel_, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+    if (media_feedback_timer_ != nullptr) {
+        lv_timer_pause(media_feedback_timer_);
+    }
+    UpdateMediaPanelTitle();
+}
+
+void LcdDisplay::OnMediaPanelCycle(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self != nullptr) {
+        self->SetMediaPanel(self->media_panel_ + 1);
+    }
+}
+
+void LcdDisplay::OnKeyboardKeyClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self == nullptr) {
+        return;
+    }
+    lv_obj_t* target = lv_event_get_target_obj(e);
+    if (target == nullptr) {
+        return;
+    }
+    const uintptr_t encoded = reinterpret_cast<uintptr_t>(lv_obj_get_user_data(target));
+    const uint8_t code = static_cast<uint8_t>(encoded & 0xFF);
+    const uint8_t base_mods = static_cast<uint8_t>((encoded >> 8) & 0xFF);
+    if (code == 0xFD) {  // 123: switch to the numeric panel
+        self->SetMediaPanel(2);
+        return;
+    }
+    if (code == 0xFE) {  // Ctrl+Space: switch input language
+        const bool sent = MediaBle::GetInstance().SendShortcut(0x01, 0x2C);
+        self->ShowMediaFeedback(sent ? "中英切换" : "蓝牙未连接");
+        return;
+    }
+    if (code == 0xFF) {  // shift / caps toggle
+        self->shift_active_ = !self->shift_active_;
+        if (self->kb_shift_btn_ != nullptr) {
+            lv_obj_set_style_bg_opa(self->kb_shift_btn_,
+                                    self->shift_active_ ? LV_OPA_30 : LV_OPA_TRANSP, 0);
+            if (self->media_title_ != nullptr) {
+                lv_obj_set_style_bg_color(
+                    self->kb_shift_btn_, lv_obj_get_style_text_color(self->media_title_, LV_PART_MAIN), 0);
+            }
+        }
+        self->ShowMediaFeedback(self->shift_active_ ? "大写" : "小写");
+        return;
+    }
+    const bool shiftable =
+        self->media_panel_ == 1 &&
+        ((code >= 0x04 && code <= 0x1D) || (code >= 0x2D && code <= 0x38));
+    const uint8_t modifiers =
+        static_cast<uint8_t>(base_mods | ((self->shift_active_ && shiftable) ? 0x02 : 0));
+    const bool sent = MediaBle::GetInstance().SendShortcut(modifiers, code);
+    const char* hint = nullptr;
+    switch (code) {
+        case 0x50: hint = "左"; break;
+        case 0x52: hint = "上"; break;
+        case 0x51: hint = "下"; break;
+        case 0x4F: hint = "右"; break;
+        default: break;
+    }
+    if (hint == nullptr) {
+        lv_obj_t* label = lv_obj_get_child(target, 0);
+        if (label != nullptr) {
+            hint = lv_label_get_text(label);
+        }
+    }
+    self->ShowMediaFeedback(sent ? (hint != nullptr ? hint : "已发送") : "蓝牙未连接");
+}
+
 void LcdDisplay::ShowMediaFeedback(const char* text) {
     if (media_title_ == nullptr) {
         return;
@@ -5138,8 +5626,8 @@ void LcdDisplay::ShowMediaFeedback(const char* text) {
 
 void LcdDisplay::MediaFeedbackTimerCb(lv_timer_t* timer) {
     auto* self = static_cast<LcdDisplay*>(lv_timer_get_user_data(timer));
-    if (self != nullptr && self->media_title_ != nullptr) {
-        lv_label_set_text(self->media_title_, "媒 体");
+    if (self != nullptr) {
+        self->UpdateMediaPanelTitle();
     }
     lv_timer_pause(timer);
 }
