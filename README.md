@@ -3,16 +3,20 @@
 > **本项目是基于上游 xiaozhi-esp32 的定制版本（分支 `avatar-5line`）**
 >
 > 主要改动：竖屏 240×320 白色程序化圆脸（眨眼/视线/表情/睡眠）、6 行分页聊天、
-> BLE HID 媒体键 + 10 个 macOS 快捷键、设置页（音量/亮度/WiFi/蓝牙/重启）、
-> TF 卡笔顺学习（9470 字，语音"写一下学字"）。
+> BLE HID 三面板键盘（媒体/全键盘/数字键）+ 10 个 macOS 快捷键、卡片式设置页与网络页、
+> Wi-Fi 网页传文件、TF 卡笔顺学习（9470 字）与英语听写。
 >
+> **注意：2026-10-22 起 16MB 板改用 6MB app + 4MB assets 分区；首次从旧版升级需 USB 迁移分区，不能只 OTA。**
+>
+> - 2026-10-22 版本说明：[docs/custom/release-20261022.md](docs/custom/release-20261022.md)
 > - 定制说明与复盘：[docs/custom/lessons-20261020.md](docs/custom/lessons-20261020.md)
 > - 笔顺数据生成：[tools/stroke-pipeline/README.md](tools/stroke-pipeline/README.md)
 > - 网页传文件（Wi-Fi 管理 SD 卡）：[docs/web-file-transfer.md](docs/web-file-transfer.md)
 > - 界面预览：[docs/custom/](docs/custom/)
 >
-> **固件下载（两个版本）**：<https://github.com/malongan/xiaozhi-robot/releases>
-> - `custom-final-20261020` 定制版：竖屏 UI + 设置页 + 笔顺学习（含笔顺数据包）
+> **固件下载（定制版 + 官方回退）**：<https://github.com/malongan/xiaozhi-robot/releases>
+> - `custom-final-20261022` 最新定制版：设置/网络卡片 + 三面板键盘 + 6MB OTA 分区
+> - `custom-final-20261021` 上一版：英语词库 v5 + 分类练习
 > - `v2.5.2` 官方版：上游原版，用于对照/回退（含本板构建镜像）
 >
 > 上游与许可证：本项目基于 MIT 协议的 [78/xiaozhi-esp32](https://github.com/78/xiaozhi-esp32)，

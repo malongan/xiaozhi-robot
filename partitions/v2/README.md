@@ -68,8 +68,8 @@ The `assets` partition stores:
 Used by the Freenove ESP32-S3 Display 2.8" board to trade unused assets space for larger OTA slots.
 
 This is a one-time USB migration: the partition table cannot be changed by OTA. Flash the new
-table, otadata, app, and assets once; writing from `0x20000` preserves NVS. See
-[`docs/custom/release-20261022.md`](../../docs/custom/release-20261022.md) for the exact command.
+table, otadata, app, and assets once. The migration command preserves NVS by never writing
+`0x9000`; see [`docs/custom/release-20261022.md`](../../docs/custom/release-20261022.md).
 
 ### 16MB Flash Devices (`16m_c3.csv`) - ESP32-C3 Optimized
 - `nvs`: 16KB
