@@ -19,6 +19,7 @@
                 "CONFIG_BT_NIMBLE_NVS_PERSIST=y",
                 "CONFIG_BT_NIMBLE_MAX_BONDS=3",
                 "CONFIG_WEB_FILE_SERVER=y",
+                "CONFIG_PARTITION_TABLE_CUSTOM_FILENAME=\"partitions/v2/16m_app6m.csv\"",
                 "CONFIG_COMPILER_OPTIMIZATION_PERF=y",
                 "CONFIG_LOG_DEFAULT_LEVEL_WARN=y",
                 "CONFIG_LWIP_TCP_WND_DEFAULT=11520",
