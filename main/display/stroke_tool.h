@@ -74,14 +74,15 @@ private:
     bool LoadIndex();
     bool LoadMediansBlob();
     bool LoadPinyin();
+    bool EnsureMedians() const;  // 首次用到笔顺时才读 medians.bin，缩短启动时间
     const uint8_t* MediansAt(int idx) const;
     void Reset();
 
     bool ready_ = false;
     int char_count_ = 0;
     uint8_t* index_raw_ = nullptr;  // PSRAM：index.bin 全量 41.6KB
-    uint8_t* medians_ = nullptr;    // PSRAM：medians.bin 全量 ~424KB
-    uint32_t medians_size_ = 0;
+    mutable uint8_t* medians_ = nullptr;  // PSRAM：medians.bin 全量，懒加载
+    mutable uint32_t medians_size_ = 0;
     int grade_start_[7] = {-1, -1, -1, -1, -1, -1, -1};
     int grade_end_[7] = {0, 0, 0, 0, 0, 0, 0};
     uint8_t* py_buf_ = nullptr;    // PSRAM：pinyin.json 原文 ~45KB

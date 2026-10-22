@@ -263,6 +263,7 @@ void MediaBle::Start() {
     int rc = nimble_port_init();
     if (rc != ESP_OK) {
         ESP_LOGE(TAG, "nimble_port_init failed: %d", rc);
+        started_ = false;
         return;
     }
 
@@ -283,11 +284,41 @@ void MediaBle::Start() {
     ESP_LOGI(TAG, "BLE HID started (single-report layout v2), advertising as %s", kDeviceName);
 }
 
+void MediaBle::Stop() {
+    if (!started_) {
+        return;
+    }
+    started_ = false;
+
+    if (connected_ && conn_handle_ != 0xFFFF) {
+        ble_gap_terminate(conn_handle_, BLE_ERR_REM_USER_CONN_TERM);
+        vTaskDelay(pdMS_TO_TICKS(30));
+    }
+    connected_ = false;
+    conn_handle_ = 0xFFFF;
+
+    const int stop_rc = nimble_port_stop();
+    if (stop_rc != 0) {
+        ESP_LOGW(TAG, "nimble_port_stop failed: %d", stop_rc);
+    }
+    const esp_err_t deinit_rc = nimble_port_deinit();
+    if (deinit_rc != ESP_OK) {
+        ESP_LOGW(TAG, "nimble_port_deinit failed: %d", deinit_rc);
+    }
+
+    report_val_handle_ = 0;
+    subscribed_handle_ = 0;
+    subscribed_notify_ = false;
+    if (status_callback_) {
+        status_callback_(false);
+    }
+    ESP_LOGI(TAG, "BLE HID stopped, memory released");
+}
+
 void MediaBle::HostTask(void*) {
     nimble_port_run();
     nimble_port_freertos_deinit();
 }
-
 void MediaBle::OnReset(int reason) { ESP_LOGW(TAG, "host reset, reason=%d", reason); }
 
 void MediaBle::OnSync() {

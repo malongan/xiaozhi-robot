@@ -83,16 +83,23 @@ bool StrokeStore::Init() {
         Reset();
         return false;
     }
-    if (!LoadMediansBlob()) {
-        ESP_LOGW(TAG, "medians.bin 加载失败");
-        Reset();
-        return false;
-    }
     if (!LoadPinyin()) {
         ESP_LOGW(TAG, "pinyin.json 解析失败（顶栏拼音不可用）");
     }
     ready_ = true;
-    ESP_LOGI(TAG, "笔顺数据就绪：%d 字，medians %uB", char_count_, medians_size_);
+    ESP_LOGI(TAG, "StrokeStore ready: %d chars (medians lazy)", char_count_);
+    return true;
+}
+
+bool StrokeStore::EnsureMedians() const {
+    if (medians_ != nullptr) {
+        return true;
+    }
+    auto* self = const_cast<StrokeStore*>(this);
+    if (!self->LoadMediansBlob()) {
+        ESP_LOGW(TAG, "medians.bin load failed");
+        return false;
+    }
     return true;
 }
 
@@ -327,6 +334,9 @@ const uint8_t* StrokeStore::MediansAt(int idx) const {
 
 bool StrokeStore::LoadMedians(int idx, std::vector<StrokeMeta>& out) const {
     out.clear();
+    if (!EnsureMedians()) {
+        return false;
+    }
     const uint8_t* base = MediansAt(idx);
     if (base == nullptr) {
         return false;

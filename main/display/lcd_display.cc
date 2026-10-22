@@ -28,6 +28,8 @@ LV_FONT_DECLARE(ui_font_16_4);
 #include <esp_lvgl_port.h>
 #include <esp_psram.h>
 #include <esp_vfs_fat.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 #include <material_symbols.h>
 #include <noto_emoji.h>
 #include <src/misc/cache/lv_cache.h>
@@ -2376,7 +2378,7 @@ void LcdDisplay::SetupUI() {
     settings_wifi_btn_label_ = make_outline_button(
         settings_conn_card, 164, 9, 50, 30, "配网", &LcdDisplay::OnWifiConfigClicked);
 
-    make_icon(settings_conn_card, 10, 76, MATERIAL_SYMBOLS_BLUETOOTH, kDarkPurple);
+    settings_bt_icon_ = make_icon(settings_conn_card, 10, 76, MATERIAL_SYMBOLS_BLUETOOTH, kDarkPurple);
     settings_bt_label_ = make_text_label(settings_conn_card, "蓝牙");
     lv_obj_set_width(settings_bt_label_, 40);
     lv_obj_set_pos(settings_bt_label_, 34, 74);
@@ -2384,10 +2386,27 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_width(settings_bt_status_, 54);
     lv_obj_set_style_text_color(settings_bt_status_, lv_color_hex(kDarkMuted), 0);
     lv_obj_set_pos(settings_bt_status_, 80, 74);
-    settings_bt_disconnect_label_ = make_small_button(
-        settings_conn_card, 136, 70, 38, "断开", &LcdDisplay::OnSettingsBtDisconnectClicked);
     settings_bt_forget_label_ = make_small_button(
-        settings_conn_card, 176, 70, 38, "清空", &LcdDisplay::OnSettingsBtForgetClicked);
+        settings_conn_card, 136, 70, 38, "清空", &LcdDisplay::OnSettingsBtForgetClicked);
+
+    settings_bt_switch_ = lv_switch_create(settings_conn_card);
+    lv_obj_set_size(settings_bt_switch_, 34, 20);
+    lv_obj_set_pos(settings_bt_switch_, 180, 72);
+    lv_obj_set_style_bg_color(settings_bt_switch_, lv_color_hex(kDarkCardControl), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(settings_bt_switch_, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_border_width(settings_bt_switch_, 0, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(settings_bt_switch_, lv_color_hex(kDarkTeal),
+                              static_cast<lv_style_selector_t>(LV_PART_INDICATOR) |
+                                  LV_STATE_CHECKED);
+    lv_obj_set_style_bg_opa(settings_bt_switch_, LV_OPA_COVER,
+                            static_cast<lv_style_selector_t>(LV_PART_INDICATOR) |
+                                LV_STATE_CHECKED);
+    lv_obj_set_style_bg_color(settings_bt_switch_, lv_color_hex(kDarkMuted), LV_PART_KNOB);
+    lv_obj_set_style_bg_color(settings_bt_switch_, lv_color_hex(0xFFFFFF),
+                              static_cast<lv_style_selector_t>(LV_PART_KNOB) | LV_STATE_CHECKED);
+    lv_obj_set_style_pad_all(settings_bt_switch_, 2, LV_PART_KNOB);
+    lv_obj_add_event_cb(settings_bt_switch_, &LcdDisplay::OnSettingsBtToggleClicked,
+                        LV_EVENT_VALUE_CHANGED, this);
 
     /* Reboot */
     lv_obj_t* settings_reboot = lv_button_create(settings_screen_);
@@ -2397,14 +2416,14 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_bg_color(settings_reboot, lv_color_hex(0x17151A), 0);
     lv_obj_set_style_bg_opa(settings_reboot, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(settings_reboot, 1, 0);
-    lv_obj_set_style_border_color(settings_reboot, lv_color_hex(kDarkDanger), 0);
+    lv_obj_set_style_border_color(settings_reboot, lv_color_hex(kDarkDim), 0);
     lv_obj_set_style_border_opa(settings_reboot, LV_OPA_60, 0);
     lv_obj_set_style_shadow_width(settings_reboot, 0, 0);
     lv_obj_set_style_pad_all(settings_reboot, 0, 0);
     lv_obj_add_event_cb(settings_reboot, &LcdDisplay::OnRebootClicked, LV_EVENT_PRESSED, this);
-    make_icon(settings_reboot, 69, 9, MATERIAL_SYMBOLS_POWER_SETTINGS_NEW, kDarkDanger);
+    make_icon(settings_reboot, 69, 9, MATERIAL_SYMBOLS_POWER_SETTINGS_NEW, kDarkMuted);
     settings_reboot_label_ = make_text_label(settings_reboot, "重启设备");
-    lv_obj_set_style_text_color(settings_reboot_label_, lv_color_hex(kDarkDanger), 0);
+    lv_obj_set_style_text_color(settings_reboot_label_, lv_color_hex(kDarkMuted), 0);
     lv_obj_set_pos(settings_reboot_label_, 91, 7);
 
 #if CONFIG_WEB_FILE_SERVER
@@ -2707,7 +2726,13 @@ void LcdDisplay::SetupUI() {
             }
         });
     });
-    MediaBle::GetInstance().Start();
+    {
+        Settings bt_settings("bluetooth", false);
+        bt_user_enabled_ = bt_settings.GetBool("enabled", true);
+    }
+    if (bt_user_enabled_) {
+        MediaBle::GetInstance().Start();
+    }
 
 #if CONFIG_WEB_FILE_SERVER
     // File transfer page mirrors the server state and upload progress.
@@ -3205,6 +3230,8 @@ void LcdDisplay::ShowSettingsScreen(bool show) {
 }
 
 void LcdDisplay::UpdateSettingsValues() {
+    auto* theme = static_cast<LvglTheme*>(GetTheme());
+    const lv_color_t text_color = theme != nullptr ? theme->text_color() : lv_color_hex(0xE8EAF0);
     auto* codec = Board::GetInstance().GetAudioCodec();
     if (codec != nullptr && settings_volume_value_ != nullptr) {
         lv_label_set_text_fmt(settings_volume_value_, "%d%%", codec->output_volume());
@@ -3242,8 +3269,52 @@ void LcdDisplay::UpdateSettingsValues() {
                                   lv_color_hex(wifi_connected ? kDarkGood : kDarkDim), 0);
     }
     if (settings_bt_status_ != nullptr) {
-        lv_label_set_text(settings_bt_status_,
-                          MediaBle::GetInstance().IsConnected() ? "已连接" : "未连接");
+        const bool connected = MediaBle::GetInstance().IsConnected() && bt_user_enabled_;
+        const char* text = "未连接";
+        uint32_t color = kDarkMuted;
+        if (bt_busy_) {
+            text = bt_user_enabled_ ? "正在开启…" : "正在关闭…";
+        } else if (!bt_user_enabled_) {
+            text = "已关闭";
+            color = kDarkDim;
+        } else if (connected) {
+            text = "已连接";
+            color = kDarkGood;
+        }
+        lv_label_set_text(settings_bt_status_, text);
+        lv_obj_set_style_text_color(settings_bt_status_, lv_color_hex(color), 0);
+    }
+    if (settings_bt_icon_ != nullptr) {
+        const bool bt_on = bt_user_enabled_ && !bt_busy_;
+        lv_obj_set_style_text_color(settings_bt_icon_,
+                                    lv_color_hex(bt_on ? kDarkPurple : kDarkDim), 0);
+    }
+    if (settings_bt_label_ != nullptr) {
+        const bool bt_on = bt_user_enabled_ && !bt_busy_;
+        lv_obj_set_style_text_color(settings_bt_label_, bt_on ? text_color : lv_color_hex(kDarkDim),
+                                    0);
+    }
+    if (settings_bt_switch_ != nullptr) {
+        if (bt_user_enabled_) {
+            lv_obj_add_state(settings_bt_switch_, LV_STATE_CHECKED);
+        } else {
+            lv_obj_remove_state(settings_bt_switch_, LV_STATE_CHECKED);
+        }
+        lv_obj_set_style_opa(settings_bt_switch_, bt_busy_ ? LV_OPA_50 : LV_OPA_COVER, 0);
+    }
+    if (settings_bt_forget_label_ != nullptr) {
+        lv_obj_t* btn = lv_obj_get_parent(settings_bt_forget_label_);
+        const bool usable = bt_user_enabled_ && !bt_busy_;
+        lv_obj_set_style_text_color(settings_bt_forget_label_,
+                                    usable ? text_color : lv_color_hex(0x5A6070), 0);
+        if (btn != nullptr) {
+            lv_obj_set_style_bg_color(btn, lv_color_hex(usable ? kDarkCardControl : 0x1B1D26), 0);
+            if (usable) {
+                lv_obj_remove_state(btn, LV_STATE_DISABLED);
+            } else {
+                lv_obj_add_state(btn, LV_STATE_DISABLED);
+            }
+        }
     }
     if (settings_ip_value_ != nullptr) {
         const std::string ip = wifi_connected ? wifi.GetIpAddress() : std::string();
@@ -3448,7 +3519,6 @@ void LcdDisplay::RebindSettingsFonts(const lv_font_t* text_font, const lv_font_t
                                settings_mic_minus_icon_,
                                settings_mic_plus_icon_,
                                settings_wifi_btn_label_,
-                               settings_bt_disconnect_label_,
                                settings_bt_forget_label_,
                                settings_reboot_label_,
                                settings_ip_label_,
@@ -3603,12 +3673,56 @@ void LcdDisplay::OnWifiConfigClicked(lv_event_t* e) {
     wifi_board->EnterWifiConfigMode();
 }
 
-void LcdDisplay::OnSettingsBtDisconnectClicked(lv_event_t* e) {
+void LcdDisplay::OnSettingsBtToggleClicked(lv_event_t* e) {
     auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
-    MediaBle::GetInstance().Disconnect();
-    if (self != nullptr) {
-        self->UpdateSettingsValues();
+    if (self == nullptr || self->bt_busy_) {
+        return;
     }
+    self->bt_user_enabled_ = !self->bt_user_enabled_;
+    self->bt_busy_ = true;
+    Settings settings("bluetooth", true);
+    settings.SetBool("enabled", self->bt_user_enabled_);
+    self->UpdateSettingsValues();
+
+    // BT init spins up code that briefly disables the flash cache, so this task
+    // must run on an internal-RAM stack; a PSRAM stack trips
+    // esp_task_stack_is_sane_cache_disabled().
+    if (xTaskCreate(&LcdDisplay::BtToggleTask, "bt_toggle", 5120, self, 5, nullptr) != pdPASS) {
+        self->bt_user_enabled_ = !self->bt_user_enabled_;
+        self->bt_busy_ = false;
+        settings.SetBool("enabled", self->bt_user_enabled_);
+        self->UpdateSettingsValues();
+        ESP_LOGE(TAG, "failed to spawn bt toggle task");
+    }
+}
+
+void LcdDisplay::BtToggleTask(void* param) {
+    auto* self = static_cast<LcdDisplay*>(param);
+    if (self == nullptr) {
+        vTaskDelete(nullptr);
+        return;
+    }
+    const bool enable = self->bt_user_enabled_;
+    ESP_LOGW(TAG, "bluetooth %s requested, internal free=%u, psram free=%u", enable ? "enable" : "disable",
+             static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)),
+             static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_SPIRAM)));
+    if (enable) {
+        MediaBle::GetInstance().Start();
+    } else {
+        MediaBle::GetInstance().Stop();
+    }
+    ESP_LOGW(TAG, "bluetooth %s done, internal free=%u, psram free=%u", enable ? "enable" : "disable",
+             static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)),
+             static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_SPIRAM)));
+    self->bt_busy_ = false;
+    Application::GetInstance().Schedule([self]() {
+        DisplayLockGuard lock(self);
+        self->UpdateSettingsValues();
+        if (self->bluetooth_screen_visible_) {
+            self->RefreshBluetoothList();
+        }
+    });
+    vTaskDelete(nullptr);
 }
 
 void LcdDisplay::OnSettingsBtForgetClicked(lv_event_t* e) {
@@ -5730,6 +5844,23 @@ void LcdDisplay::RefreshBluetoothList() {
     }
     DisplayLockGuard lock(this);
     auto& ble = MediaBle::GetInstance();
+    if (!bt_user_enabled_ || !ble.IsRunning()) {
+        lv_obj_clean(bt_list_);
+        bt_peer_count_ = 0;
+        for (auto& button : bt_forget_buttons_) {
+            button = nullptr;
+        }
+        if (bt_status_ != nullptr) {
+            lv_label_set_text(bt_status_, bt_busy_ ? "正在关闭…" : "蓝牙已关闭");
+        }
+        if (bt_empty_ != nullptr) {
+            lv_obj_add_flag(bt_empty_, LV_OBJ_FLAG_HIDDEN);
+        }
+        if (bt_disconnect_btn_ != nullptr) {
+            lv_obj_add_flag(bt_disconnect_btn_, LV_OBJ_FLAG_HIDDEN);
+        }
+        return;
+    }
     bt_peer_count_ = ble.GetBondedPeers(bt_peers_, 8);
     MediaBlePeer connected = {};
     const bool has_conn = ble.GetConnectedPeer(&connected);

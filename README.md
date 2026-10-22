@@ -9,7 +9,9 @@
 > **注意：2026-10-22 起 16MB 板改用 6MB app + 4MB assets 分区；首次从旧版升级需 USB 迁移分区，不能只 OTA。**
 >
 > - 2026-10-22 版本说明：[docs/custom/release-20261022.md](docs/custom/release-20261022.md)
+> - 2026-10-22 r2 ???????/???? + ??????[docs/custom/release-20261022-r2.md](docs/custom/release-20261022-r2.md)
 > - 定制说明与复盘：[docs/custom/lessons-20261020.md](docs/custom/lessons-20261020.md)
+> - 内存与启动优化复盘（2026-10-22）：[docs/custom/lessons-20261022-memory.md](docs/custom/lessons-20261022-memory.md)
 > - 笔顺数据生成：[tools/stroke-pipeline/README.md](tools/stroke-pipeline/README.md)
 > - 网页传文件（Wi-Fi 管理 SD 卡）：[docs/web-file-transfer.md](docs/web-file-transfer.md)
 > - 界面预览：[docs/custom/](docs/custom/)

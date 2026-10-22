@@ -206,11 +206,14 @@ protected:
     lv_obj_t* settings_bright_minus_icon_ = nullptr;
     lv_obj_t* settings_bright_plus_icon_ = nullptr;
     lv_obj_t* settings_wifi_btn_label_ = nullptr;
-    lv_obj_t* settings_bt_disconnect_label_ = nullptr;
+    lv_obj_t* settings_bt_icon_ = nullptr;
+    lv_obj_t* settings_bt_switch_ = nullptr;
     lv_obj_t* settings_bt_forget_label_ = nullptr;
     lv_obj_t* settings_reboot_label_ = nullptr;
     std::vector<lv_obj_t*> settings_icon_labels_;
     bool settings_screen_visible_ = false;
+    bool bt_user_enabled_ = true;
+    bool bt_busy_ = false;
 
     // 网络页：文件服务、WiFi、SD 容量与上传进度
     lv_obj_t* file_service_screen_ = nullptr;
@@ -347,7 +350,8 @@ protected:
     static void OnMicGainDownClicked(lv_event_t* e);
     static void OnMicGainUpClicked(lv_event_t* e);
     static void OnWifiConfigClicked(lv_event_t* e);
-    static void OnSettingsBtDisconnectClicked(lv_event_t* e);
+    static void OnSettingsBtToggleClicked(lv_event_t* e);
+    static void BtToggleTask(void* param);
     static void OnSettingsBtForgetClicked(lv_event_t* e);
     static void OnRebootClicked(lv_event_t* e);
     void ShowSettingsScreen(bool show);
