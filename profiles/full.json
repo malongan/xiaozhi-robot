@@ -1,7 +1,8 @@
 {
   "name": "full",
-  "description": "英语听写在内的全部已登记功能包",
+  "description": "全部已登记功能包，等同当前 r3 行为",
   "features": {
-    "english_dictation": true
+    "english_dictation": true,
+    "stroke_order": true
   }
 }

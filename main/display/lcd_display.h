@@ -3,8 +3,8 @@
 
 #include "gif/lvgl_gif.h"
 #include "lvgl_display.h"
+#include "features/stroke_order/stroke_tool.h"
 #include "media_ble.h"
-#include "stroke_tool.h"
 
 #include <esp_lcd_panel_io.h>
 #include <esp_lcd_panel_ops.h>

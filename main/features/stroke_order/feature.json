@@ -1,0 +1,15 @@
+{
+  "id": "stroke_order",
+  "name": "笔顺学习",
+  "description": "TF 卡笔顺数据、汉字笔顺动画页与语音翻字工具",
+  "config": "CONFIG_FEATURE_STROKE_ORDER",
+  "default": true,
+  "depends": [],
+  "sources": [
+    "features/stroke_order/stroke_tool.cc",
+    "features/stroke_order/stroke_order_tools.cc"
+  ],
+  "assets": [
+    "display/font_pinyin.c"
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "name": "stroke",
+  "description": "仅笔顺学习，用于验证功能包隔离",
+  "features": {
+    "english_dictation": false,
+    "stroke_order": true
+  }
+}

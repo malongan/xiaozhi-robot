@@ -16,7 +16,9 @@
 #include "web_file_server.h"
 
 LV_FONT_DECLARE(font_zzz_30);
+#if CONFIG_FEATURE_STROKE_ORDER
 LV_FONT_DECLARE(font_pinyin_20);
+#endif
 LV_FONT_DECLARE(font_english_20);
 LV_FONT_DECLARE(ui_font_16_4);
 
@@ -1722,6 +1724,7 @@ void LcdDisplay::SetupUI() {
     lv_label_set_text(bt_empty_, "尚未配对任何设备\n在电脑/手机蓝牙里\n搜索 Xiaozhi-Media 配对");
     lv_obj_align(bt_empty_, LV_ALIGN_CENTER, 0, 10);
 
+#if CONFIG_FEATURE_STROKE_ORDER
     /* Stroke order screen: TF card data, entry fixed at bottom-right */
     stroke_canvas_buf_ = static_cast<uint8_t*>(heap_caps_malloc(
         kStrokeCanvasSide * kStrokeCanvasSide * 2, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
@@ -1810,6 +1813,11 @@ void LcdDisplay::SetupUI() {
         lv_obj_set_style_text_color(stroke_hint, lv_color_hex(0x8A7357), 0);
         lv_label_set_text(stroke_hint, "轻点左右切换");
         lv_obj_align(stroke_hint, LV_ALIGN_TOP_MID, 0, 250);
+
+        stroke_anim_timer_ = lv_timer_create(&LcdDisplay::StrokeAnimTimerCb, 60, this);
+        lv_timer_pause(stroke_anim_timer_);
+    }
+#endif
 
 #if CONFIG_FEATURE_ENGLISH_DICTATION
         // ---- 英语听写页 ----
@@ -2163,10 +2171,6 @@ void LcdDisplay::SetupUI() {
         lv_label_set_text(english_setup_next_label_, "下一步");
         lv_obj_center(english_setup_next_label_);
 #endif
-
-        stroke_anim_timer_ = lv_timer_create(&LcdDisplay::StrokeAnimTimerCb, 60, this);
-        lv_timer_pause(stroke_anim_timer_);
-    }
 
     /* Settings screen: volume / brightness / WiFi / Bluetooth / reboot */
     settings_screen_ = lv_obj_create(screen);
@@ -2866,13 +2870,14 @@ void LcdDisplay::RepairDanglingFonts(const lv_font_t* text_font, const lv_font_t
                                      const lv_font_t* large_icon_font) {
     // The set of fonts that are still alive after the assets were replaced.
     // Anything else in a label is a pointer into freed memory.
-#if CONFIG_FEATURE_ENGLISH_DICTATION
-    const lv_font_t* live[] = {text_font,    icon_font,       large_icon_font,
-                               &font_zzz_30, &font_pinyin_20, &font_english_20};
-#else
     const lv_font_t* live[] = {text_font, icon_font, large_icon_font, &font_zzz_30,
-                               &font_pinyin_20};
+#if CONFIG_FEATURE_STROKE_ORDER
+                               &font_pinyin_20,
 #endif
+#if CONFIG_FEATURE_ENGLISH_DICTATION
+                               &font_english_20,
+#endif
+    };
     int repaired = 0;
 
     // Walk the whole tree: hidden pages are laid out too, so a label inside a
@@ -3202,6 +3207,8 @@ void LcdDisplay::ApplyChatLayout() {
 
 void LcdDisplay::RebindStrokeFonts(const lv_font_t* text_font, const lv_font_t* icon_font,
                                    const lv_font_t* large_icon_font) {
+#if CONFIG_FEATURE_STROKE_ORDER
+    (void)large_icon_font;
     // The stroke page is built once in SetupUI with the theme fonts of that
     // moment.  When assets reload and the old fonts are freed we must move all
     // of its labels to the new fonts *before* any style change triggers a
@@ -3220,6 +3227,11 @@ void LcdDisplay::RebindStrokeFonts(const lv_font_t* text_font, const lv_font_t* 
     if (stroke_close_icon_ != nullptr && icon_font != nullptr) {
         lv_obj_set_style_text_font(stroke_close_icon_, icon_font, 0);
     }
+#else
+    (void)text_font;
+    (void)icon_font;
+    (void)large_icon_font;
+#endif
 }
 
 void LcdDisplay::ShowSettingsScreen(bool show) {
@@ -4453,6 +4465,8 @@ void LcdDisplay::ShowBluetoothScreen(bool show) {
     UpdateMediaBarVisibility();
 }
 
+#if CONFIG_FEATURE_STROKE_ORDER
+
 /* Stroke order learner */
 
 static const char* const kStrokeGradeCn[] = {"",       "",       "一年级", "二年级",
@@ -4791,6 +4805,8 @@ void LcdDisplay::ShowStrokeScreen(int char_idx) {
     }
     UpdateMediaBarVisibility();
 }
+
+#endif
 
 #if CONFIG_FEATURE_ENGLISH_DICTATION
 // ---- 英语听写页 ----
@@ -5419,6 +5435,8 @@ void LcdDisplay::RebindEnglishFonts(const lv_font_t* text_font, const lv_font_t*
 
 #endif
 
+#if CONFIG_FEATURE_STROKE_ORDER
+
 void LcdDisplay::ShowStrokeScreen(bool show) {
     if (stroke_screen_ == nullptr) {
         return;
@@ -5506,6 +5524,16 @@ void LcdDisplay::OnStrokeNextClicked(lv_event_t* e) {
     }
 }
 
+#else
+
+void LcdDisplay::ShowStrokeScreen(int char_idx) { (void)char_idx; }
+
+void LcdDisplay::ShowStrokeScreen(bool show) { (void)show; }
+
+void LcdDisplay::StrokeChangeChar(int dir) { (void)dir; }
+
+#endif
+
 bool LcdDisplay::DrawerEnglishEnabled() const {
 #if CONFIG_FEATURE_ENGLISH_DICTATION
     return EnglishPlayer::Available();
@@ -5514,7 +5542,13 @@ bool LcdDisplay::DrawerEnglishEnabled() const {
 #endif
 }
 
-bool LcdDisplay::DrawerStrokeEnabled() const { return StrokeStore::GetInstance().Ready(); }
+bool LcdDisplay::DrawerStrokeEnabled() const {
+#if CONFIG_FEATURE_STROKE_ORDER
+    return StrokeStore::GetInstance().Ready();
+#else
+    return false;
+#endif
+}
 
 void LcdDisplay::RefreshDrawerTiles() {
     for (int i = 0; i < kDrawerTileCount; ++i) {
@@ -5587,11 +5621,13 @@ void LcdDisplay::OpenEnglishPage() {
 }
 
 void LcdDisplay::OpenStrokePage() {
+#if CONFIG_FEATURE_STROKE_ORDER
     auto& store = StrokeStore::GetInstance();
     const int idx = stroke_char_idx_ >= 0 ? stroke_char_idx_ : store.GradeStart(1);
     if (store.Ready() && idx >= 0) {
         ShowStrokeScreen(idx);
     }
+#endif
 }
 
 void LcdDisplay::OpenMediaPage() { ShowMediaScreen(true); }

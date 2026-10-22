@@ -17,9 +17,7 @@ set(SOURCES "audio/audio_codec.cc"
             "display/display.cc"
             "display/text_glyph.cc"
             "display/lcd_display.cc"
-            "display/stroke_tool.cc"
             "display/font_zzz.c"
-            "display/font_pinyin.c"
             "display/oled_display.cc"
             "display/lvgl_display/lvgl_display.cc"
             "display/emote_display.cc"
@@ -57,6 +55,14 @@ if(CONFIG_FEATURE_ENGLISH_DICTATION)
         "features/english_dictation/english_tool.cc"
         "features/english_dictation/english_player.cc"
         "features/english_dictation/english_dictation_tools.cc"
+    )
+endif()
+
+if(CONFIG_FEATURE_STROKE_ORDER)
+    list(APPEND SOURCES
+        "display/font_pinyin.c"
+        "features/stroke_order/stroke_tool.cc"
+        "features/stroke_order/stroke_order_tools.cc"
     )
 endif()
 

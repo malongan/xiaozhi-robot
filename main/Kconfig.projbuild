@@ -14,6 +14,14 @@ config FEATURE_ENGLISH_DICTATION
         self.english.* MCP tools. Disable it to build a firmware without the
         English feature pack.
 
+config FEATURE_STROKE_ORDER
+    bool "Enable stroke order learner"
+    default y
+    help
+        Enable the stroke-order learner page, TF-card stroke data store and
+        self.stroke.* MCP tools. Disable it to build a firmware without the
+        stroke order feature pack.
+
 choice
     prompt "Flash Assets"
     default FLASH_DEFAULT_ASSETS if !USE_EMOTE_MESSAGE_STYLE

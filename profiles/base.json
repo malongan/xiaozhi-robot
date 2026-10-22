@@ -1,7 +1,8 @@
 {
   "name": "base",
-  "description": "不含英语听写功能包的最小定制固件",
+  "description": "不含英语听写与笔顺学习的最小定制固件",
   "features": {
-    "english_dictation": false
+    "english_dictation": false,
+    "stroke_order": false
   }
 }
