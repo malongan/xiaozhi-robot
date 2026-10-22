@@ -81,6 +81,15 @@ The build script changes local `sdkconfig` and build state. Do not assume the bu
 - UI/assets changes: verify applicable no-display/OLED/LVGL paths and partition size.
 - Always report what was tested and what still needs physical hardware. A successful build is not hardware validation.
 
+## Feature Packs
+
+- Optional user-visible capabilities live in `main/features/<id>/` behind `CONFIG_FEATURE_<ID>`; do not add another copy under `main/display/` or `main/boards/`.
+- Read `docs/custom/feature-development-guide.md` before adding or splitting a feature pack.
+- A feature-pack change updates its `feature.json`, `README.md`, Kconfig, CMake, every profile, UI guards/stubs, and docs in one patch.
+- Profiles must list every feature explicitly; `full` enables all packs and must preserve existing behavior.
+- Build all six profiles and check symbols on both sides; smoke-test `full` on hardware when behavior changes.
+- Web transfer config was renamed from `CONFIG_WEB_FILE_SERVER*` to `CONFIG_FEATURE_WEB_FILE_TRANSFER*`; regenerate local `sdkconfig`, do not reuse old keys.
+
 ## Authoritative Documentation
 
 - Overview and SDK policy: `README.md`
@@ -88,6 +97,9 @@ The build script changes local `sdkconfig` and build state. Do not assume the bu
 - Audio design: `main/audio/README.md`
 - Code style: `docs/code_style.md`
 - Protocols: `docs/websocket.md`, `docs/mqtt-udp.md`, `docs/mcp-protocol.md`
+- Feature packs and merge workflow: `docs/custom/feature-packs.md`
+- Adding/splitting a feature pack: `docs/custom/feature-development-guide.md`
+- Feature-pack agent rules: `main/features/AGENTS.md`
 - CI matrix: `.github/workflows/build.yml`
 
 Keep detailed or fast-changing information in those files, not here. Add a nested `AGENTS.md` only when a subsystem needs specialized instructions.

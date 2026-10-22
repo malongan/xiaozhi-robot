@@ -1,6 +1,6 @@
 # 网页传文件（Wi-Fi SD 卡管理器）
 
-> 这是 `web_file_transfer` 功能包，构建组合见[功能包与组合构建](feature-packs.md)。
+> 这是 `web_file_transfer` 功能包，构建组合见[功能包与组合构建](custom/feature-packs.md)。
 
 开启后，设备在连上 Wi-Fi 时启动一个极小的 HTTP 服务，用手机或电脑浏览器即可浏览、上传、下载、删除 SD 卡里的文件，无需数据线。
 
@@ -11,6 +11,8 @@
    ```json
    "CONFIG_FEATURE_WEB_FILE_TRANSFER=y"
    ```
+
+   旧配置 `CONFIG_WEB_FILE_SERVER` 已改名；旧的本地 `sdkconfig` 不会自动迁移，请重新生成配置或在 menuconfig 中打开新开关。
 
    或 `idf.py menuconfig` → **Web File Transfer** → *Enable SD card web file transfer*。
 

@@ -2,6 +2,8 @@
 
 定制版开始把可裁剪功能收进 `main/features/<id>/`，由 Kconfig 开关和 profile 决定是否编译。目标是同一套源码按需组合，而不是维护多份固件分支。
 
+> 2026-10-23 功能包拆分已合并到 `main`，合并点 tag 为 `custom-feature-packs-20261023`；`custom-final-20261022-r3` 保持原发布内容不变。
+
 > 新增或拆分功能前先读：[功能包开发指导](feature-development-guide.md)。
 
 ## 当前功能包
@@ -152,6 +154,26 @@ endif()
   }
 }
 ```
+
+## 配置迁移
+
+2026-10-23 将网页传文件开关统一到功能包命名：
+
+| 旧配置 | 新配置 |
+|---|---|
+| `CONFIG_WEB_FILE_SERVER` | `CONFIG_FEATURE_WEB_FILE_TRANSFER` |
+| `CONFIG_WEB_FILE_SERVER_PORT` | `CONFIG_FEATURE_WEB_FILE_TRANSFER_PORT` |
+| `CONFIG_WEB_FILE_SERVER_PIN` | `CONFIG_FEATURE_WEB_FILE_TRANSFER_PIN` |
+
+目标板 `config.json` 已改为新开关。根目录 `sdkconfig` 是本地生成文件、不入库；拉取新代码后请用 `scripts/build.py` 重新生成配置，或用 `idf.py menuconfig` 打开新开关。不要只手工改旧 `sdkconfig` 的键名后继续使用旧构建目录。
+
+## 主线与多处开发
+
+- `github` 是定制仓，`origin` 是上游；功能开发在独立分支进行，验证后合入 `github/main`。
+- `main` 是集成分支，`custom-final-*` tag 对应已发布固件；不要移动或覆盖旧 tag。
+- 合并前至少构建 `base`、`english`、`stroke`、`keyboard`、`web_file_transfer`、`full` 六个 profile，并检查关闭侧无功能符号、开启侧有符号。
+- 只改功能包且 `full` 行为不变时，可以用 fast-forward 合并；涉及核心行为、分区或 NVS 时按发布流程重新做真机验证。
+- 本次功能包合并点使用 tag `custom-feature-packs-20261023`，后续固件发布另建 `custom-final-*` tag 和版本说明。
 
 ## 构建
 

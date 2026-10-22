@@ -57,7 +57,8 @@ config FEATURE_WEB_FILE_TRANSFER
 - 依赖某个子系统时写 `depends on BT_ENABLED` 等，不要假设子系统一定开启。
 - 端口、PIN、路径等参数继续放在同一菜单下，并 `depends on` 主开关。
 - 新功能默认值跟产品策略一致：目标板默认交付的能力可在板级 `config.json` 打开；通用功能不要随意默认 `y`。
-- 重命名旧开关时，同步更新板级 `pins/config.json`、根 `sdkconfig`、代码和文档；旧 `sdkconfig` 不会自动迁移。
+- 重命名旧开关时，同步更新板级 `config.json`、代码和文档；根 `sdkconfig` 是本地生成文件，不入库，旧配置不会自动迁移。合并后要求开发者重新生成配置，或在 menuconfig 中打开新开关。
+- 已发生的迁移：`CONFIG_WEB_FILE_SERVER*` -> `CONFIG_FEATURE_WEB_FILE_TRANSFER*`。新增迁移时在 `docs/custom/feature-packs.md` 的“配置迁移”表登记。
 
 ## 4. CMake
 
