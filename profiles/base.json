@@ -1,9 +1,10 @@
 {
   "name": "base",
-  "description": "不含英语听写、笔顺学习与蓝牙键盘的最小定制固件",
+  "description": "不含英语听写、笔顺学习、蓝牙键盘与网络文件传输的最小定制固件",
   "features": {
     "english_dictation": false,
     "stroke_order": false,
-    "ble_keyboard": false
+    "ble_keyboard": false,
+    "web_file_transfer": false
   }
 }

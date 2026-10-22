@@ -4,6 +4,7 @@
   "features": {
     "english_dictation": false,
     "stroke_order": false,
-    "ble_keyboard": true
+    "ble_keyboard": true,
+    "web_file_transfer": false
   }
 }

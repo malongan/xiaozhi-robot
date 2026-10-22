@@ -18,8 +18,8 @@
 #include <wifi_station.h>
 #include <ssid_manager.h>
 
-#if CONFIG_WEB_FILE_SERVER
-#include "web_file_server.h"
+#if CONFIG_FEATURE_WEB_FILE_TRANSFER
+#include "features/web_file_transfer/web_file_server.h"
 #endif
 #ifdef CONFIG_USE_ESP_BLUFI_WIFI_PROVISIONING
 #include "blufi.h"
@@ -132,7 +132,7 @@ void WifiBoard::OnNetworkEvent(NetworkEvent event, const std::string& data) {
             {
                 auto& wifi_manager = WifiManager::GetInstance();
                 GetDisplay()->SetIpAddress(wifi_manager.GetIpAddress());
-#if CONFIG_WEB_FILE_SERVER
+#if CONFIG_FEATURE_WEB_FILE_TRANSFER
                 WebFileServer::GetInstance().Start();
 #endif
             }
@@ -145,7 +145,7 @@ void WifiBoard::OnNetworkEvent(NetworkEvent event, const std::string& data) {
             break;
         case NetworkEvent::Disconnected:
             ESP_LOGW(TAG, "WiFi disconnected");
-#if CONFIG_WEB_FILE_SERVER
+#if CONFIG_FEATURE_WEB_FILE_TRANSFER
             WebFileServer::GetInstance().Stop();
 #endif
             GetDisplay()->SetIpAddress("");
@@ -153,7 +153,7 @@ void WifiBoard::OnNetworkEvent(NetworkEvent event, const std::string& data) {
         case NetworkEvent::WifiConfigModeEnter:
             ESP_LOGI(TAG, "WiFi config mode entered");
             in_config_mode_ = true;
-#if CONFIG_WEB_FILE_SERVER
+#if CONFIG_FEATURE_WEB_FILE_TRANSFER
             // The provisioning portal owns port 80 while the hotspot is up.
             WebFileServer::GetInstance().Stop();
 #endif

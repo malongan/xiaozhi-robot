@@ -2,6 +2,8 @@
 
 定制版开始把可裁剪功能收进 `main/features/<id>/`，由 Kconfig 开关和 profile 决定是否编译。目标是同一套源码按需组合，而不是维护多份固件分支。
 
+> 新增或拆分功能前先读：[功能包开发指导](feature-development-guide.md)。
+
 ## 当前功能包
 
 | 功能包 | Kconfig | 状态 |
@@ -9,6 +11,7 @@
 | `english_dictation` | `CONFIG_FEATURE_ENGLISH_DICTATION` | MVP，默认开启 |
 | `stroke_order` | `CONFIG_FEATURE_STROKE_ORDER` | MVP，默认开启 |
 | `ble_keyboard` | `CONFIG_FEATURE_BLE_KEYBOARD` | MVP，默认开启，依赖 `BT_ENABLED` |
+| `web_file_transfer` | `CONFIG_FEATURE_WEB_FILE_TRANSFER` | 目标板开启，`full` 启用，依赖 SD 卡与 Wi-Fi |
 
 英语功能包包含：
 
@@ -30,6 +33,13 @@
 - 媒体控制面板、全键盘、数字键盘三个页面
 - macOS 快捷键与设置页蓝牙开关
 - 抽屉“键盘”入口；关闭时入口保留但显示为不可用
+
+网络文件传输功能包包含：
+
+- `web_file_server.*`：HTTP 服务、目录/上传/下载/删除 API、可选 PIN 校验
+- `web_assets/index.html`：管理页面，构建时 gzip 后嵌入固件
+- 网络页、上传进度、服务启停与 Wi-Fi 连接生命周期
+- 抽屉“网络”入口；关闭时入口保留但显示为不可用
 
 ## 目录约定
 
@@ -55,11 +65,19 @@ main/features/ble_keyboard/
 ├── README.md
 ├── media_ble.cc
 └── media_ble.h
+main/features/web_file_transfer/
+├── feature.json
+├── README.md
+├── web_file_server.cc
+├── web_file_server.h
+└── web_assets/
+    └── index.html
 profiles/
 ├── base.json
 ├── english.json
 ├── stroke.json
 ├── keyboard.json
+├── web_file_transfer.json
 └── full.json
 scripts/feature_build.py
 ```
@@ -103,15 +121,25 @@ if(CONFIG_FEATURE_BLE_KEYBOARD)
         "features/ble_keyboard/media_ble.cc"
     )
 endif()
+
+if(CONFIG_FEATURE_WEB_FILE_TRANSFER)
+    list(APPEND SOURCES "features/web_file_transfer/web_file_server.cc")
+    set(WEB_INDEX_HTML
+        "${CMAKE_CURRENT_SOURCE_DIR}/features/web_file_transfer/web_assets/index.html")
+    set(WEB_INDEX_GZ
+        "${CMAKE_CURRENT_BINARY_DIR}/features/web_file_transfer/index.html.gz")
+    # gzip 后加入 WEB_ASSETS，生成 _binary_index_html_gz_* 符号
+endif()
 ```
 
 ## Profile
 
-- `base`：关闭英语听写、笔顺学习和蓝牙键盘，用于最小固件与体积基线。
+- `base`：关闭英语听写、笔顺学习、蓝牙键盘和网络文件传输，用于最小固件与体积基线。
 - `english`：仅英语听写，用于验证功能包隔离。
 - `stroke`：仅笔顺学习，用于验证功能包隔离。
 - `keyboard`：仅蓝牙键盘，用于验证功能包隔离。
-- `full`：全部已登记功能包，保持 r3 的完整功能。
+- `web_file_transfer`：仅网络文件传输，用于验证功能包隔离。
+- `full`：全部已登记功能包，保持当前完整功能。
 
 ```json
 {
@@ -119,7 +147,8 @@ endif()
   "features": {
     "english_dictation": false,
     "stroke_order": false,
-    "ble_keyboard": false
+    "ble_keyboard": false,
+    "web_file_transfer": false
   }
 }
 ```
@@ -146,6 +175,7 @@ python3 scripts/feature_build.py --profile base
 python3 scripts/feature_build.py --profile english
 python3 scripts/feature_build.py --profile stroke
 python3 scripts/feature_build.py --profile keyboard
+python3 scripts/feature_build.py --profile web_file_transfer
 python3 scripts/feature_build.py --profile full
 ```
 
@@ -163,28 +193,32 @@ python3 scripts/feature_build.py --profile base --no-build
 
 | 配置 | xiaozhi.bin | Flash Code | Flash Data | DIRAM |
 |---|---:|---:|---:|---:|
-| `base`（全关） | 3,151,152 B | 2,342,064 B | 684,656 B | 154,043 B |
-| `english`（仅英语） | 3,227,120 B | 2,378,772 B | 723,712 B | 154,267 B |
-| `stroke`（仅笔顺） | 3,202,256 B | 2,357,004 B | 720,720 B | 154,139 B |
-| `keyboard`（仅键盘） | 3,388,064 B | 2,531,012 B | 709,992 B | 178,075 B |
+| `base`（全关） | 3,115,584 B | 2,313,476 B | 677,680 B | 153,995 B |
+| `english`（仅英语） | 3,191,360 B | 2,349,964 B | 716,752 B | 154,219 B |
+| `stroke`（仅笔顺） | 3,166,704 B | 2,328,408 B | 713,760 B | 154,091 B |
+| `keyboard`（仅键盘） | 3,351,984 B | 2,501,908 B | 703,016 B | 178,043 B |
+| `web_file_transfer`（仅传输） | 3,151,152 B | 2,342,064 B | 684,656 B | 154,043 B |
 | `full`（全开） | 3,490,304 B | 2,581,756 B | 761,192 B | 178,395 B |
-| `full - base` | +339,152 B | +239,692 B | +76,536 B | +24,352 B |
+| `full - base` | +374,720 B | +268,280 B | +83,512 B | +24,400 B |
 
 符号检查：
 
-| 配置 | Stroke 相关符号 | English 相关符号 | BLE 键盘符号 |
-|---|---:|---:|---:|
-| `base` | 0 | 0 | 0 |
-| `english` | 0 | 54 | 0 |
-| `stroke` | 23 | 0 | 0 |
-| `keyboard` | 0 | 0 | 21 |
-| `full` | 23 | 54 | 21 |
+| 配置 | Stroke 相关符号 | English 相关符号 | BLE 键盘符号 | Web 传输符号 |
+|---|---:|---:|---:|---:|
+| `base` | 0 | 0 | 0 | 0 |
+| `english` | 0 | 54 | 0 | 0 |
+| `stroke` | 23 | 0 | 0 | 0 |
+| `keyboard` | 0 | 0 | 21 | 0 |
+| `web_file_transfer` | 0 | 0 | 0 | 20 |
+| `full` | 23 | 54 | 21 | 20 |
 
 主机测试 `python3 -m unittest discover -s scripts/tests` 通过。
 
 2026-10-23 蓝牙键盘拆分后，五种 profile 均编译通过，`base/english/stroke` 中无 `MediaBle` 符号，`keyboard/full` 中保留。
 
 2026-10-23 真机验证：拆分后的 `full` 固件（3,490,304 B）刷入 `0x20000` 后启动正常，TF 卡 29,476 MB，`StrokeStore` 9,470 字、`EnglishStore` 1,220 词均就绪；macOS 自动重连 `Xiaozhi-Media`，识别为 Keyboard（Battery 100%），无 panic。三面板按键未逐项人工点按。
+
+2026-10-23 网络文件传输拆分后，六种 profile 均编译通过；`base/english/stroke/keyboard` 无 `WebFileServer` 符号，`web_file_transfer/full` 各 20 个，嵌入资源符号 2 个。新 `full` 固件（3,490,304 B，SHA256 `b8f19d28…1faf`）刷入 `0x20000` 后启动正常，`/api/info` 返回 `running:true` 且 SD 已挂载；实测新建目录、上传 29 B 文件、列表、下载内容一致、递归删除均成功；网络页触摸操作与断线停止已人工验证正常。
 
 ## 添加新功能包
 
@@ -197,7 +231,7 @@ python3 scripts/feature_build.py --profile base --no-build
 
 ## 限制
 
-- 英语听写、笔顺与蓝牙键盘页面仍嵌在 `main/display/lcd_display.*`。关闭功能后页面不创建、功能实现不编译，但抽屉里的入口保留并显示为不可用。
+- 英语听写、笔顺、蓝牙键盘与网络文件传输页面仍嵌在 `main/display/lcd_display.*`。关闭功能后页面不创建、功能实现不编译，但抽屉里的入口保留并显示为不可用。
 - 关闭蓝牙键盘只移除功能包，不会关闭 ESP-IDF 的 BT 协议栈；`BT_ENABLED` 仍由根 `sdkconfig` 决定。
 - profile 目前只切换功能包开关，不负责板型或分区差异；板型仍以根目录 `sdkconfig` 为准。
 - 这是编译期组合，不是运行时插件；ELF 动态加载仍不采用。

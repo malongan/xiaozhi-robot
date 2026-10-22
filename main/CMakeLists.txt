@@ -1120,15 +1120,18 @@ if(CONFIG_IDF_TARGET_ESP32S3)
 endif()
 
 set(WEB_ASSETS "")
-if(CONFIG_WEB_FILE_SERVER)
-    list(APPEND SOURCES "web_file_server.cc")
-    set(WEB_INDEX_HTML "${CMAKE_CURRENT_SOURCE_DIR}/web_assets/index.html")
-    set(WEB_INDEX_GZ "${CMAKE_CURRENT_BINARY_DIR}/web_assets/index.html.gz")
+if(CONFIG_FEATURE_WEB_FILE_TRANSFER)
+    list(APPEND SOURCES "features/web_file_transfer/web_file_server.cc")
+    set(WEB_INDEX_HTML
+        "${CMAKE_CURRENT_SOURCE_DIR}/features/web_file_transfer/web_assets/index.html")
+    set(WEB_INDEX_GZ
+        "${CMAKE_CURRENT_BINARY_DIR}/features/web_file_transfer/index.html.gz")
     set(WEB_GZIP_SCRIPT "${PROJECT_DIR}/scripts/gzip_web_asset.py")
     set_source_files_properties("${WEB_INDEX_GZ}" PROPERTIES GENERATED TRUE)
     add_custom_command(
         OUTPUT "${WEB_INDEX_GZ}"
-        COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/web_assets"
+        COMMAND "${CMAKE_COMMAND}" -E make_directory
+                "${CMAKE_CURRENT_BINARY_DIR}/features/web_file_transfer"
         COMMAND python "${WEB_GZIP_SCRIPT}" "${WEB_INDEX_HTML}" "${WEB_INDEX_GZ}"
         DEPENDS "${WEB_INDEX_HTML}" "${WEB_GZIP_SCRIPT}"
         COMMENT "Compressing web assets"

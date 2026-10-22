@@ -1,0 +1,14 @@
+{
+  "id": "web_file_transfer",
+  "name": "网络文件传输",
+  "description": "同一 Wi-Fi 下通过浏览器浏览、上传、下载和删除 SD 卡文件",
+  "config": "CONFIG_FEATURE_WEB_FILE_TRANSFER",
+  "default": false,
+  "depends": [],
+  "sources": [
+    "features/web_file_transfer/web_file_server.cc"
+  ],
+  "assets": [
+    "features/web_file_transfer/web_assets/index.html"
+  ]
+}

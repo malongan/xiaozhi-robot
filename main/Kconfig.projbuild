@@ -1064,7 +1064,7 @@ menu "WiFi Configuration Method"
 endmenu
 
 menu "Web File Transfer"
-    config WEB_FILE_SERVER
+    config FEATURE_WEB_FILE_TRANSFER
         bool "Enable SD card web file transfer"
         default n
         help
@@ -1073,15 +1073,15 @@ menu "Web File Transfer"
             The service starts automatically once Wi-Fi connects and stops
             when the link drops or the provisioning hotspot takes over.
 
-    config WEB_FILE_SERVER_PORT
+    config FEATURE_WEB_FILE_TRANSFER_PORT
         int "HTTP port"
-        depends on WEB_FILE_SERVER
+        depends on FEATURE_WEB_FILE_TRANSFER
         range 80 65535
         default 80
 
-    config WEB_FILE_SERVER_PIN
+    config FEATURE_WEB_FILE_TRANSFER_PIN
         string "Optional access PIN (empty disables)"
-        depends on WEB_FILE_SERVER
+        depends on FEATURE_WEB_FILE_TRANSFER
         default ""
         help
             When non-empty, every /api request must carry the PIN either as

@@ -15,7 +15,9 @@
 #include "features/ble_keyboard/media_ble.h"
 #endif
 #include "wifi_board.h"
-#include "web_file_server.h"
+#if CONFIG_FEATURE_WEB_FILE_TRANSFER
+#include "features/web_file_transfer/web_file_server.h"
+#endif
 
 LV_FONT_DECLARE(font_zzz_30);
 #if CONFIG_FEATURE_STROKE_ORDER
@@ -391,7 +393,7 @@ MipiLcdDisplay::MipiLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel
 LcdDisplay::~LcdDisplay() {
     SetPreviewImage(nullptr);
 
-#if CONFIG_WEB_FILE_SERVER
+#if CONFIG_FEATURE_WEB_FILE_TRANSFER
     WebFileServer::GetInstance().SetStatusCallback(nullptr);
     WebFileServer::GetInstance().SetActivityCallback(nullptr);
 #endif
@@ -477,12 +479,12 @@ void LcdDisplay::Unlock() { lvgl_port_unlock(); }
 const LcdDisplay::DrawerTileSpec LcdDisplay::kDrawerSpecs[LcdDisplay::kDrawerTileCount] = {
     {MATERIAL_SYMBOLS_SETTINGS, "设置", &LcdDisplay::OpenSettingsPage,
      &LcdDisplay::DrawerAlwaysEnabled, false, "", 0x5B6C8A, 0x3E4C63},
-#if CONFIG_WEB_FILE_SERVER
+#if CONFIG_FEATURE_WEB_FILE_TRANSFER
     {MATERIAL_SYMBOLS_WIFI, "网络", &LcdDisplay::OpenFileServicePage,
      &LcdDisplay::DrawerAlwaysEnabled, false, "", 0x2FB6A8, 0x1E8E86},
 #else
     {MATERIAL_SYMBOLS_WIFI, "网络", &LcdDisplay::OpenFileServicePage,
-     &LcdDisplay::DrawerAlwaysEnabled, true, "文件传输功能开发中", 0x2FB6A8, 0x1E8E86},
+     &LcdDisplay::DrawerAlwaysEnabled, true, "网络文件传输未启用", 0x2FB6A8, 0x1E8E86},
 #endif
     {MATERIAL_SYMBOLS_LANGUAGE, "听写", &LcdDisplay::OpenEnglishPage,
      &LcdDisplay::DrawerEnglishEnabled, false, "未找到词库，请插入存储卡", 0xF0A03C, 0xD97B22},
@@ -2440,7 +2442,7 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_text_color(settings_reboot_label_, lv_color_hex(kDarkMuted), 0);
     lv_obj_set_pos(settings_reboot_label_, 91, 7);
 
-#if CONFIG_WEB_FILE_SERVER
+#if CONFIG_FEATURE_WEB_FILE_TRANSFER
     /* File transfer screen: URL, run state, free space and upload progress */
     file_service_screen_ = lv_obj_create(screen);
     lv_obj_set_size(file_service_screen_, LV_HOR_RES, LV_VER_RES);
@@ -2750,7 +2752,7 @@ void LcdDisplay::SetupUI() {
     }
 #endif  // CONFIG_FEATURE_BLE_KEYBOARD
 
-#if CONFIG_WEB_FILE_SERVER
+#if CONFIG_FEATURE_WEB_FILE_TRANSFER
     // File transfer page mirrors the server state and upload progress.
     WebFileServer::GetInstance().SetStatusCallback([this](bool running) {
         Application::GetInstance().Schedule([this, running]() {
@@ -3361,6 +3363,7 @@ void LcdDisplay::UpdateSettingsValues() {
     }
 }
 
+#if CONFIG_FEATURE_WEB_FILE_TRANSFER
 void LcdDisplay::ShowFileServiceScreen(bool show) {
     if (file_service_screen_ == nullptr) {
         return;
@@ -3392,7 +3395,6 @@ void LcdDisplay::UpdateFileServiceValues() {
     if (file_service_screen_ == nullptr) {
         return;
     }
-#if CONFIG_WEB_FILE_SERVER
     auto& server = WebFileServer::GetInstance();
     auto& wifi = WifiManager::GetInstance();
     const bool running = server.IsRunning();
@@ -3450,7 +3452,6 @@ void LcdDisplay::UpdateFileServiceValues() {
             }
         }
     }
-#endif
 }
 
 void LcdDisplay::UpdateFileTransferActivity(const std::string& name, int percent, bool done,
@@ -3496,7 +3497,6 @@ void LcdDisplay::OnFileServiceToggleClicked(lv_event_t* e) {
     if (self == nullptr) {
         return;
     }
-#if CONFIG_WEB_FILE_SERVER
     auto& server = WebFileServer::GetInstance();
     if (server.IsRunning()) {
         server.Stop();
@@ -3514,9 +3514,14 @@ void LcdDisplay::OnFileServiceToggleClicked(lv_event_t* e) {
     } else {
         server.Start();
     }
-#endif
     self->UpdateFileServiceValues();
 }
+
+#else
+void LcdDisplay::ShowFileServiceScreen(bool show) { (void)show; }
+void LcdDisplay::UpdateFileServiceValues() {}
+void LcdDisplay::UpdateFileTransferActivity(const std::string&, int, bool, bool) {}
+#endif  // CONFIG_FEATURE_WEB_FILE_TRANSFER
 
 void LcdDisplay::SetIpAddress(const std::string& ip) {
     (void)ip;
@@ -5664,7 +5669,11 @@ void LcdDisplay::OpenMediaPage() { ShowMediaScreen(true); }
 void LcdDisplay::OpenMediaPage() {}
 #endif
 
+#if CONFIG_FEATURE_WEB_FILE_TRANSFER
 void LcdDisplay::OpenFileServicePage() { ShowFileServiceScreen(true); }
+#else
+void LcdDisplay::OpenFileServicePage() {}
+#endif
 
 void LcdDisplay::OnDrawerHandleClicked(lv_event_t* e) {
     auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));

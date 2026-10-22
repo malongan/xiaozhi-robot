@@ -2,7 +2,7 @@
 
 // Weak symbol so builds without the embedded page still link (defensive only;
 // the Kconfig option and the CMake rule are enabled together).
-#if CONFIG_WEB_FILE_SERVER
+#if CONFIG_FEATURE_WEB_FILE_TRANSFER
 
 #include <algorithm>
 #include <cerrno>
@@ -37,7 +37,7 @@ constexpr int kMaxRemoveDepth = 8;
 constexpr int kMaxRemoveEntries = 5000;
 constexpr int64_t kProgressIntervalUs = 300 * 1000;
 constexpr uint64_t kUploadSlack = 64 * 1024;
-constexpr const char* kPin = CONFIG_WEB_FILE_SERVER_PIN;
+constexpr const char* kPin = CONFIG_FEATURE_WEB_FILE_TRANSFER_PIN;
 
 extern const uint8_t index_html_gz_start[] asm("_binary_index_html_gz_start");
 extern const uint8_t index_html_gz_end[] asm("_binary_index_html_gz_end");
@@ -726,7 +726,7 @@ bool WebFileServer::Start() {
         return true;
     }
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.server_port = CONFIG_WEB_FILE_SERVER_PORT;
+    config.server_port = CONFIG_FEATURE_WEB_FILE_TRANSFER_PORT;
     config.ctrl_port = 32770;
     config.stack_size = 8192;
     config.max_open_sockets = 4;
@@ -771,7 +771,7 @@ bool WebFileServer::Start() {
         }
     }
     server_ = handle;
-    ESP_LOGI(TAG, "serving %s on port %d", kSdRoot, CONFIG_WEB_FILE_SERVER_PORT);
+    ESP_LOGI(TAG, "serving %s on port %d", kSdRoot, CONFIG_FEATURE_WEB_FILE_TRANSFER_PORT);
     NotifyStatus();
     return true;
 }
@@ -795,8 +795,8 @@ std::string WebFileServer::Url() const {
     if (ip.empty()) {
         return {};
     }
-#if CONFIG_WEB_FILE_SERVER_PORT != 80
-    return "http://" + ip + ":" + std::to_string(CONFIG_WEB_FILE_SERVER_PORT);
+#if CONFIG_FEATURE_WEB_FILE_TRANSFER_PORT != 80
+    return "http://" + ip + ":" + std::to_string(CONFIG_FEATURE_WEB_FILE_TRANSFER_PORT);
 #else
     return "http://" + ip;
 #endif
@@ -829,5 +829,5 @@ std::string WebFileServer::Url() const { return {}; }
 void WebFileServer::NotifyStatus() {}
 void WebFileServer::NotifyActivity(const std::string&, size_t, size_t, bool, bool) {}
 
-#endif  // CONFIG_WEB_FILE_SERVER
+#endif  // CONFIG_FEATURE_WEB_FILE_TRANSFER
 

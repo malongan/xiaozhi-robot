@@ -1,0 +1,10 @@
+{
+  "name": "web_file_transfer",
+  "description": "仅网络文件传输，用于验证功能包隔离",
+  "features": {
+    "english_dictation": false,
+    "stroke_order": false,
+    "ble_keyboard": false,
+    "web_file_transfer": true
+  }
+}
