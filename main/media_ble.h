@@ -30,6 +30,10 @@ public:
 
     // Brings up NimBLE, the HID service and advertising. Idempotent.
     void Start();
+    // Tears down the host and the BT controller, returning their heap to the
+    // system. Blocking (hundreds of ms); call from a worker task. Idempotent.
+    void Stop();
+    bool IsRunning() const { return started_; }
     void SetStatusCallback(StatusCallback callback);
 
     // Pulses one consumer-control bit (press, 20 ms, release).
