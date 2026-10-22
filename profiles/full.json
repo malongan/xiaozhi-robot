@@ -1,0 +1,7 @@
+{
+  "name": "full",
+  "description": "英语听写在内的全部已登记功能包",
+  "features": {
+    "english_dictation": true
+  }
+}

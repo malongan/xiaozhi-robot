@@ -1,0 +1,7 @@
+{
+  "name": "english",
+  "description": "当前 r3 行为：含英语听写与语音调节",
+  "features": {
+    "english_dictation": true
+  }
+}

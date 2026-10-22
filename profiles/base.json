@@ -1,0 +1,7 @@
+{
+  "name": "base",
+  "description": "不含英语听写功能包的最小定制固件",
+  "features": {
+    "english_dictation": false
+  }
+}

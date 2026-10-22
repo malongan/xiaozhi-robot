@@ -4,8 +4,10 @@
 #include "application.h"
 #include "assets.h"
 #include "assets/lang_config.h"
-#include "english_player.h"
-#include "english_tool.h"
+#if CONFIG_FEATURE_ENGLISH_DICTATION
+#include "features/english_dictation/english_player.h"
+#include "features/english_dictation/english_tool.h"
+#endif
 #include "gif/lvgl_gif.h"
 #include "lvgl_font.h"
 #include "lvgl_theme.h"
@@ -1809,6 +1811,7 @@ void LcdDisplay::SetupUI() {
         lv_label_set_text(stroke_hint, "轻点左右切换");
         lv_obj_align(stroke_hint, LV_ALIGN_TOP_MID, 0, 250);
 
+#if CONFIG_FEATURE_ENGLISH_DICTATION
         // ---- 英语听写页 ----
         english_screen_ = lv_obj_create(screen);
         lv_obj_set_size(english_screen_, LV_HOR_RES, LV_VER_RES);
@@ -2159,6 +2162,7 @@ void LcdDisplay::SetupUI() {
         lv_obj_set_style_text_color(english_setup_next_label_, lv_color_hex(0xFFFFFF), 0);
         lv_label_set_text(english_setup_next_label_, "下一步");
         lv_obj_center(english_setup_next_label_);
+#endif
 
         stroke_anim_timer_ = lv_timer_create(&LcdDisplay::StrokeAnimTimerCb, 60, this);
         lv_timer_pause(stroke_anim_timer_);
@@ -2862,8 +2866,13 @@ void LcdDisplay::RepairDanglingFonts(const lv_font_t* text_font, const lv_font_t
                                      const lv_font_t* large_icon_font) {
     // The set of fonts that are still alive after the assets were replaced.
     // Anything else in a label is a pointer into freed memory.
+#if CONFIG_FEATURE_ENGLISH_DICTATION
     const lv_font_t* live[] = {text_font,    icon_font,       large_icon_font,
                                &font_zzz_30, &font_pinyin_20, &font_english_20};
+#else
+    const lv_font_t* live[] = {text_font, icon_font, large_icon_font, &font_zzz_30,
+                               &font_pinyin_20};
+#endif
     int repaired = 0;
 
     // Walk the whole tree: hidden pages are laid out too, so a label inside a
@@ -3747,6 +3756,7 @@ void LcdDisplay::OnWakeWordDetected() {
     ESP_LOGI(TAG, "wake/new-turn hook: stroke=%d settings=%d", stroke_screen_visible_,
              settings_screen_visible_);
     return_to_drawer_ = false;
+#if CONFIG_FEATURE_ENGLISH_DICTATION
     // In a lesson the wake word only opens a background voice-command turn;
     // keep the lesson page in front and keep the player paused (not stopped).
     if (english_screen_visible_ && !Application::GetInstance().IsDictationActive()) {
@@ -3756,6 +3766,7 @@ void LcdDisplay::OnWakeWordDetected() {
     if (english_setup_visible_) {
         ShowEnglishSetup(false);
     }
+#endif
     if (stroke_screen_visible_) {
         ShowStrokeScreen(false);
     }
@@ -4403,10 +4414,12 @@ void LcdDisplay::ShowMediaScreen(bool show) {
     if (show) {
         ShowBluetoothScreen(false);
         // 媒体页与英语页互斥
+#if CONFIG_FEATURE_ENGLISH_DICTATION
         if (english_screen_visible_) {
             EnglishPlayer::GetInstance().Stop();
             ShowEnglishScreen(false);
         }
+#endif
         ShowEnglishSetup(false);
         SetMediaPanel(0);
         lv_obj_remove_flag(media_screen_, LV_OBJ_FLAG_HIDDEN);
@@ -4425,10 +4438,12 @@ void LcdDisplay::ShowBluetoothScreen(bool show) {
     bluetooth_screen_visible_ = show;
     if (show) {
         RefreshBluetoothList();
+#if CONFIG_FEATURE_ENGLISH_DICTATION
         if (english_screen_visible_) {
             EnglishPlayer::GetInstance().Stop();
             ShowEnglishScreen(false);
         }
+#endif
         ShowEnglishSetup(false);
         lv_obj_remove_flag(bluetooth_screen_, LV_OBJ_FLAG_HIDDEN);
         lv_obj_move_foreground(bluetooth_screen_);
@@ -4777,6 +4792,7 @@ void LcdDisplay::ShowStrokeScreen(int char_idx) {
     UpdateMediaBarVisibility();
 }
 
+#if CONFIG_FEATURE_ENGLISH_DICTATION
 // ---- 英语听写页 ----
 
 void LcdDisplay::ShowEnglishScreen(bool show) {
@@ -5389,6 +5405,20 @@ void LcdDisplay::OnEnglishIntervalClicked(lv_event_t* e) {
     });
 }
 
+#else
+
+void LcdDisplay::ShowEnglishScreen(bool show) { (void)show; }
+void LcdDisplay::UpdateEnglishScreen() {}
+void LcdDisplay::RefreshEnglishScreen() {}
+void LcdDisplay::RefreshEnglishScreenStatic() {}
+void LcdDisplay::ShowEnglishSetup(bool show) { (void)show; }
+void LcdDisplay::RebindEnglishFonts(const lv_font_t* text_font, const lv_font_t* icon_font) {
+    (void)text_font;
+    (void)icon_font;
+}
+
+#endif
+
 void LcdDisplay::ShowStrokeScreen(bool show) {
     if (stroke_screen_ == nullptr) {
         return;
@@ -5476,7 +5506,13 @@ void LcdDisplay::OnStrokeNextClicked(lv_event_t* e) {
     }
 }
 
-bool LcdDisplay::DrawerEnglishEnabled() const { return EnglishPlayer::Available(); }
+bool LcdDisplay::DrawerEnglishEnabled() const {
+#if CONFIG_FEATURE_ENGLISH_DICTATION
+    return EnglishPlayer::Available();
+#else
+    return false;
+#endif
+}
 
 bool LcdDisplay::DrawerStrokeEnabled() const { return StrokeStore::GetInstance().Ready(); }
 
@@ -5544,7 +5580,11 @@ void LcdDisplay::ShowDrawerScreen(bool show) {
 
 void LcdDisplay::OpenSettingsPage() { ShowSettingsScreen(true); }
 
-void LcdDisplay::OpenEnglishPage() { ShowEnglishSetup(true); }
+void LcdDisplay::OpenEnglishPage() {
+#if CONFIG_FEATURE_ENGLISH_DICTATION
+    ShowEnglishSetup(true);
+#endif
+}
 
 void LcdDisplay::OpenStrokePage() {
     auto& store = StrokeStore::GetInstance();

@@ -5,7 +5,9 @@
 #include "board.h"
 #include "cjson_utils.h"
 #include "display.h"
-#include "display/english_player.h"
+#if CONFIG_FEATURE_ENGLISH_DICTATION
+#include "features/english_dictation/english_player.h"
+#endif
 #include "mcp_server.h"
 #include "mqtt_protocol.h"
 #include "settings.h"
@@ -319,7 +321,9 @@ void Application::Run() {
             }
 
             // 英语听写：每秒推进一次（发下一个词 / 倒计时）
+#if CONFIG_FEATURE_ENGLISH_DICTATION
             EnglishPlayer::GetInstance().Tick();
+#endif
             // 倒计时每秒变化，界面也要跟着刷新
             display->RefreshEnglishScreen();
 
@@ -927,7 +931,9 @@ void Application::EndDictationCommandMode(const char* reason) {
         StopListening();
     } else if (GetDeviceState() == kDeviceStateIdle) {
         resume_dictation_on_idle_.store(false);
+#if CONFIG_FEATURE_ENGLISH_DICTATION
         EnglishPlayer::GetInstance().Resume();
+#endif
     }
 }
 
@@ -1067,7 +1073,9 @@ void Application::HandleWakeWordDetectedEvent() {
         // Command turns use the normal auto-detected listening mode; the
         // 5-second grace period is enforced locally by the clock timer.
         listening_mode_ = kListeningModeAutoStop;
+#if CONFIG_FEATURE_ENGLISH_DICTATION
         EnglishPlayer::GetInstance().Pause();
+#endif
         audio_service_.ResetDecoder();
         StartDictationCommandTimer();
     }
@@ -1219,7 +1227,9 @@ void Application::HandleStateChangedEvent() {
             audio_service_.EnableVoiceProcessing(false);
             audio_service_.EnableWakeWordDetection(true);
             if (resume_dictation_on_idle_.exchange(false)) {
+#if CONFIG_FEATURE_ENGLISH_DICTATION
                 EnglishPlayer::GetInstance().Resume();
+#endif
             }
             break;
         case kDeviceStateConnecting:

@@ -18,11 +18,8 @@ set(SOURCES "audio/audio_codec.cc"
             "display/text_glyph.cc"
             "display/lcd_display.cc"
             "display/stroke_tool.cc"
-            "display/english_tool.cc"
-            "display/english_player.cc"
             "display/font_zzz.c"
             "display/font_pinyin.c"
-            "display/font_english.c"
             "display/oled_display.cc"
             "display/lvgl_display/lvgl_display.cc"
             "display/emote_display.cc"
@@ -53,6 +50,15 @@ set(SOURCES "audio/audio_codec.cc"
             )
 
 set(INCLUDE_DIRS "." "display" "display/lvgl_display" "display/lvgl_display/jpg" "audio" "audio/demuxer" "protocols")
+
+if(CONFIG_FEATURE_ENGLISH_DICTATION)
+    list(APPEND SOURCES
+        "display/font_english.c"
+        "features/english_dictation/english_tool.cc"
+        "features/english_dictation/english_player.cc"
+        "features/english_dictation/english_dictation_tools.cc"
+    )
+endif()
 
 # Add board common files
 list(APPEND SOURCES

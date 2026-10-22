@@ -1,0 +1,16 @@
+{
+  "id": "english_dictation",
+  "name": "英语听写",
+  "description": "TF 卡词库、英语听写/单词卡播放器与语音控制工具",
+  "config": "CONFIG_FEATURE_ENGLISH_DICTATION",
+  "default": true,
+  "depends": [],
+  "sources": [
+    "features/english_dictation/english_tool.cc",
+    "features/english_dictation/english_player.cc",
+    "features/english_dictation/english_dictation_tools.cc"
+  ],
+  "assets": [
+    "display/font_english.c"
+  ]
+}

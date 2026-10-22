@@ -11,6 +11,7 @@
 > - 2026-10-22 版本说明：[docs/custom/release-20261022.md](docs/custom/release-20261022.md)
 > - 2026-10-22 r2 版本说明：内部 RAM 优化 + 启动提速 + 蓝牙运行时开关：[docs/custom/release-20261022-r2.md](docs/custom/release-20261022-r2.md)
 > - 2026-10-22 r3 版本说明：听写语音调节 + 同词循环/拼音修复：[docs/custom/release-20261022-r3.md](docs/custom/release-20261022-r3.md)
+> - 功能包与组合构建：[docs/custom/feature-packs.md](docs/custom/feature-packs.md)
 > - 定制说明与复盘：[docs/custom/lessons-20261020.md](docs/custom/lessons-20261020.md)
 > - 内存与启动优化复盘（2026-10-22）：[docs/custom/lessons-20261022-memory.md](docs/custom/lessons-20261022-memory.md)
 > - 笔顺数据生成：[tools/stroke-pipeline/README.md](tools/stroke-pipeline/README.md)

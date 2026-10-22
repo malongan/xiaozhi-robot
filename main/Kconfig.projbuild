@@ -6,6 +6,14 @@ config OTA_URL
     help
         The application will access this URL to check for new firmwares and server address.
 
+config FEATURE_ENGLISH_DICTATION
+    bool "Enable English dictation"
+    default y
+    help
+        Enable the English dictation/word-card player, TF-card word store and
+        self.english.* MCP tools. Disable it to build a firmware without the
+        English feature pack.
+
 choice
     prompt "Flash Assets"
     default FLASH_DEFAULT_ASSETS if !USE_EMOTE_MESSAGE_STYLE
