@@ -9,7 +9,8 @@
 > **注意：2026-10-22 起 16MB 板改用 6MB app + 4MB assets 分区；首次从旧版升级需 USB 迁移分区，不能只 OTA。**
 >
 > - 2026-10-22 版本说明：[docs/custom/release-20261022.md](docs/custom/release-20261022.md)
-> - 2026-10-22 r2 ???????/???? + ??????[docs/custom/release-20261022-r2.md](docs/custom/release-20261022-r2.md)
+> - 2026-10-22 r2 版本说明：内部 RAM 优化 + 启动提速 + 蓝牙运行时开关：[docs/custom/release-20261022-r2.md](docs/custom/release-20261022-r2.md)
+> - 2026-10-22 r3 版本说明：听写语音调节 + 同词循环/拼音修复：[docs/custom/release-20261022-r3.md](docs/custom/release-20261022-r3.md)
 > - 定制说明与复盘：[docs/custom/lessons-20261020.md](docs/custom/lessons-20261020.md)
 > - 内存与启动优化复盘（2026-10-22）：[docs/custom/lessons-20261022-memory.md](docs/custom/lessons-20261022-memory.md)
 > - 笔顺数据生成：[tools/stroke-pipeline/README.md](tools/stroke-pipeline/README.md)
@@ -17,8 +18,9 @@
 > - 界面预览：[docs/custom/](docs/custom/)
 >
 > **固件下载（定制版 + 官方回退）**：<https://github.com/malongan/xiaozhi-robot/releases>
-> - `custom-final-20261022` 最新定制版：设置/网络卡片 + 三面板键盘 + 6MB OTA 分区
-> - `custom-final-20261021` 上一版：英语词库 v5 + 分类练习
+> - `custom-final-20261022-r3` 最新定制版：听写语音调节 + 同词循环/拼音修复
+> - `custom-final-20261022-r2` 上一版：蓝牙开关 + 内存/启动优化
+> - `custom-final-20261022` 6MB 分区首个稳定版：设置/网络卡片 + 三面板键盘
 > - `v2.5.2` 官方版：上游原版，用于对照/回退（含本板构建镜像）
 >
 > 上游与许可证：本项目基于 MIT 协议的 [78/xiaozhi-esp32](https://github.com/78/xiaozhi-esp32)，

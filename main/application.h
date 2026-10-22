@@ -6,6 +6,7 @@
 #include <freertos/event_groups.h>
 #include <freertos/task.h>
 
+#include <atomic>
 #include <cstdint>
 #include <deque>
 #include <functional>
@@ -113,6 +114,15 @@ public:
      */
     void StopListening();
 
+    /**
+     * Enter/leave local audio lesson mode (English dictation).
+     * While active, the device leaves server listening and keeps wake-word
+     * detection available. A wake word enters a short command session so the
+     * lesson can be adjusted by voice without leaving the lesson screen.
+     */
+    void SetDictationActive(bool active);
+    bool IsDictationActive() const { return dictation_active_.load(); }
+
     void Reboot();
     void WakeWordInvoke(const std::string& wake_word);
     bool UpgradeFirmware(const std::string& url, const std::string& version = "");
@@ -160,6 +170,12 @@ private:
         false;  // Flag to play popup sound after state changes to listening
     bool pending_listening_start_ =
         false;  // Waiting for playback to drain before starting listening (auto mode)
+    // Set from LVGL/main tasks; read by the main event loop.
+    std::atomic<bool> dictation_active_{false};
+    // A wake word during a lesson enters a short voice-command session.
+    std::atomic<bool> dictation_command_mode_{false};
+    std::atomic<uint32_t> dictation_command_deadline_ms_{0};
+    std::atomic<bool> resume_dictation_on_idle_{false};
     int clock_ticks_ = 0;
     TaskHandle_t activation_task_handle_ = nullptr;
 
@@ -172,6 +188,8 @@ private:
     void HandleNetworkDisconnectedEvent();
     void HandleActivationDoneEvent();
     void HandleWakeWordDetectedEvent();
+    void StartDictationCommandTimer();
+    void EndDictationCommandMode(const char* reason);
     void ContinueOpenAudioChannel(ListeningMode mode);
     void BeginWakeWordInvoke(const std::string& wake_word);
     void ContinueWakeWordInvoke(const std::string& wake_word);

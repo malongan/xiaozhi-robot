@@ -41,6 +41,9 @@ public:
                Mode mode = kDictation);
 
     void Stop();
+    // 暂停/继续自动推进（进入语音调节命令时使用），保留当前倒计时。
+    void Pause();
+    void Resume();
     void Next();
     void Prev();
     void Repeat();
@@ -54,7 +57,13 @@ public:
     void ToggleMode();
     // 在 手动/5/10/15/20/30 秒之间轮换间隔
     void CycleInterval();
-    // 轮换播报语言（英文 / 中文 / 中英）
+    // 设置播报语言；正在播放时不重播当前词（供"开始听写"前静默设置）
+    void SetSpeak(Speak speak);
+    // 设置自动翻页间隔（0 为手动），不重新开始、不重播当前词。
+    void SetInterval(int interval_seconds);
+    // 调整是否显示单词（不重新开始）。
+    void SetShowWord(bool show) { show_word_ = show; }
+    // 轮换播报语言（英文 / 中文 / 中英），正在播放时立即用新语言重播
     void CycleSpeak();
     // 外部（语音命令）请求翻页：太密集的请求会被忽略，
     // 否则助手连续调用"下一个"会让听写变成连播。
@@ -79,6 +88,7 @@ public:
     Mode CurrentMode() const { return mode_; }
     int CurrentUnit() const { return unit_; }
     int CurrentTopic() const { return topic_; }
+    int CurrentCount() const { return count_; }
     Speak CurrentSpeak() const { return speak_; }
     // 播报语言名（用于界面显示）
     static const char* SpeakName(Speak speak);
@@ -115,8 +125,10 @@ private:
     bool pending_cn_ = false;
     // 上一次播放因设备忙被推迟：下一轮 Tick 先重试当前词，避免跳词
     bool retry_current_ = false;
+    uint32_t paused_remaining_ms_ = 0;
     RefreshCallback refresh_cb_ = nullptr;
     uint32_t last_manual_ = 0;
+    uint32_t last_repeat_ = 0;
     uint32_t next_tick_ = 0;
     std::vector<uint8_t> audio_;
 };

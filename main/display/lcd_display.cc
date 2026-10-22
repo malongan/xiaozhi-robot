@@ -3747,6 +3747,15 @@ void LcdDisplay::OnWakeWordDetected() {
     ESP_LOGI(TAG, "wake/new-turn hook: stroke=%d settings=%d", stroke_screen_visible_,
              settings_screen_visible_);
     return_to_drawer_ = false;
+    // In a lesson the wake word only opens a background voice-command turn;
+    // keep the lesson page in front and keep the player paused (not stopped).
+    if (english_screen_visible_ && !Application::GetInstance().IsDictationActive()) {
+        EnglishPlayer::GetInstance().Stop();
+        ShowEnglishScreen(false);
+    }
+    if (english_setup_visible_) {
+        ShowEnglishSetup(false);
+    }
     if (stroke_screen_visible_) {
         ShowStrokeScreen(false);
     }
@@ -5280,9 +5289,8 @@ void LcdDisplay::OnEnglishSetupNextClicked(lv_event_t* e) {
     // 播放会在音频队列里阻塞，放到主任务执行，避免卡住 LVGL
     Application::GetInstance().Schedule([self, unit, topic, count, interval, mode, speak]() {
         auto& player = EnglishPlayer::GetInstance();
-        while (player.CurrentSpeak() != speak) {
-            player.CycleSpeak();
-        }
+        // 只设置语言，不在这里重播当前词；否则"开始"会先把旧词再读一遍。
+        player.SetSpeak(speak);
         player.Start(unit, topic, count, interval, mode == EnglishPlayer::kCards, mode);
         self->RefreshEnglishScreen();
     });

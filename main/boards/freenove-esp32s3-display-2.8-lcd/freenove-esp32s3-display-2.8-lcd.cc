@@ -368,7 +368,9 @@ private:
             "23 健康安全，24 服装，25 国家语言，27 形状），unit 与 topic 可同时使用（取交集）。"
             "count 为词数（0 表示全部），interval 为间隔秒数（默认 10，0 表示手动：只播一遍当前词，"
             "等用户说下一个或点按钮才翻页），show_word 为 true 时屏幕上会显示单词拼写"
-            "（默认只显示中文意思），speak 为播报语言：0 报英文，1 报中文，2 中英都报。",
+            "（默认只显示中文意思），speak 为播报语言：0 报英文，1 报中文，2 中英都报。"
+            "运行中只想改语言、间隔或显示方式时不要重新开始，请优先调用 "
+            "self.english.speak / self.english.interval。",
             PropertyList({Property("unit", kPropertyTypeInteger, 0, 34),
                           Property("topic", kPropertyTypeInteger, 0, 27),
                           Property("count", kPropertyTypeInteger, 0, 100),
@@ -393,10 +395,20 @@ private:
                         auto& player = EnglishPlayer::GetInstance();
                         const auto want =
                             static_cast<EnglishPlayer::Speak>(speak < 0 ? 0 : (speak % 3));
-                        while (player.CurrentSpeak() != want) {
-                            player.CycleSpeak();
+                        // 同一轮听写里改语言/间隔/显示方式时只更新参数，不回到第一个词。
+                        const bool same_lesson = player.Active() &&
+                                                 player.CurrentUnit() == unit &&
+                                                 player.CurrentTopic() == topic &&
+                                                 player.CurrentCount() == count &&
+                                                 player.CurrentMode() == EnglishPlayer::kDictation;
+                        if (same_lesson) {
+                            player.SetSpeak(want);
+                            player.SetInterval(interval);
+                            player.SetShowWord(show_word);
+                        } else {
+                            player.SetSpeak(want);
+                            player.Start(unit, topic, count, interval, show_word);
                         }
-                        player.Start(unit, topic, count, interval, show_word);
                         lcd->UpdateEnglishScreen();
                     });
                 const int total = store.CountFilter(unit, topic);
@@ -439,8 +451,16 @@ private:
                 const int interval = properties["interval"].value<int>();
                 Application::GetInstance().Schedule([lcd, unit, topic, count, interval]() {
                     lcd->ShowEnglishScreen(true);
-                    EnglishPlayer::GetInstance().Start(unit, topic, count, interval, true,
-                                                       EnglishPlayer::kCards);
+                    auto& player = EnglishPlayer::GetInstance();
+                    const bool already = player.Active() &&
+                                         player.CurrentUnit() == unit &&
+                                         player.CurrentTopic() == topic &&
+                                         player.CurrentCount() == count &&
+                                         player.Interval() == interval &&
+                                         player.CurrentMode() == EnglishPlayer::kCards;
+                    if (!already) {
+                        player.Start(unit, topic, count, interval, true, EnglishPlayer::kCards);
+                    }
                     lcd->UpdateEnglishScreen();
                 });
                 const int total = store.CountFilter(unit, topic);
@@ -482,8 +502,44 @@ private:
                         return std::string("重播当前单词。");
                     });
 
-        mcp.AddTool("self.english.stop", "结束英语听写，关闭学习页。", PropertyList(),
-                    [lcd](const PropertyList&) -> ToolResult {
+        mcp.AddTool(
+            "self.english.speak",
+            "调整正在进行的英语听写的播报语言，不重新开始、不跳词：0 只报英文，1 只报中文，"
+            "2 中英都报。只改后续播报；若用户要马上重听当前词，再调用 repeat。",
+            PropertyList({Property("speak", kPropertyTypeInteger, 0, 2)}),
+            [lcd](const PropertyList& properties) -> ToolResult {
+                const int speak = properties["speak"].value<int>();
+                const int mode = speak < 0 ? 0 : (speak % 3);
+                Application::GetInstance().Schedule([lcd, mode]() {
+                    EnglishPlayer::GetInstance().SetSpeak(
+                        static_cast<EnglishPlayer::Speak>(mode));
+                    lcd->UpdateEnglishScreen();
+                });
+                const char* name = mode == 1 ? "中文" : (mode == 2 ? "中英" : "英文");
+                return std::string("播报语言已改为") + name + "。";
+            });
+
+        mcp.AddTool(
+            "self.english.interval",
+            "调整正在进行的英语听写的自动翻页间隔，不重新开始、不跳词、不重播。"
+            "seconds 为 0-120 秒；0 表示手动，只有用户说下一个才翻页。",
+            PropertyList({Property("seconds", kPropertyTypeInteger, 0, 120)}),
+            [lcd](const PropertyList& properties) -> ToolResult {
+                const int seconds = properties["seconds"].value<int>();
+                Application::GetInstance().Schedule([lcd, seconds]() {
+                    EnglishPlayer::GetInstance().SetInterval(seconds);
+                    lcd->UpdateEnglishScreen();
+                });
+                if (seconds <= 0) {
+                    return std::string("已改为手动翻页。");
+                }
+                return "间隔已改为 " + std::to_string(seconds) + " 秒。";
+            });
+
+        mcp.AddTool("self.english.stop",
+                    "结束英语听写并关闭学习页。用户说退出听写、结束听写或关闭学习页时调用；"
+                    "只调整语言或间隔时不要调用。",
+                    PropertyList(), [lcd](const PropertyList&) -> ToolResult {
                         Application::GetInstance().Schedule([lcd]() {
                             EnglishPlayer::GetInstance().Stop();
                             lcd->ShowEnglishScreen(false);

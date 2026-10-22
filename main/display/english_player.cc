@@ -86,7 +86,12 @@ bool EnglishPlayer::Start(int unit, int topic, int count, int interval_seconds, 
     active_ = true;
     pending_cn_ = false;
     retry_current_ = false;
+    paused_remaining_ms_ = 0;
+    last_repeat_ = 0;
     next_tick_ = 0;
+
+    // 听写期间退出服务器监听，避免麦克风把播放内容/环境声送给助手。
+    Application::GetInstance().SetDictationActive(true);
 
     if (interval_ > 0) {
         ESP_LOGI(TAG, "开始%s：%d 词（单元 %d，分类 %d），间隔 %d 秒，%s",
@@ -135,9 +140,25 @@ const char* EnglishPlayer::SpeakName(Speak speak) {
     }
 }
 
-void EnglishPlayer::CycleSpeak() {
-    speak_ = static_cast<Speak>((speak_ + 1) % 3);
+void EnglishPlayer::SetSpeak(Speak speak) {
+    switch (speak) {
+        case kSpeakEnglish:
+        case kSpeakChinese:
+        case kSpeakBoth:
+            break;
+        default:
+            speak = kSpeakEnglish;
+            break;
+    }
+    if (speak_ == speak) {
+        return;
+    }
+    speak_ = speak;
     ESP_LOGI(TAG, "播报语言：%s", SpeakName(speak_));
+}
+
+void EnglishPlayer::CycleSpeak() {
+    SetSpeak(static_cast<Speak>((speak_ + 1) % 3));
     if (active_) {
         PlayCurrent();
     }
@@ -203,6 +224,7 @@ bool EnglishPlayer::RequestPrev() {
 }
 
 void EnglishPlayer::Stop() {
+    Application::GetInstance().SetDictationActive(false);
     if (!active_) {
         return;
     }
@@ -210,6 +232,7 @@ void EnglishPlayer::Stop() {
     paused_ = false;
     pending_cn_ = false;
     retry_current_ = false;
+    paused_remaining_ms_ = 0;
     current_ = -1;
     total_ = 0;
     pos_ = 0;
@@ -221,6 +244,78 @@ void EnglishPlayer::Stop() {
     correct_ = 0;
     answered_ = 0;
     ESP_LOGI(TAG, "停止听写");
+}
+
+void EnglishPlayer::Pause() {
+    if (!active_ || paused_) {
+        return;
+    }
+    const uint32_t now = NowMs();
+    const bool playing =
+        pending_cn_ || !Application::GetInstance().GetAudioService().IsPlaybackIdle();
+    paused_ = true;
+    if (playing) {
+        // 当前词被打断：继续后先重播这个词，避免漏词。
+        retry_current_ = true;
+        next_tick_ = now;
+        paused_remaining_ms_ = 0;
+    } else {
+        paused_remaining_ms_ = next_tick_ > now ? next_tick_ - now : 0;
+    }
+    ESP_LOGI(TAG, "听写暂停");
+}
+
+void EnglishPlayer::Resume() {
+    if (!active_ || !paused_) {
+        return;
+    }
+    paused_ = false;
+    if (next_tick_ != 0) {
+        next_tick_ = NowMs() + paused_remaining_ms_;
+    }
+    ESP_LOGI(TAG, "听写继续");
+    if (refresh_cb_ != nullptr) {
+        refresh_cb_();
+    }
+}
+
+void EnglishPlayer::SetInterval(int interval_seconds) {
+    if (interval_seconds < 0) {
+        interval_seconds = 0;
+    }
+    if (interval_seconds > 120) {
+        interval_seconds = 120;
+    }
+    if (interval_ == interval_seconds) {
+        return;
+    }
+    interval_ = interval_seconds;
+    if (!active_) {
+        return;
+    }
+    const uint32_t now = NowMs();
+    if (paused_) {
+        // 暂停中改间隔：继续后按新间隔等待；若当前词被打断，先补播再计时。
+        if (interval_ <= 0) {
+            next_tick_ = 0;
+            paused_remaining_ms_ = 0;
+        } else {
+            // 手动模式原本 next_tick_ 为 0，给 Resume 一个非零锚点。
+            if (next_tick_ == 0) {
+                next_tick_ = now;
+            }
+            paused_remaining_ms_ = retry_current_
+                                       ? 0
+                                       : static_cast<uint32_t>(interval_) * 1000 + 1000;
+        }
+    } else if (!pending_cn_) {
+        next_tick_ =
+            interval_ > 0 ? now + static_cast<uint32_t>(interval_) * 1000 + 1000 : 0;
+    }
+    ESP_LOGI(TAG, "间隔改为 %d 秒", interval_);
+    if (refresh_cb_ != nullptr) {
+        refresh_cb_();
+    }
 }
 
 void EnglishPlayer::Next() {
@@ -279,6 +374,12 @@ void EnglishPlayer::Repeat() {
     if (!active_) {
         return;
     }
+    const uint32_t now = NowMs();
+    if (last_repeat_ != 0 && now - last_repeat_ < 800) {
+        ESP_LOGI(TAG, "忽略过于频繁的重播请求");
+        return;
+    }
+    last_repeat_ = now;
     PlayCurrent();
 }
 
@@ -294,6 +395,7 @@ bool EnglishPlayer::Restart() {
     paused_ = false;
     pending_cn_ = false;
     retry_current_ = false;
+    last_repeat_ = 0;
     next_tick_ = 0;
     ESP_LOGI(TAG, "重新开始：%d 词", total_);
     PlayCurrent();
@@ -316,6 +418,9 @@ int EnglishPlayer::Countdown() const {
 }
 
 bool EnglishPlayer::PlayCurrent() {
+    if (paused_) {
+        return false;
+    }
     auto& store = EnglishStore::GetInstance();
     if (current_ < 0 || current_ >= store.WordCount()) {
         return false;
@@ -333,6 +438,9 @@ bool EnglishPlayer::PlayCurrent() {
         retry_current_ = true;
         return false;
     }
+    // 真正播出去了，清掉“忙时重试”标记。双语分支下面会进入 pending_cn_，
+    // 若这里不清，Tick 会每 200ms 再走一次重试，导致同一个词无限重播。
+    retry_current_ = false;
     // 按播报语言决定播放哪一段（重播/切换语言时清掉上一词的待播中文）
     pending_cn_ = false;
     bool want_en = (speak_ == kSpeakEnglish || speak_ == kSpeakBoth);
@@ -377,7 +485,7 @@ bool EnglishPlayer::PlayCurrent() {
 }
 
 void EnglishPlayer::Tick() {
-    if (!active_) {
+    if (!active_ || paused_) {
         return;
     }
     const uint32_t now = NowMs();
@@ -428,10 +536,8 @@ void EnglishPlayer::Tick() {
     pos_++;
     current_ = order_[pos_];
     if (!PlayCurrent()) {
-        // 设备忙：退回当前词，稍后重试，避免跳词
-        pos_--;
-        current_ = order_[pos_];
-        retry_current_ = false;
+        // 设备忙：保留已推进的 current_，由 retry_current_ 在空闲后补播。
+        // 不能回滚并清掉 retry_current_，否则会丢掉"补播下一个词"的状态。
         return;
     }
     if (refresh_cb_ != nullptr) {

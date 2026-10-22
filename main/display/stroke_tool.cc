@@ -87,7 +87,8 @@ bool StrokeStore::Init() {
         ESP_LOGW(TAG, "pinyin.json 解析失败（顶栏拼音不可用）");
     }
     ready_ = true;
-    ESP_LOGI(TAG, "StrokeStore ready: %d chars (medians lazy)", char_count_);
+    ESP_LOGI(TAG, "StrokeStore ready: %d chars, pinyin=%d (medians lazy)", char_count_,
+             py_count_);
     return true;
 }
 
@@ -213,7 +214,7 @@ bool StrokeStore::LoadPinyin() {
     std::vector<uint32_t> offs;
     std::vector<uint8_t> lens;
     const char* p = reinterpret_cast<const char*>(py_buf_);
-    while (*p != 0 && keys.size() < 8192) {
+    while (*p != 0 && keys.size() < 10000) {
         if (*p != '"') {
             ++p;
             continue;

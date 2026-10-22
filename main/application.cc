@@ -287,6 +287,10 @@ void Application::Run() {
 
         if (bits & MAIN_EVENT_VAD_CHANGE) {
             if (GetDeviceState() == kDeviceStateListening) {
+                if (dictation_command_mode_.load()) {
+                    // Give the user a fresh 5s window from their latest speech.
+                    StartDictationCommandTimer();
+                }
                 auto led = Board::GetInstance().GetLed();
                 led->OnStateChanged();
             }
@@ -305,6 +309,14 @@ void Application::Run() {
             clock_ticks_++;
             auto display = Board::GetInstance().GetDisplay();
             display->UpdateStatusBar();
+
+            if (dictation_command_mode_.load()) {
+                const uint32_t deadline = dictation_command_deadline_ms_.load();
+                const uint32_t now = static_cast<uint32_t>(esp_timer_get_time() / 1000);
+                if (deadline != 0 && static_cast<int32_t>(now - deadline) >= 0) {
+                    EndDictationCommandMode("5 秒无调节命令");
+                }
+            }
 
             // 英语听写：每秒推进一次（发下一个词 / 倒计时）
             EnglishPlayer::GetInstance().Tick();
@@ -659,12 +671,20 @@ void Application::InitializeProtocol() {
             if (strcmp(state->valuestring, "start") == 0) {
                 Schedule([this]() {
                     aborted_ = false;
+                    if (dictation_command_mode_.load()) {
+                        // The reply is being spoken: do not hit the 5-second
+                        // grace deadline in the middle of it.
+                        dictation_command_deadline_ms_.store(0);
+                    }
                     SetDeviceState(kDeviceStateSpeaking);
                 });
             } else if (strcmp(state->valuestring, "stop") == 0) {
                 Schedule([this]() {
                     if (GetDeviceState() == kDeviceStateSpeaking) {
-                        if (listening_mode_ == kListeningModeManualStop) {
+                        if (dictation_active_.load() && dictation_command_mode_.load()) {
+                            // Keep taking adjustment commands for another 5s.
+                            SetDeviceState(kDeviceStateListening);
+                        } else if (listening_mode_ == kListeningModeManualStop) {
                             SetDeviceState(kDeviceStateIdle);
                         } else {
                             SetDeviceState(kDeviceStateListening);
@@ -861,7 +881,61 @@ void Application::StartListening() { xEventGroupSetBits(event_group_, MAIN_EVENT
 
 void Application::StopListening() { xEventGroupSetBits(event_group_, MAIN_EVENT_STOP_LISTENING); }
 
+void Application::SetDictationActive(bool active) {
+    if (!active) {
+        dictation_command_mode_.store(false);
+        dictation_command_deadline_ms_.store(0);
+        resume_dictation_on_idle_.store(false);
+    }
+    if (dictation_active_.exchange(active) == active) {
+        return;
+    }
+    ESP_LOGI(TAG, "听写模式：%s", active ? "退出对话监听" : "结束听写");
+
+    if (!active) {
+        return;
+    }
+
+    // Called from the main task or the LVGL task; apply audio changes in the
+    // main task where the state machine and audio service live. Re-check the
+    // flag so a wake word that arrives before this task runs still wins.
+    Schedule([this]() {
+        if (!dictation_command_mode_.load() &&
+            dictation_active_.load() && GetDeviceState() == kDeviceStateListening) {
+            StopListening();
+        }
+    });
+}
+
+void Application::StartDictationCommandTimer() {
+    const uint32_t now = static_cast<uint32_t>(esp_timer_get_time() / 1000);
+    dictation_command_deadline_ms_.store(now + 5000);
+    ESP_LOGI(TAG, "听写命令模式：5 秒后停止监听");
+}
+
+void Application::EndDictationCommandMode(const char* reason) {
+    if (!dictation_command_mode_.exchange(false)) {
+        return;
+    }
+    dictation_command_deadline_ms_.store(0);
+    ESP_LOGI(TAG, "听写命令模式结束：%s", reason);
+
+    // Resume only after the state machine has actually left Listening, so a
+    // local word cannot play into the server ASR half of the transition.
+    resume_dictation_on_idle_.store(true);
+    if (GetDeviceState() == kDeviceStateListening) {
+        StopListening();
+    } else if (GetDeviceState() == kDeviceStateIdle) {
+        resume_dictation_on_idle_.store(false);
+        EnglishPlayer::GetInstance().Resume();
+    }
+}
+
 void Application::HandleToggleChatEvent() {
+    if (dictation_active_.load()) {
+        ESP_LOGI(TAG, "听写中，忽略对话按键");
+        return;
+    }
     auto state = GetDeviceState();
 
     if (state == kDeviceStateNotifying) {
@@ -926,6 +1000,10 @@ void Application::ContinueOpenAudioChannel(ListeningMode mode) {
 }
 
 void Application::HandleStartListeningEvent() {
+    if (dictation_active_.load() && !dictation_command_mode_.load()) {
+        ESP_LOGI(TAG, "听写中，忽略进入监听请求");
+        return;
+    }
     auto state = GetDeviceState();
 
     if (state == kDeviceStateNotifying) {
@@ -983,6 +1061,17 @@ void Application::HandleWakeWordDetectedEvent() {
         return;
     }
 
+    if (dictation_active_.load()) {
+        ESP_LOGI(TAG, "唤醒词进入听写调节模式");
+        dictation_command_mode_.store(true);
+        // Command turns use the normal auto-detected listening mode; the
+        // 5-second grace period is enforced locally by the clock timer.
+        listening_mode_ = kListeningModeAutoStop;
+        EnglishPlayer::GetInstance().Pause();
+        audio_service_.ResetDecoder();
+        StartDictationCommandTimer();
+    }
+
     auto state = GetDeviceState();
     auto wake_word = audio_service_.GetLastWakeWord();
     ESP_LOGI(TAG, "Wake word detected: %s (state: %d)", wake_word.c_str(), (int)state);
@@ -1011,7 +1100,9 @@ void Application::HandleWakeWordDetectedEvent() {
             ;
 
         if (state == kDeviceStateListening) {
-            protocol_->SendStartListening(GetDefaultListeningMode());
+            listening_mode_ = dictation_command_mode_.load() ? kListeningModeAutoStop
+                                                             : GetDefaultListeningMode();
+            protocol_->SendStartListening(listening_mode_);
             audio_service_.ResetDecoder();
             audio_service_.PlaySound(Lang::Sounds::OGG_POPUP);
             // Re-enable wake word detection as it was stopped by the detection itself
@@ -1095,6 +1186,16 @@ void Application::HandleStateChangedEvent() {
     // the Listening case below re-arms it when needed.
     pending_listening_start_ = false;
 
+    // Dictation plays local TTS and must not compete with server ASR. If the
+    // assistant tries to return to listening after its reply, go back to idle.
+    // The exception is the short voice-command session started by a wake word.
+    if (dictation_active_.load() && !dictation_command_mode_.load() &&
+        new_state == kDeviceStateListening) {
+        ESP_LOGI(TAG, "听写中，跳过监听状态");
+        StopListening();
+        return;
+    }
+
     auto& board = Board::GetInstance();
     auto display = board.GetDisplay();
     auto led = board.GetLed();
@@ -1117,6 +1218,9 @@ void Application::HandleStateChangedEvent() {
             display->SetAvatarMood(kAvatarMoodIdle);
             audio_service_.EnableVoiceProcessing(false);
             audio_service_.EnableWakeWordDetection(true);
+            if (resume_dictation_on_idle_.exchange(false)) {
+                EnglishPlayer::GetInstance().Resume();
+            }
             break;
         case kDeviceStateConnecting:
             display->SetStatus(Lang::Strings::CONNECTING);
@@ -1128,9 +1232,14 @@ void Application::HandleStateChangedEvent() {
             display->SetStatus(Lang::Strings::LISTENING);
             display->SetEmotion("neutral");
             display->SetAvatarMood(kAvatarMoodListening);
+            if (dictation_command_mode_.load()) {
+                StartDictationCommandTimer();
+            }
 
-            // Make sure the audio processor is running
-            if (play_popup_on_listening_ || !audio_service_.IsAudioProcessorRunning()) {
+            // Make sure the audio processor is running. In a dictation command
+            // turn, always send the manual listen-start explicitly.
+            if (dictation_command_mode_.load() || play_popup_on_listening_ ||
+                !audio_service_.IsAudioProcessorRunning()) {
                 // For auto mode, wait for the playback queue to drain before enabling
                 // voice processing. This prevents audio truncation when STOP arrives
                 // late due to network jitter. Instead of blocking the main loop here,
@@ -1288,7 +1397,7 @@ void Application::AbortSpeaking(AbortReason reason) {
 }
 
 void Application::SetListeningMode(ListeningMode mode) {
-    listening_mode_ = mode;
+    listening_mode_ = dictation_command_mode_.load() ? kListeningModeAutoStop : mode;
     SetDeviceState(kDeviceStateListening);
 }
 
