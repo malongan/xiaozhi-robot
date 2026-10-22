@@ -130,7 +130,7 @@ void AudioService::Start() {
             audio_service->AudioInputTask();
             vTaskDelete(NULL);
         },
-        "audio_input", 2048 * 3, this, 8, &audio_input_task_handle_, 0);
+        "audio_input", 2048 * 2, this, 8, &audio_input_task_handle_, 0);
 
     /* Start the audio output task */
     xTaskCreate(
@@ -167,7 +167,7 @@ void AudioService::Start() {
             audio_service->OpusCodecTask();
             vTaskDelete(NULL);
         },
-        "opus_codec", 2048 * 12, this, 2, &opus_codec_task_handle_);
+        "opus_codec", 2048 * 9, this, 2, &opus_codec_task_handle_);
 }
 
 void AudioService::Stop() {

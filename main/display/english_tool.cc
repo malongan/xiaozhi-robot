@@ -446,21 +446,25 @@ int EnglishStore::ChineseCount() const {
 int EnglishStore::CheckAudio(int sample) const {
     int bad = 0;
     const int n = count_ < sample ? count_ : sample;
-    std::vector<uint8_t> buf;
+    // 只读 Ogg 头，避免启动时读完整音频文件
+    char hdr[4];
     for (int i = 0; i < n; ++i) {
-        if (!ReadAudio(i, buf) || buf.empty()) {
-            ESP_LOGW(TAG, "音频缺失或损坏：第 %d 词", i);
+        const std::string path = AudioPath(i);
+        FILE* f = path.empty() ? nullptr : fopen(path.c_str(), "rb");
+        if (f == nullptr) {
+            ESP_LOGW(TAG, "音频缺失：第 %d 条", i);
             bad++;
             continue;
         }
-        // 简单校验：Ogg 头
-        if (buf.size() < 4 || memcmp(buf.data(), "OggS", 4) != 0) {
-            ESP_LOGW(TAG, "音频格式不对：第 %d 词", i);
+        const size_t got = fread(hdr, 1, sizeof(hdr), f);
+        fclose(f);
+        if (got != sizeof(hdr) || memcmp(hdr, "OggS", 4) != 0) {
+            ESP_LOGW(TAG, "音频格式异常：第 %d 条", i);
             bad++;
         }
     }
     if (n > 0) {
-        ESP_LOGI(TAG, "音频自检：抽查 %d 词，%d 个有问题", n, bad);
+        ESP_LOGI(TAG, "音频自检：共 %d 词，%d 条异常", n, bad);
     }
     return bad;
 }

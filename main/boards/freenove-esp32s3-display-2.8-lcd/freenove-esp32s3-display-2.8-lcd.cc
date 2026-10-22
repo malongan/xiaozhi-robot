@@ -130,6 +130,17 @@ private:
         return true;
     }
 
+    // 音频自检每次 fopen 在 SD 卡上要 ~85ms，放到后台避免拖慢启动
+    static void DeferredAudioCheck(void*) {
+        vTaskDelay(pdMS_TO_TICKS(8000));
+        EnglishStore::GetInstance().CheckAudio(20);
+        vTaskDelete(nullptr);
+    }
+
+    static void ScheduleAudioCheck() {
+        xTaskCreate(DeferredAudioCheck, "eng_chk", 4608, nullptr, 1, nullptr);
+    }
+
     bool MountSdCard() { return MountSdSdmmc() || MountSdSdspi(); }
 
     static void OnSdRetry(void* arg) {
@@ -138,9 +149,8 @@ private:
             board->StopSdRetryTimer();
             StrokeStore::GetInstance().Init();
             auto& english = EnglishStore::GetInstance();
-            if (english.Init()) {
-                english.CheckAudio(20);
-            }
+            english.Init();
+            ScheduleAudioCheck();
             ESP_LOGI(TAG, "TF 卡热插拔挂载成功，笔顺与英语词库已加载");
         }
     }
@@ -155,9 +165,8 @@ private:
         if (MountSdCard()) {
             StrokeStore::GetInstance().Init();
             auto& english = EnglishStore::GetInstance();
-            if (english.Init()) {
-                english.CheckAudio(20);
-            }
+            english.Init();
+            ScheduleAudioCheck();
             return;
         }
         esp_timer_create_args_t timer_args = {
