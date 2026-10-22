@@ -242,6 +242,8 @@ python3 scripts/feature_build.py --profile base --no-build
 
 2026-10-23 网络文件传输拆分后，六种 profile 均编译通过；`base/english/stroke/keyboard` 无 `WebFileServer` 符号，`web_file_transfer/full` 各 20 个，嵌入资源符号 2 个。新 `full` 固件（3,490,304 B，SHA256 `b8f19d28…1faf`）刷入 `0x20000` 后启动正常，`/api/info` 返回 `running:true` 且 SD 已挂载；实测新建目录、上传 29 B 文件、列表、下载内容一致、递归删除均成功；网络页触摸操作与断线停止已人工验证正常。
 
+CI 状态（2026-10-23）：`main` 的 Build Boards 共 20 个 job，19 个通过，目标板 `freenove-esp32s3-display-2.8-lcd` 通过；`waveshare-esp32-p4-nano-10.1-a-ci` 失败。该失败在 r3（run `39803223244`）已存在，原因是 WeChat 布局分支缺少 `ShowSettingsScreen`、`ApplyChatLayout` 等公共 LCD 方法定义，与本次功能包拆分无关。为避免扩大改动范围，本次合并没有修复它；需要单独整合 WeChat 布局与公共 LCD 方法。
+
 ## 添加新功能包
 
 1. 建 `main/features/<id>/`，放实现、`feature.json`、`README.md`。
