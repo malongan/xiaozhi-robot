@@ -728,8 +728,8 @@ bool WebFileServer::Start() {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.server_port = CONFIG_WEB_FILE_SERVER_PORT;
     config.ctrl_port = 32770;
-    config.stack_size = 6144;
-    config.max_open_sockets = 3;
+    config.stack_size = 8192;
+    config.max_open_sockets = 4;
     config.recv_wait_timeout = 15;
     config.send_wait_timeout = 15;
     config.lru_purge_enable = true;
