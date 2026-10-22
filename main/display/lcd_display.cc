@@ -3703,15 +3703,17 @@ void LcdDisplay::BtToggleTask(void* param) {
         return;
     }
     const bool enable = self->bt_user_enabled_;
-    ESP_LOGW(TAG, "bluetooth %s requested, internal free=%u", enable ? "enable" : "disable",
-             static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)));
+    ESP_LOGW(TAG, "bluetooth %s requested, internal free=%u, psram free=%u", enable ? "enable" : "disable",
+             static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)),
+             static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_SPIRAM)));
     if (enable) {
         MediaBle::GetInstance().Start();
     } else {
         MediaBle::GetInstance().Stop();
     }
-    ESP_LOGW(TAG, "bluetooth %s done, internal free=%u", enable ? "enable" : "disable",
-             static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)));
+    ESP_LOGW(TAG, "bluetooth %s done, internal free=%u, psram free=%u", enable ? "enable" : "disable",
+             static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)),
+             static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_SPIRAM)));
     self->bt_busy_ = false;
     Application::GetInstance().Schedule([self]() {
         DisplayLockGuard lock(self);
