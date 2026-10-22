@@ -1,0 +1,12 @@
+{
+  "id": "ble_keyboard",
+  "name": "蓝牙键盘",
+  "description": "BLE HID 键盘：媒体控制、全键盘、数字键与配对管理",
+  "config": "CONFIG_FEATURE_BLE_KEYBOARD",
+  "default": true,
+  "depends": ["BT_ENABLED"],
+  "sources": [
+    "features/ble_keyboard/media_ble.cc"
+  ],
+  "assets": []
+}

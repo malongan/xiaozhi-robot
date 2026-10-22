@@ -44,7 +44,6 @@ set(SOURCES "audio/audio_codec.cc"
             "assets/font_puhui_16_4.c"
             "assets/ui_font_16_4.c"
             "main.cc"
-            "media_ble.cc"
             )
 
 set(INCLUDE_DIRS "." "display" "display/lvgl_display" "display/lvgl_display/jpg" "audio" "audio/demuxer" "protocols")
@@ -63,6 +62,12 @@ if(CONFIG_FEATURE_STROKE_ORDER)
         "display/font_pinyin.c"
         "features/stroke_order/stroke_tool.cc"
         "features/stroke_order/stroke_order_tools.cc"
+    )
+endif()
+
+if(CONFIG_FEATURE_BLE_KEYBOARD)
+    list(APPEND SOURCES
+        "features/ble_keyboard/media_ble.cc"
     )
 endif()
 

@@ -22,6 +22,15 @@ config FEATURE_STROKE_ORDER
         self.stroke.* MCP tools. Disable it to build a firmware without the
         stroke order feature pack.
 
+config FEATURE_BLE_KEYBOARD
+    bool "Enable BLE HID keyboard"
+    depends on BT_ENABLED
+    default y
+    help
+        Enable the BLE HID media keyboard, full keyboard and numeric keypad
+        pages, pairing management and the Bluetooth settings row. Disable it
+        to build a firmware without the BLE keyboard feature pack.
+
 choice
     prompt "Flash Assets"
     default FLASH_DEFAULT_ASSETS if !USE_EMOTE_MESSAGE_STYLE

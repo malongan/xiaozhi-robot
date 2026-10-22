@@ -4,7 +4,9 @@
 #include "gif/lvgl_gif.h"
 #include "lvgl_display.h"
 #include "features/stroke_order/stroke_tool.h"
-#include "media_ble.h"
+#if CONFIG_FEATURE_BLE_KEYBOARD
+#include "features/ble_keyboard/media_ble.h"
+#endif
 
 #include <esp_lcd_panel_io.h>
 #include <esp_lcd_panel_ops.h>
@@ -61,7 +63,7 @@ protected:
     bool follow_latest_ = true;
     int chat_lines_per_page_ = 6;  // 5 lines + media entry when idle, 6 while talking
     lv_obj_t* chat_area_ = nullptr;
-    lv_obj_t* media_bar_ = nullptr;         // bottom keyboard icon, idle only
+    lv_obj_t* media_bar_ = nullptr;         // bottom drawer handle (keyboard glyph), idle only
     lv_obj_t* media_screen_ = nullptr;      // full-screen media keys page
     lv_obj_t* bluetooth_screen_ = nullptr;  // paired-device list
     bool media_screen_visible_ = false;
@@ -280,6 +282,7 @@ protected:
     bool DrawerAlwaysEnabled() const { return true; }
     bool DrawerEnglishEnabled() const;
     bool DrawerStrokeEnabled() const;
+    bool DrawerBleKeyboardEnabled() const;
     static void OnDrawerHandleClicked(lv_event_t* e);
     static void OnDrawerBackClicked(lv_event_t* e);
     static void OnDrawerTileClicked(lv_event_t* e);
@@ -291,7 +294,9 @@ protected:
     lv_obj_t* bt_empty_ = nullptr;
     lv_obj_t* bt_status_ = nullptr;
     lv_obj_t* bt_list_ = nullptr;
+#if CONFIG_FEATURE_BLE_KEYBOARD
     MediaBlePeer bt_peers_[8] = {};
+#endif
     int bt_peer_count_ = 0;
     lv_obj_t* bt_forget_buttons_[8] = {};
     lv_obj_t* bt_disconnect_btn_ = nullptr;

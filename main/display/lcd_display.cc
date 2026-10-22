@@ -11,7 +11,9 @@
 #include "gif/lvgl_gif.h"
 #include "lvgl_font.h"
 #include "lvgl_theme.h"
-#include "media_ble.h"
+#if CONFIG_FEATURE_BLE_KEYBOARD
+#include "features/ble_keyboard/media_ble.h"
+#endif
 #include "wifi_board.h"
 #include "web_file_server.h"
 
@@ -487,7 +489,7 @@ const LcdDisplay::DrawerTileSpec LcdDisplay::kDrawerSpecs[LcdDisplay::kDrawerTil
     {MATERIAL_SYMBOLS_EDIT_SQUARE, "笔画", &LcdDisplay::OpenStrokePage,
      &LcdDisplay::DrawerStrokeEnabled, false, "笔顺数据未就绪", 0x8B6FE8, 0x6A4FD0},
     {MATERIAL_SYMBOLS_BLUETOOTH, "键盘", &LcdDisplay::OpenMediaPage,
-     &LcdDisplay::DrawerAlwaysEnabled, false, "", 0x4A8FE8, 0x2E6BC8},
+     &LcdDisplay::DrawerBleKeyboardEnabled, false, "蓝牙键盘未启用", 0x4A8FE8, 0x2E6BC8},
 };
 
 #if CONFIG_USE_WECHAT_MESSAGE_STYLE
@@ -1394,6 +1396,7 @@ void LcdDisplay::SetupUI() {
         }
     }
 
+#if CONFIG_FEATURE_BLE_KEYBOARD
     /* Media screen: full-screen overlay with six outline media keys. */
     media_screen_ = lv_obj_create(screen);
     lv_obj_set_size(media_screen_, LV_HOR_RES, LV_VER_RES);
@@ -1723,6 +1726,7 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_text_color(bt_empty_, lvgl_theme->text_color(), 0);
     lv_label_set_text(bt_empty_, "尚未配对任何设备\n在电脑/手机蓝牙里\n搜索 Xiaozhi-Media 配对");
     lv_obj_align(bt_empty_, LV_ALIGN_CENTER, 0, 10);
+#endif  // CONFIG_FEATURE_BLE_KEYBOARD
 
 #if CONFIG_FEATURE_STROKE_ORDER
     /* Stroke order screen: TF card data, entry fixed at bottom-right */
@@ -2386,6 +2390,7 @@ void LcdDisplay::SetupUI() {
     settings_wifi_btn_label_ = make_outline_button(
         settings_conn_card, 164, 9, 50, 30, "配网", &LcdDisplay::OnWifiConfigClicked);
 
+#if CONFIG_FEATURE_BLE_KEYBOARD
     settings_bt_icon_ = make_icon(settings_conn_card, 10, 76, MATERIAL_SYMBOLS_BLUETOOTH, kDarkPurple);
     settings_bt_label_ = make_text_label(settings_conn_card, "蓝牙");
     lv_obj_set_width(settings_bt_label_, 40);
@@ -2415,6 +2420,7 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_pad_all(settings_bt_switch_, 2, LV_PART_KNOB);
     lv_obj_add_event_cb(settings_bt_switch_, &LcdDisplay::OnSettingsBtToggleClicked,
                         LV_EVENT_VALUE_CHANGED, this);
+#endif  // CONFIG_FEATURE_BLE_KEYBOARD
 
     /* Reboot */
     lv_obj_t* settings_reboot = lv_button_create(settings_screen_);
@@ -2721,6 +2727,7 @@ void LcdDisplay::SetupUI() {
     chat_lines_per_page_ = 5;  // idle layout: five lines + media entry icon
     ApplyChatLayout();
 
+#if CONFIG_FEATURE_BLE_KEYBOARD
     // Bring up the BLE HID media keyboard and reflect the link state.
     MediaBle::GetInstance().SetStatusCallback([this](bool connected) {
         Application::GetInstance().Schedule([this, connected]() {
@@ -2741,6 +2748,7 @@ void LcdDisplay::SetupUI() {
     if (bt_user_enabled_) {
         MediaBle::GetInstance().Start();
     }
+#endif  // CONFIG_FEATURE_BLE_KEYBOARD
 
 #if CONFIG_WEB_FILE_SERVER
     // File transfer page mirrors the server state and upload progress.
@@ -3145,6 +3153,7 @@ void LcdDisplay::ApplyChatLayout() {
         lv_obj_set_style_text_font(avatar_think_dots_, font, 0);
         lv_obj_set_style_text_color(avatar_think_dots_, lvgl_theme->text_color(), 0);
     }
+#if CONFIG_FEATURE_BLE_KEYBOARD
     lv_obj_t* themed_labels[] = {media_title_, media_hint_, bt_title_,
                                  bt_empty_,    bt_status_,  bt_disconnect_label_};
     for (lv_obj_t* label : themed_labels) {
@@ -3186,6 +3195,7 @@ void LcdDisplay::ApplyChatLayout() {
             lv_obj_set_style_text_color(numpad_icon_labels_[i], lv_color_hex(kDarkTeal), 0);
         }
     }
+#endif  // CONFIG_FEATURE_BLE_KEYBOARD
     lv_obj_set_style_text_line_space(chat_message_label_, chat_line_space, 0);
     lv_obj_set_width(chat_message_label_, chat_w);
 
@@ -3289,6 +3299,7 @@ void LcdDisplay::UpdateSettingsValues() {
         lv_obj_set_style_bg_color(settings_wifi_dot_,
                                   lv_color_hex(wifi_connected ? kDarkGood : kDarkDim), 0);
     }
+#if CONFIG_FEATURE_BLE_KEYBOARD
     if (settings_bt_status_ != nullptr) {
         const bool connected = MediaBle::GetInstance().IsConnected() && bt_user_enabled_;
         const char* text = "未连接";
@@ -3337,6 +3348,7 @@ void LcdDisplay::UpdateSettingsValues() {
             }
         }
     }
+#endif  // CONFIG_FEATURE_BLE_KEYBOARD
     if (settings_ip_value_ != nullptr) {
         const std::string ip = wifi_connected ? wifi.GetIpAddress() : std::string();
         if (ip.empty()) {
@@ -3694,6 +3706,7 @@ void LcdDisplay::OnWifiConfigClicked(lv_event_t* e) {
     wifi_board->EnterWifiConfigMode();
 }
 
+#if CONFIG_FEATURE_BLE_KEYBOARD
 void LcdDisplay::OnSettingsBtToggleClicked(lv_event_t* e) {
     auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
     if (self == nullptr || self->bt_busy_) {
@@ -3757,6 +3770,8 @@ void LcdDisplay::OnSettingsBtForgetClicked(lv_event_t* e) {
         self->UpdateSettingsValues();
     }
 }
+
+#endif  // CONFIG_FEATURE_BLE_KEYBOARD
 
 void LcdDisplay::OnRebootClicked(lv_event_t* e) {
     (void)e;
@@ -4417,6 +4432,7 @@ void LcdDisplay::UpdateMediaBarVisibility() {
     }
 }
 
+#if CONFIG_FEATURE_BLE_KEYBOARD
 void LcdDisplay::ShowMediaScreen(bool show) {
     if (media_screen_ == nullptr) {
         return;
@@ -4464,6 +4480,10 @@ void LcdDisplay::ShowBluetoothScreen(bool show) {
     }
     UpdateMediaBarVisibility();
 }
+#else
+void LcdDisplay::ShowMediaScreen(bool show) { (void)show; }
+void LcdDisplay::ShowBluetoothScreen(bool show) { (void)show; }
+#endif  // CONFIG_FEATURE_BLE_KEYBOARD
 
 #if CONFIG_FEATURE_STROKE_ORDER
 
@@ -5550,6 +5570,14 @@ bool LcdDisplay::DrawerStrokeEnabled() const {
 #endif
 }
 
+bool LcdDisplay::DrawerBleKeyboardEnabled() const {
+#if CONFIG_FEATURE_BLE_KEYBOARD
+    return true;
+#else
+    return false;
+#endif
+}
+
 void LcdDisplay::RefreshDrawerTiles() {
     for (int i = 0; i < kDrawerTileCount; ++i) {
         if (drawer_tiles_[i] == nullptr) {
@@ -5630,7 +5658,11 @@ void LcdDisplay::OpenStrokePage() {
 #endif
 }
 
+#if CONFIG_FEATURE_BLE_KEYBOARD
 void LcdDisplay::OpenMediaPage() { ShowMediaScreen(true); }
+#else
+void LcdDisplay::OpenMediaPage() {}
+#endif
 
 void LcdDisplay::OpenFileServicePage() { ShowFileServiceScreen(true); }
 
@@ -5673,6 +5705,7 @@ void LcdDisplay::OnDrawerTileClicked(lv_event_t* e) {
     (self->*spec.action)();
 }
 
+#if CONFIG_FEATURE_BLE_KEYBOARD
 void LcdDisplay::OnMediaBackClicked(lv_event_t* e) {
     auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
     if (self != nullptr) {
@@ -6045,6 +6078,8 @@ void LcdDisplay::OnBluetoothBackClicked(lv_event_t* e) {
         self->ShowBluetoothScreen(false);
     }
 }
+
+#endif  // CONFIG_FEATURE_BLE_KEYBOARD
 
 void LcdDisplay::SetEmotion(const char* emotion) {
     if (!setup_ui_called_) {

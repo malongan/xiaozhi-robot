@@ -3,6 +3,7 @@
   "description": "仅英语听写，用于验证功能包隔离",
   "features": {
     "english_dictation": true,
-    "stroke_order": false
+    "stroke_order": false,
+    "ble_keyboard": false
   }
 }

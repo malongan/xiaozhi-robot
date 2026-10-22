@@ -1,0 +1,9 @@
+{
+  "name": "keyboard",
+  "description": "仅蓝牙键盘，用于验证功能包隔离",
+  "features": {
+    "english_dictation": false,
+    "stroke_order": false,
+    "ble_keyboard": true
+  }
+}

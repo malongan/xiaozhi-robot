@@ -1,8 +1,9 @@
 {
   "name": "full",
-  "description": "全部已登记功能包，等同当前 r3 行为",
+  "description": "全部已登记功能包，保持 r3 的完整功能",
   "features": {
     "english_dictation": true,
-    "stroke_order": true
+    "stroke_order": true,
+    "ble_keyboard": true
   }
 }
