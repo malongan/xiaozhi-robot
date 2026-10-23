@@ -302,7 +302,8 @@ python3 scripts/feature_build.py --profile base --no-build
 | `keyboard`（仅键盘） | 3,352,448 B | 2,502,276 B | 703,112 B | 178,043 B |
 | `web_file_transfer`（仅传输） | 3,151,792 B | 2,342,592 B | 684,768 B | 154,043 B |
 | `music`（仅音乐） | 3,685,936 B | 2,667,824 B | 889,952 B | 158,207 B |
-| `full`（全开） | 4,061,760 B | 2,937,204 B | 973,464 B | 182,607 B |
+| `full`（全开） | 4,064,720 B | 2,940,004 B | 973,624 B | 182,607 B |
+| `no_keyboard`（关键盘） | 3,830,048 B | 2,753,284 B | 948,288 B | 158,559 B |
 | `music - base` | +569,760 B | +353,860 B | +212,176 B | +4,212 B |
 | `full - base` | +945,584 B | +623,240 B | +295,688 B | +28,612 B |
 
@@ -326,7 +327,7 @@ python3 scripts/feature_build.py --profile base --no-build
 12 项为 Windows 环境缺少外部命令（`python3`/`cmake`）导致的 `FileNotFoundError`，
 1 项跳过，与本次改动无关。
 
-真机验证：`full` 固件（4,061,760 B）刷入 `0x20000` 后启动正常、无 panic，唤醒词模型
+真机验证：`full` 固件（4,064,720 B）刷入 `0x20000` 后启动正常、无 panic，唤醒词模型
 加载正常。列表翻页按钮的点击区域（含页码左右半区）与音乐语音流程尚未人工验证，
 需要在 `/sdcard/music` 放歌后逐项确认。
 
