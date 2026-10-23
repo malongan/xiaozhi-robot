@@ -6495,13 +6495,37 @@ void LcdDisplay::SetHideSubtitle(bool hide) {
 
 namespace {
 
-constexpr uint32_t kMusicInk = 0xF2F5FA;
-constexpr uint32_t kMusicMuted = 0x9AA3B2;
-constexpr uint32_t kMusicDim = 0x6B7382;
-constexpr uint32_t kMusicAccent = 0xE05A7A;
-constexpr uint32_t kMusicBarBg = 0x2A2E36;
-constexpr uint32_t kMusicRowBg = 0x24272E;
-constexpr uint32_t kMusicChevron = 0x6B7382;
+struct MusicPalette {
+    uint32_t screen_bg;
+    uint32_t bezel_bg;
+    uint32_t bezel_border;
+    uint32_t lcd_top;
+    uint32_t lcd_bottom;
+    uint32_t ink;
+    uint32_t muted;
+    uint32_t dim;
+    uint32_t accent;
+    uint32_t bar_bg;
+    uint32_t row_bg;
+    uint32_t chevron;
+    uint32_t wheel_bg;
+    uint32_t wheel_border;
+    uint32_t hub_bg;
+    uint32_t hub_border;
+    uint32_t disabled;
+};
+
+constexpr MusicPalette kMusicDark = {
+    0x000000, 0x0A0B0D, 0x262A33, 0x1B1E22, 0x121417, 0xF2F5FA, 0x9AA3B2,
+    0x6B7382, 0xE05A7A, 0x2A2E36, 0x24272E, 0x6B7382, 0x13151A, 0x2B2F37,
+    0x1D2027, 0x30343D, 0x4A5059,
+};
+
+constexpr MusicPalette kMusicLight = {
+    0xE8EAED, 0xC3C8CE, 0xA8AFB7, 0xFFFFFF, 0xF3F5F7, 0x1F242B, 0x6F7885,
+    0x8B94A1, 0x2F7CE8, 0xDDE2E7, 0xF7F8FA, 0xC8CED5, 0xF7F8F9, 0xB0B6BD,
+    0xEEF0F2, 0xB3B9C0, 0xC8CED5,
+};
 
 enum MusicRowKind {
     kMusicRowNone = 0,
@@ -6546,10 +6570,15 @@ void LcdDisplay::SetupMusicScreen() {
     const lv_font_t* icon_font =
         (theme != nullptr && theme->icon_font() != nullptr) ? theme->icon_font()->font() : text_font;
 
+    {
+        Settings music_settings("display", true);
+        music_light_skin_ = music_settings.GetString("music_skin", "dark") == "light";
+    }
+    const MusicPalette& pal = music_light_skin_ ? kMusicLight : kMusicDark;
     music_screen_ = lv_obj_create(lv_screen_active());
     lv_obj_set_size(music_screen_, LV_HOR_RES, LV_VER_RES);
     lv_obj_set_pos(music_screen_, 0, 0);
-    lv_obj_set_style_bg_color(music_screen_, lv_color_hex(0x000000), 0);
+    lv_obj_set_style_bg_color(music_screen_, lv_color_hex(pal.screen_bg), 0);
     lv_obj_set_style_bg_opa(music_screen_, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(music_screen_, 0, 0);
     lv_obj_set_style_radius(music_screen_, 0, 0);
@@ -6558,21 +6587,23 @@ void LcdDisplay::SetupMusicScreen() {
     lv_obj_add_flag(music_screen_, LV_OBJ_FLAG_HIDDEN);
 
     lv_obj_t* bezel = lv_obj_create(music_screen_);
+    music_bezel_ = bezel;
     lv_obj_set_size(bezel, 224, 176);
     lv_obj_set_pos(bezel, 8, 8);
-    lv_obj_set_style_bg_color(bezel, lv_color_hex(0x0A0B0D), 0);
+    lv_obj_set_style_bg_color(bezel, lv_color_hex(pal.bezel_bg), 0);
     lv_obj_set_style_bg_opa(bezel, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(bezel, 1, 0);
-    lv_obj_set_style_border_color(bezel, lv_color_hex(0x262A33), 0);
+    lv_obj_set_style_border_color(bezel, lv_color_hex(pal.bezel_border), 0);
     lv_obj_set_style_radius(bezel, 18, 0);
     lv_obj_set_style_pad_all(bezel, 0, 0);
     lv_obj_remove_flag(bezel, LV_OBJ_FLAG_SCROLLABLE);
 
     lv_obj_t* lcd = lv_obj_create(bezel);
+    music_lcd_ = lcd;
     lv_obj_set_size(lcd, 208, 160);
     lv_obj_set_pos(lcd, 8, 8);
-    lv_obj_set_style_bg_color(lcd, lv_color_hex(0x1B1E22), 0);
-    lv_obj_set_style_bg_grad_color(lcd, lv_color_hex(0x121417), 0);
+    lv_obj_set_style_bg_color(lcd, lv_color_hex(pal.lcd_top), 0);
+    lv_obj_set_style_bg_grad_color(lcd, lv_color_hex(pal.lcd_bottom), 0);
     lv_obj_set_style_bg_grad_dir(lcd, LV_GRAD_DIR_VER, 0);
     lv_obj_set_style_bg_opa(lcd, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(lcd, 0, 0);
@@ -6580,20 +6611,20 @@ void LcdDisplay::SetupMusicScreen() {
     lv_obj_set_style_pad_all(lcd, 0, 0);
     lv_obj_remove_flag(lcd, LV_OBJ_FLAG_SCROLLABLE);
 
-    lv_obj_t* back = MusicMakeLabel(lcd, icon_font, kMusicMuted);
+    lv_obj_t* back = MusicMakeLabel(lcd, icon_font, pal.muted);
     lv_label_set_text(back, MATERIAL_SYMBOLS_ARROW_BACK);
     lv_obj_set_pos(back, 4, 3);
     lv_obj_set_ext_click_area(back, 8);
     lv_obj_add_flag(back, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(back, &LcdDisplay::OnMusicBackClicked, LV_EVENT_CLICKED, this);
 
-    music_header_label_ = MusicMakeLabel(lcd, text_font, kMusicInk);
+    music_header_label_ = MusicMakeLabel(lcd, text_font, pal.ink);
     lv_obj_set_pos(music_header_label_, 24, 1);
     lv_obj_set_size(music_header_label_, 100, 22);
     lv_label_set_long_mode(music_header_label_, LV_LABEL_LONG_DOT);
     lv_label_set_text(music_header_label_, "iPod");
 
-    music_play_icon_ = MusicMakeLabel(lcd, icon_font, kMusicMuted);
+    music_play_icon_ = MusicMakeLabel(lcd, icon_font, pal.muted);
     lv_obj_set_pos(music_play_icon_, 182, 3);
     lv_label_set_text(music_play_icon_, MATERIAL_SYMBOLS_PLAY_ARROW);
 
@@ -6613,7 +6644,7 @@ void LcdDisplay::SetupMusicScreen() {
     lv_obj_add_flag(music_pager_prev_, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(music_pager_prev_, &LcdDisplay::OnMusicPagePrevClicked,
                         LV_EVENT_CLICKED, this);
-    lv_obj_t* prev_icon = MusicMakeLabel(music_pager_prev_, icon_font, kMusicMuted);
+    lv_obj_t* prev_icon = MusicMakeLabel(music_pager_prev_, icon_font, pal.muted);
     lv_label_set_text(prev_icon, MATERIAL_SYMBOLS_KEYBOARD_ARROW_LEFT);
     lv_obj_align(prev_icon, LV_ALIGN_LEFT_MID, 2, 0);
 
@@ -6624,13 +6655,13 @@ void LcdDisplay::SetupMusicScreen() {
     lv_obj_add_flag(music_pager_next_, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(music_pager_next_, &LcdDisplay::OnMusicPageNextClicked,
                         LV_EVENT_CLICKED, this);
-    lv_obj_t* next_icon = MusicMakeLabel(music_pager_next_, icon_font, kMusicMuted);
+    lv_obj_t* next_icon = MusicMakeLabel(music_pager_next_, icon_font, pal.muted);
     lv_label_set_text(next_icon, MATERIAL_SYMBOLS_KEYBOARD_ARROW_RIGHT);
     lv_obj_align(next_icon, LV_ALIGN_RIGHT_MID, -2, 0);
 
     // Non-clickable, drawn on top: taps on the number fall through to the
     // half of the pager underneath it.
-    music_pager_count_ = MusicMakeLabel(music_pager_, text_font, kMusicMuted);
+    music_pager_count_ = MusicMakeLabel(music_pager_, text_font, pal.muted);
     lv_obj_set_size(music_pager_count_, 40, 22);
     lv_obj_set_pos(music_pager_count_, 19, 0);
     lv_obj_set_style_text_align(music_pager_count_, LV_TEXT_ALIGN_CENTER, 0);
@@ -6645,7 +6676,7 @@ void LcdDisplay::SetupMusicScreen() {
         lv_obj_t* row = lv_obj_create(music_list_);
         lv_obj_set_size(row, 192, 24);
         lv_obj_set_pos(row, 2, i * 24);
-        lv_obj_set_style_bg_color(row, lv_color_hex(kMusicRowBg), 0);
+        lv_obj_set_style_bg_color(row, lv_color_hex(pal.row_bg), 0);
         lv_obj_set_style_bg_opa(row, LV_OPA_COVER, 0);
         lv_obj_set_style_border_width(row, 0, 0);
         lv_obj_set_style_radius(row, 7, 0);
@@ -6658,12 +6689,12 @@ void LcdDisplay::SetupMusicScreen() {
         lv_obj_set_user_data(row, reinterpret_cast<void*>(static_cast<intptr_t>(i)));
         lv_obj_add_event_cb(row, &LcdDisplay::OnMusicRowClicked, LV_EVENT_CLICKED, this);
 
-        lv_obj_t* label = MusicMakeLabel(row, text_font, kMusicInk);
+        lv_obj_t* label = MusicMakeLabel(row, text_font, pal.ink);
         lv_obj_set_pos(label, 8, 0);
         lv_obj_set_size(label, 158, 24);
         lv_label_set_long_mode(label, LV_LABEL_LONG_DOT);
 
-        lv_obj_t* chevron = MusicMakeLabel(row, icon_font, kMusicChevron);
+        lv_obj_t* chevron = MusicMakeLabel(row, icon_font, pal.chevron);
         lv_label_set_text(chevron, MATERIAL_SYMBOLS_KEYBOARD_ARROW_RIGHT);
         lv_obj_align(chevron, LV_ALIGN_RIGHT_MID, -6, 0);
         lv_obj_add_flag(chevron, LV_OBJ_FLAG_HIDDEN);
@@ -6677,7 +6708,7 @@ void LcdDisplay::SetupMusicScreen() {
     music_scroll_track_ = lv_obj_create(music_list_);
     lv_obj_set_size(music_scroll_track_, 2, 124);
     lv_obj_set_pos(music_scroll_track_, 193, 0);
-    lv_obj_set_style_bg_color(music_scroll_track_, lv_color_hex(kMusicBarBg), 0);
+    lv_obj_set_style_bg_color(music_scroll_track_, lv_color_hex(pal.bar_bg), 0);
     lv_obj_set_style_bg_opa(music_scroll_track_, LV_OPA_50, 0);
     lv_obj_set_style_border_width(music_scroll_track_, 0, 0);
     lv_obj_set_style_radius(music_scroll_track_, 1, 0);
@@ -6688,7 +6719,7 @@ void LcdDisplay::SetupMusicScreen() {
     music_scroll_thumb_ = lv_obj_create(music_list_);
     lv_obj_set_size(music_scroll_thumb_, 2, 40);
     lv_obj_set_pos(music_scroll_thumb_, 193, 0);
-    lv_obj_set_style_bg_color(music_scroll_thumb_, lv_color_hex(kMusicMuted), 0);
+    lv_obj_set_style_bg_color(music_scroll_thumb_, lv_color_hex(pal.muted), 0);
     lv_obj_set_style_bg_opa(music_scroll_thumb_, LV_OPA_60, 0);
     lv_obj_set_style_border_width(music_scroll_thumb_, 0, 0);
     lv_obj_set_style_radius(music_scroll_thumb_, 1, 0);
@@ -6703,19 +6734,19 @@ void LcdDisplay::SetupMusicScreen() {
     MusicFlatten(music_now_panel_);
     lv_obj_add_flag(music_now_panel_, LV_OBJ_FLAG_HIDDEN);
 
-    music_now_title_ = MusicMakeLabel(music_now_panel_, text_font, kMusicInk);
+    music_now_title_ = MusicMakeLabel(music_now_panel_, text_font, pal.ink);
     lv_obj_set_pos(music_now_title_, 6, 2);
     lv_obj_set_size(music_now_title_, 196, 22);
     lv_obj_set_style_text_align(music_now_title_, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_long_mode(music_now_title_, LV_LABEL_LONG_DOT);
 
-    music_now_artist_ = MusicMakeLabel(music_now_panel_, text_font, kMusicMuted);
+    music_now_artist_ = MusicMakeLabel(music_now_panel_, text_font, pal.muted);
     lv_obj_set_pos(music_now_artist_, 6, 22);
     lv_obj_set_size(music_now_artist_, 196, 22);
     lv_obj_set_style_text_align(music_now_artist_, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_long_mode(music_now_artist_, LV_LABEL_LONG_DOT);
 
-    music_now_album_ = MusicMakeLabel(music_now_panel_, text_font, kMusicDim);
+    music_now_album_ = MusicMakeLabel(music_now_panel_, text_font, pal.dim);
     lv_obj_set_pos(music_now_album_, 6, 42);
     lv_obj_set_size(music_now_album_, 196, 22);
     lv_obj_set_style_text_align(music_now_album_, LV_TEXT_ALIGN_CENTER, 0);
@@ -6726,19 +6757,19 @@ void LcdDisplay::SetupMusicScreen() {
     lv_obj_set_size(music_progress_, 184, 4);
     lv_bar_set_range(music_progress_, 0, 100);
     lv_bar_set_value(music_progress_, 0, LV_ANIM_OFF);
-    lv_obj_set_style_bg_color(music_progress_, lv_color_hex(kMusicBarBg), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(music_progress_, lv_color_hex(pal.bar_bg), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(music_progress_, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_radius(music_progress_, 2, LV_PART_MAIN);
-    lv_obj_set_style_bg_color(music_progress_, lv_color_hex(kMusicAccent), LV_PART_INDICATOR);
+    lv_obj_set_style_bg_color(music_progress_, lv_color_hex(pal.accent), LV_PART_INDICATOR);
     lv_obj_set_style_bg_opa(music_progress_, LV_OPA_COVER, LV_PART_INDICATOR);
     lv_obj_set_style_radius(music_progress_, 2, LV_PART_INDICATOR);
 
-    music_now_time_ = MusicMakeLabel(music_now_panel_, text_font, kMusicDim);
+    music_now_time_ = MusicMakeLabel(music_now_panel_, text_font, pal.dim);
     lv_obj_set_pos(music_now_time_, 12, 80);
     lv_obj_set_size(music_now_time_, 70, 22);
     lv_label_set_text(music_now_time_, "0:00");
 
-    music_now_total_ = MusicMakeLabel(music_now_panel_, text_font, kMusicDim);
+    music_now_total_ = MusicMakeLabel(music_now_panel_, text_font, pal.dim);
     lv_obj_set_pos(music_now_total_, 126, 80);
     lv_obj_set_size(music_now_total_, 70, 22);
     lv_obj_set_style_text_align(music_now_total_, LV_TEXT_ALIGN_RIGHT, 0);
@@ -6746,27 +6777,33 @@ void LcdDisplay::SetupMusicScreen() {
 
     // Click wheel.
     lv_obj_t* wheel = lv_obj_create(music_screen_);
+    music_wheel_ = wheel;
     lv_obj_set_size(wheel, 120, 120);
     lv_obj_set_pos(wheel, 60, 196);
     lv_obj_set_style_radius(wheel, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_bg_color(wheel, lv_color_hex(0x13151A), 0);
+    lv_obj_set_style_bg_color(wheel, lv_color_hex(pal.wheel_bg), 0);
     lv_obj_set_style_bg_opa(wheel, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(wheel, 1, 0);
-    lv_obj_set_style_border_color(wheel, lv_color_hex(0x2B2F37), 0);
+    lv_obj_set_style_border_color(wheel, lv_color_hex(pal.wheel_border), 0);
     lv_obj_set_style_pad_all(wheel, 0, 0);
     lv_obj_set_style_shadow_width(wheel, 6, 0);
     lv_obj_set_style_shadow_ofs_y(wheel, 2, 0);
     lv_obj_set_style_shadow_opa(wheel, LV_OPA_30, 0);
     lv_obj_remove_flag(wheel, LV_OBJ_FLAG_SCROLLABLE);
 
-    lv_obj_t* menu = MusicMakeLabel(wheel, text_font, kMusicMuted);
+    lv_obj_t* menu = MusicMakeLabel(wheel, text_font, pal.muted);
     lv_label_set_text(menu, "MENU");
     lv_obj_align(menu, LV_ALIGN_TOP_MID, 0, 8);
     lv_obj_set_ext_click_area(menu, 10);
     lv_obj_add_flag(menu, LV_OBJ_FLAG_CLICKABLE);
+    music_menu_label_ = menu;
+    // The input device default long-press time is used (LVGL 9 has no
+    // per-object setter); the click and long-press callbacks coexist.
     lv_obj_add_event_cb(menu, &LcdDisplay::OnMusicMenuClicked, LV_EVENT_CLICKED, this);
+    lv_obj_add_event_cb(menu, &LcdDisplay::OnMusicMenuLongPressed,
+                        LV_EVENT_LONG_PRESSED, this);
 
-    music_wheel_prev_ = MusicMakeLabel(wheel, icon_font, kMusicMuted);
+    music_wheel_prev_ = MusicMakeLabel(wheel, icon_font, pal.muted);
     lv_label_set_text(music_wheel_prev_, MATERIAL_SYMBOLS_SKIP_PREVIOUS);
     lv_obj_align(music_wheel_prev_, LV_ALIGN_LEFT_MID, 10, 0);
     lv_obj_set_ext_click_area(music_wheel_prev_, 10);
@@ -6774,7 +6811,7 @@ void LcdDisplay::SetupMusicScreen() {
     lv_obj_add_event_cb(music_wheel_prev_, &LcdDisplay::OnMusicPrevClicked, LV_EVENT_CLICKED,
                         this);
 
-    music_wheel_next_ = MusicMakeLabel(wheel, icon_font, kMusicMuted);
+    music_wheel_next_ = MusicMakeLabel(wheel, icon_font, pal.muted);
     lv_label_set_text(music_wheel_next_, MATERIAL_SYMBOLS_SKIP_NEXT);
     lv_obj_align(music_wheel_next_, LV_ALIGN_RIGHT_MID, -10, 0);
     lv_obj_set_ext_click_area(music_wheel_next_, 10);
@@ -6782,7 +6819,7 @@ void LcdDisplay::SetupMusicScreen() {
     lv_obj_add_event_cb(music_wheel_next_, &LcdDisplay::OnMusicNextClicked, LV_EVENT_CLICKED,
                         this);
 
-    music_wheel_play_ = MusicMakeLabel(wheel, icon_font, kMusicAccent);
+    music_wheel_play_ = MusicMakeLabel(wheel, icon_font, pal.accent);
     lv_label_set_text(music_wheel_play_, MATERIAL_SYMBOLS_PLAY_ARROW);
     lv_obj_align(music_wheel_play_, LV_ALIGN_BOTTOM_MID, 0, -6);
     lv_obj_set_ext_click_area(music_wheel_play_, 10);
@@ -6794,10 +6831,10 @@ void LcdDisplay::SetupMusicScreen() {
     lv_obj_set_size(music_hub_, 40, 40);
     lv_obj_center(music_hub_);
     lv_obj_set_style_radius(music_hub_, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_bg_color(music_hub_, lv_color_hex(0x1D2027), 0);
+    lv_obj_set_style_bg_color(music_hub_, lv_color_hex(pal.hub_bg), 0);
     lv_obj_set_style_bg_opa(music_hub_, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(music_hub_, 1, 0);
-    lv_obj_set_style_border_color(music_hub_, lv_color_hex(0x30343D), 0);
+    lv_obj_set_style_border_color(music_hub_, lv_color_hex(pal.hub_border), 0);
     lv_obj_set_style_pad_all(music_hub_, 0, 0);
     lv_obj_remove_flag(music_hub_, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_flag(music_hub_, LV_OBJ_FLAG_CLICKABLE);
@@ -6806,6 +6843,114 @@ void LcdDisplay::SetupMusicScreen() {
 
     music_tick_timer_ = lv_timer_create(&LcdDisplay::OnMusicTick, 500, this);
     lv_timer_pause(music_tick_timer_);
+}
+
+void LcdDisplay::ApplyMusicSkin() {
+    if (music_screen_ == nullptr) {
+        return;
+    }
+    const MusicPalette& pal = music_light_skin_ ? kMusicLight : kMusicDark;
+    DisplayLockGuard lock(this);
+
+    lv_obj_set_style_bg_color(music_screen_, lv_color_hex(pal.screen_bg), 0);
+    if (music_bezel_ != nullptr) {
+        lv_obj_set_style_bg_color(music_bezel_, lv_color_hex(pal.bezel_bg), 0);
+        lv_obj_set_style_border_color(music_bezel_, lv_color_hex(pal.bezel_border), 0);
+    }
+    if (music_lcd_ != nullptr) {
+        lv_obj_set_style_bg_color(music_lcd_, lv_color_hex(pal.lcd_top), 0);
+        lv_obj_set_style_bg_grad_color(music_lcd_, lv_color_hex(pal.lcd_bottom), 0);
+    }
+    if (music_header_label_ != nullptr) {
+        lv_obj_set_style_text_color(music_header_label_, lv_color_hex(pal.ink), 0);
+    }
+    lv_obj_t* muted_labels[] = {music_play_icon_, music_pager_count_, music_now_artist_,
+                                music_wheel_prev_, music_wheel_next_, music_menu_label_};
+    for (lv_obj_t* label : muted_labels) {
+        if (label != nullptr) {
+            lv_obj_set_style_text_color(label, lv_color_hex(pal.muted), 0);
+        }
+    }
+    if (music_pager_prev_ != nullptr) {
+        lv_obj_t* icon = lv_obj_get_child(music_pager_prev_, 0);
+        if (icon != nullptr) {
+            lv_obj_set_style_text_color(icon, lv_color_hex(pal.muted), 0);
+        }
+    }
+    if (music_pager_next_ != nullptr) {
+        lv_obj_t* icon = lv_obj_get_child(music_pager_next_, 0);
+        if (icon != nullptr) {
+            lv_obj_set_style_text_color(icon, lv_color_hex(pal.muted), 0);
+        }
+    }
+    lv_obj_t* dim_labels[] = {music_now_album_, music_now_time_, music_now_total_};
+    for (lv_obj_t* label : dim_labels) {
+        if (label != nullptr) {
+            lv_obj_set_style_text_color(label, lv_color_hex(pal.dim), 0);
+        }
+    }
+    if (music_now_title_ != nullptr) {
+        lv_obj_set_style_text_color(music_now_title_, lv_color_hex(pal.ink), 0);
+    }
+    for (int i = 0; i < kMusicRows; ++i) {
+        lv_obj_t* row = music_list_rows_[i];
+        if (row == nullptr) {
+            continue;
+        }
+        lv_obj_set_style_bg_color(row, lv_color_hex(pal.row_bg), 0);
+        lv_obj_t* label = lv_obj_get_child(row, 0);
+        if (label != nullptr) {
+            lv_obj_set_style_text_color(label, lv_color_hex(pal.ink), 0);
+        }
+        lv_obj_t* chevron = lv_obj_get_child(row, 1);
+        if (chevron != nullptr) {
+            lv_obj_set_style_text_color(chevron, lv_color_hex(pal.chevron), 0);
+        }
+    }
+    if (music_scroll_track_ != nullptr) {
+        lv_obj_set_style_bg_color(music_scroll_track_, lv_color_hex(pal.bar_bg), 0);
+    }
+    if (music_scroll_thumb_ != nullptr) {
+        lv_obj_set_style_bg_color(music_scroll_thumb_, lv_color_hex(pal.muted), 0);
+    }
+    if (music_progress_ != nullptr) {
+        lv_obj_set_style_bg_color(music_progress_, lv_color_hex(pal.bar_bg),
+                                  LV_PART_MAIN);
+        lv_obj_set_style_bg_color(music_progress_, lv_color_hex(pal.accent),
+                                  LV_PART_INDICATOR);
+    }
+    if (music_wheel_play_ != nullptr) {
+        lv_obj_set_style_text_color(music_wheel_play_, lv_color_hex(pal.accent), 0);
+    }
+    if (music_wheel_ != nullptr) {
+        lv_obj_set_style_bg_color(music_wheel_, lv_color_hex(pal.wheel_bg), 0);
+        lv_obj_set_style_border_color(music_wheel_, lv_color_hex(pal.wheel_border), 0);
+    }
+    if (music_hub_ != nullptr) {
+        lv_obj_set_style_bg_color(music_hub_, lv_color_hex(pal.hub_bg), 0);
+        lv_obj_set_style_border_color(music_hub_, lv_color_hex(pal.hub_border), 0);
+    }
+}
+
+void LcdDisplay::ToggleMusicSkin() {
+    music_light_skin_ = !music_light_skin_;
+    Settings music_settings("display", true);
+    music_settings.SetString("music_skin", music_light_skin_ ? "light" : "dark");
+    ApplyMusicSkin();
+    ESP_LOGI(TAG, "music skin -> %s", music_light_skin_ ? "light" : "dark");
+}
+
+void LcdDisplay::OnMusicMenuLongPressed(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self == nullptr) {
+        return;
+    }
+    // Only the iPod root menu toggles the skin; in sub-pages the long press
+    // is ignored so it cannot fight with the back navigation.
+    if (self->music_view_ != kMusicViewRoot) {
+        return;
+    }
+    self->ToggleMusicSkin();
 }
 
 void LcdDisplay::ShowMusicScreen(bool show) {
@@ -6871,7 +7016,20 @@ void LcdDisplay::MusicBack() {
         SetMusicView(kMusicViewRoot, "", 0, false);
         return;
     }
+    // The iPod root menu never leaves the player: repeated MENU taps stop
+    // here. Only the back arrow (or an explicit stop) closes the page.
+    if (music_view_ == kMusicViewRoot) {
+        return;
+    }
+}
+
+void LcdDisplay::MusicExit() {
+    if (music_view_ != kMusicViewRoot || !music_nav_stack_.empty()) {
+        music_nav_stack_.clear();
+        SetMusicView(kMusicViewRoot, "", 0, false);
+    }
     const bool to_drawer = return_to_drawer_;
+    return_to_drawer_ = false;
     ShowMusicScreen(false);
     if (to_drawer) {
         CloseSubPageToDrawer();
@@ -7231,7 +7389,7 @@ void LcdDisplay::MusicSelectRow(int row) {
 void LcdDisplay::OnMusicBackClicked(lv_event_t* e) {
     auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
     if (self != nullptr) {
-        self->MusicBack();
+        self->MusicExit();
     }
 }
 

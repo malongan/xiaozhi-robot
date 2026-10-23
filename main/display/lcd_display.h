@@ -329,6 +329,11 @@ protected:
     lv_obj_t* music_wheel_play_ = nullptr;
     lv_obj_t* music_wheel_next_ = nullptr;
     lv_obj_t* music_hub_ = nullptr;
+    lv_obj_t* music_wheel_ = nullptr;
+    lv_obj_t* music_bezel_ = nullptr;
+    lv_obj_t* music_lcd_ = nullptr;
+    lv_obj_t* music_menu_label_ = nullptr;
+    bool music_light_skin_ = false;
     lv_timer_t* music_tick_timer_ = nullptr;
     // Header pager: two 39 px tap targets that also cover the page number in
     // the middle (tap left half = previous page, right half = next page).
@@ -352,6 +357,7 @@ protected:
     void SetupMusicScreen();
     void ShowMusicScreen(bool show);
     void MusicBack();
+    void MusicExit();
     void MusicSelectRow(int row);
     void SetMusicView(int view, const std::string& filter, int page, bool remember = true);
     void RefreshMusicViewItems();
@@ -360,6 +366,9 @@ protected:
     void RenderMusicList();
     void RenderMusicNowPlaying();
     void UpdateMusicPager();
+    void ApplyMusicSkin();
+    void ToggleMusicSkin();
+    static void OnMusicMenuLongPressed(lv_event_t* e);
     void UpdateMusicProgress();
     void RebindMusicFonts(const lv_font_t* text_font, const lv_font_t* icon_font,
                           const lv_font_t* large_icon_font);

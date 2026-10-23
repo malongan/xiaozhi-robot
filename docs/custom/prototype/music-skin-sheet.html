@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>音乐皮肤选择 · 交互样式稿</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: radial-gradient(900px 600px at 50% 0%, #f1f3f6 0%, #e6eaef 60%, #dbe0e6 100%);
+    color: #4a525c;
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    padding: 34px 40px 44px;
+  }
+  h1 { font-size: 17px; color: #2b323a; margin: 0 0 4px; font-weight: 600; }
+  .note { font-size: 12px; color: #7b848e; margin: 0 0 26px; line-height: 1.7; }
+  .stage { display: flex; gap: 52px; align-items: flex-start; }
+  .frame-wrap { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+  .caption { font-size: 12px; color: #6f7885; }
+
+  .device { position: relative; width: 240px; height: 320px;
+    transform: scale(2); transform-origin: top left; background: #111; border-radius: 12px;
+    box-shadow: 0 10px 24px rgba(0,0,0,.35); }
+  .device-slot { width: 480px; height: 640px; }
+  .bezel { position: absolute; left: 8px; top: 8px; width: 224px; height: 176px;
+    background: #0a0b0d; border: 1px solid #262a33; border-radius: 18px; }
+  .lcd { position: absolute; left: 16px; top: 16px; width: 208px; height: 160px;
+    background: linear-gradient(180deg,#1b1e22,#121417); border-radius: 12px; overflow: hidden; }
+
+  .back { position: absolute; left: 4px; top: 1px; width: 20px; height: 22px; font-size: 15px;
+    line-height: 22px; text-align: center; color: #9aa3b2; }
+  .title { position: absolute; left: 24px; top: 1px; width: 100px; height: 22px; font-size: 13px;
+    line-height: 22px; color: #f2f5fa; }
+  .pager { position: absolute; right: 4px; top: 0; height: 24px; display: flex; align-items: center; }
+  .pager .btn { width: 22px; text-align: center; font-size: 14px; color: #9aa3b2; }
+  .pager .btn.off { color: #4a5059; }
+  .pager .count { min-width: 34px; text-align: center; font-size: 10px; color: #9aa3b2; }
+
+  .list { position: absolute; left: 6px; top: 28px; width: 196px; height: 124px; }
+  .row { position: absolute; left: 2px; width: 188px; height: 24px; background: #24272e;
+    border-radius: 7px; display: flex; align-items: center; padding: 0 8px; font-size: 12px; color: #f2f5fa; }
+
+  .wheel { position: absolute; left: 60px; top: 196px; width: 120px; height: 120px; border-radius: 50%;
+    background: radial-gradient(125% 125% at 50% 18%, #23262c 0%, #16181d 55%, #101216 100%);
+    border: 1px solid #2b2f37; }
+  .wheel .menu { position: absolute; left: 0; right: 0; top: 7px; text-align: center; font-size: 8px;
+    letter-spacing: 1.4px; color: #9aa3b2; font-weight: 600; }
+  .wheel .side { position: absolute; top: 50%; transform: translateY(-50%); width: 26px; text-align: center;
+    font-size: 12px; color: #9aa3b2; }
+  .wheel .prev { left: 7px; } .wheel .next { right: 7px; }
+  .wheel .play { position: absolute; left: 0; right: 0; bottom: 6px; text-align: center; font-size: 12px; color: #e05a7a; }
+  .hub { position: absolute; left: 40px; top: 40px; width: 40px; height: 40px; border-radius: 50%;
+    background: #1d2027; border: 1px solid #30343d; }
+
+  /* --- skin sheet --- */
+  .scrim { position: absolute; left: 16px; top: 16px; width: 208px; height: 160px;
+    background: rgba(6, 8, 11, .62); backdrop-filter: blur(2px); border-radius: 12px; }
+  .sheet { position: absolute; left: 26px; top: 44px; width: 188px; height: 104px;
+    background: #1b1f25; border: 1px solid #2f3540; border-radius: 14px;
+    box-shadow: 0 10px 22px rgba(0,0,0,.45); }
+  .sheet .sheet-title { position: absolute; left: 0; right: 0; top: 7px; text-align: center;
+    font-size: 9px; letter-spacing: .6px; color: #9aa3b2; }
+  .cards { position: absolute; left: 10px; top: 24px; display: flex; gap: 8px; }
+  .card { width: 80px; height: 62px; border-radius: 10px; background: #22262d; border: 1px solid #343b46;
+    padding: 6px 6px 0; }
+  .card.sel { border: 2px solid #4a8ff0; background: #232a34; }
+  .card .mini { position: relative; width: 66px; height: 38px; border-radius: 5px; overflow: hidden; }
+  .card .mini.dark { background: #12151a; }
+  .card .mini.light { background: #fbfcfd; }
+  .card .mini i { position: absolute; left: 4px; right: 4px; height: 4px; border-radius: 2px; }
+  .card .mini.dark i { background: #2b3039; }
+  .card .mini.light i { background: #e3e7ec; }
+  .card .cap { font-size: 9px; text-align: center; margin-top: 4px; color: #c9d1db; }
+  .card .ok { position: absolute; top: 4px; right: 6px; font-size: 9px; color: #6fb2ff; }
+  .sheet .tip { position: absolute; left: 0; right: 0; bottom: 5px; text-align: center;
+    font-size: 8px; color: #6b7382; }
+</style>
+</head>
+<body>
+  <h1>音乐皮肤选择 · 样式稿（方案 1：长按标题）</h1>
+  <p class="note">音乐页任意列表/播放页长按顶部标题 0.6 秒 → 弹出 188×104 面板；两张迷你预览卡，点选立即应用并关闭，点面板外取消。</p>
+
+  <div class="stage">
+    <div class="frame-wrap">
+      <div class="caption">长按标题 → 面板弹出（浅色未选中）</div>
+      <div class="device-slot"><div class="device">
+        <div class="bezel"></div>
+        <div class="lcd">
+          <div class="back">‹</div><div class="title">歌曲</div>
+          <div class="pager"><div class="btn off">‹</div><div class="count">1/12</div><div class="btn">›</div></div>
+          <div class="list">
+            <div class="row" style="top:0">晴天</div>
+            <div class="row" style="top:24px">稻香</div>
+            <div class="row" style="top:48px">七里香</div>
+            <div class="row" style="top:72px">夜曲</div>
+            <div class="row" style="top:96px">告白气球</div>
+          </div>
+          <div class="scrim"></div>
+          <div class="sheet">
+            <div class="sheet-title">音乐皮肤</div>
+            <div class="cards">
+              <div class="card sel">
+                <div class="mini dark">
+                  <i style="top:6px"></i><i style="top:13px"></i><i style="top:20px"></i>
+                </div>
+                <div class="cap">深色</div>
+                <div class="ok">✓</div>
+              </div>
+              <div class="card">
+                <div class="mini light">
+                  <i style="top:6px"></i><i style="top:13px"></i><i style="top:20px"></i>
+                </div>
+                <div class="cap">浅色</div>
+              </div>
+            </div>
+            <div class="tip">点按即时生效 · 点空白处取消</div>
+          </div>
+        </div>
+        <div class="wheel">
+          <div class="menu">MENU</div><div class="side prev">⏮</div><div class="side next">⏭</div>
+          <div class="play">⏸</div><div class="hub"></div>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="frame-wrap">
+      <div class="caption">选“浅色”后：整页立即切换</div>
+      <div class="device-slot"><div class="device" style="background:linear-gradient(160deg,#f7f8f9,#e9ebee 55%,#d6d9dd)">
+        <div class="bezel" style="background:#d9dde1;border-color:#fff;box-shadow:inset 0 0 0 1px #fff,0 2px 5px rgba(60,70,85,.18)"></div>
+        <div class="lcd" style="background:linear-gradient(180deg,#fff,#f3f5f7)">
+          <div class="back" style="color:#6f7885">‹</div>
+          <div class="title" style="color:#1f242b">歌曲</div>
+          <div class="pager"><div class="btn off" style="color:#c8ced5">‹</div><div class="count" style="color:#6f7885">1/12</div><div class="btn" style="color:#6f7885">›</div></div>
+          <div class="list">
+            <div class="row" style="top:0;background:#f7f8fa;color:#1f242b;border-radius:0;border-bottom:1px solid #e4e8ec">晴天</div>
+            <div class="row" style="top:24px;background:#f7f8fa;color:#1f242b;border-radius:0;border-bottom:1px solid #e4e8ec">稻香</div>
+            <div class="row" style="top:48px;background:#f7f8fa;color:#1f242b;border-radius:0;border-bottom:1px solid #e4e8ec">七里香</div>
+            <div class="row" style="top:72px;background:#f7f8fa;color:#1f242b;border-radius:0;border-bottom:1px solid #e4e8ec">夜曲</div>
+            <div class="row" style="top:96px;background:#f7f8fa;color:#1f242b;border-radius:0">告白气球</div>
+          </div>
+        </div>
+        <div class="wheel" style="background:radial-gradient(125% 125% at 50% 15%,#fff,#f2f3f5 45%,#dcdfe3);border-color:#c2c7cd">
+          <div class="menu" style="color:#8d949d">MENU</div>
+          <div class="side prev" style="color:#8d949d">⏮</div>
+          <div class="side next" style="color:#8d949d">⏭</div>
+          <div class="play" style="color:#46505c">⏸</div>
+          <div class="hub" style="background:radial-gradient(120% 120% at 50% 30%,#f4f5f7,#e4e6e9 55%,#d3d6da);border-color:#c3c8ce"></div>
+        </div>
+      </div></div>
+    </div>
+  </div>
+</body>
+</html>
