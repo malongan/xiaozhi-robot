@@ -1,0 +1,11 @@
+{
+  "name": "no_keyboard",
+  "description": "除蓝牙键盘外全部开启，用于日常不带键盘遥控的使用方式",
+  "features": {
+    "english_dictation": true,
+    "stroke_order": true,
+    "ble_keyboard": false,
+    "web_file_transfer": true,
+    "music_player": true
+  }
+}
