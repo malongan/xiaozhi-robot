@@ -117,6 +117,7 @@ profiles/
 ├── keyboard.json
 ├── web_file_transfer.json
 ├── music.json
+├── no_keyboard.json
 └── full.json
 scripts/feature_build.py
 ```
@@ -186,6 +187,7 @@ endif()
 - `keyboard`：仅蓝牙键盘，用于验证功能包隔离。
 - `web_file_transfer`：仅网络文件传输，用于验证功能包隔离。
 - `music`：仅 SD 卡音乐播放器，用于验证功能包隔离。
+- `no_keyboard`：除蓝牙键盘外全部开启（保留 BT 协议栈），用于日常不带键盘遥控的固件。
 - `full`：全部已登记功能包，保持当前完整功能。
 
 ```json
