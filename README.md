@@ -10,6 +10,7 @@
 >
 > - 2026-10-22 版本说明：[docs/custom/release-20261022.md](docs/custom/release-20261022.md)
 > - 2026-10-22 r2 版本说明：内部 RAM 优化 + 启动提速 + 蓝牙运行时开关：[docs/custom/release-20261022-r2.md](docs/custom/release-20261022-r2.md)
+> - 2026-10-23 版本说明（音乐功能包 + 头像动画降频）：[docs/custom/release-20261023-music.md](docs/custom/release-20261023-music.md)
 > - 2026-10-22 r3 版本说明：听写语音调节 + 同词循环/拼音修复：[docs/custom/release-20261022-r3.md](docs/custom/release-20261022-r3.md)
 > - 功能包与组合构建：[docs/custom/feature-packs.md](docs/custom/feature-packs.md)
 > - 功能包开发指导：[docs/custom/feature-development-guide.md](docs/custom/feature-development-guide.md)

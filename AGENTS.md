@@ -87,7 +87,7 @@ The build script changes local `sdkconfig` and build state. Do not assume the bu
 - Read `docs/custom/feature-development-guide.md` before adding or splitting a feature pack.
 - A feature-pack change updates its `feature.json`, `README.md`, Kconfig, CMake, every profile, UI guards/stubs, and docs in one patch.
 - Profiles must list every feature explicitly; `full` enables all packs and must preserve existing behavior.
-- Build all six profiles and check symbols on both sides; smoke-test `full` on hardware when behavior changes.
+- Build all seven profiles and check symbols on both sides; smoke-test `full` on hardware when behavior changes.
 - Web transfer config was renamed from `CONFIG_WEB_FILE_SERVER*` to `CONFIG_FEATURE_WEB_FILE_TRANSFER*`; regenerate local `sdkconfig`, do not reuse old keys.
 
 ## Authoritative Documentation

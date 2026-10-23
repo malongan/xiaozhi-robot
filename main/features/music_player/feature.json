@@ -1,0 +1,12 @@
+{
+  "id": "music_player",
+  "name": "音乐播放器",
+  "description": "SD 卡音乐库索引、MP3/AAC/FLAC/WAV/OGG 解码、音乐页与 self.music.* 语音工具",
+  "config": "CONFIG_FEATURE_MUSIC_PLAYER",
+  "default": false,
+  "depends": [],
+  "sources": [
+    "features/music_player/music_library.cc",
+    "features/music_player/media_player.cc"
+  ]
+}

@@ -8,6 +8,9 @@
 #if CONFIG_FEATURE_ENGLISH_DICTATION
 #include "features/english_dictation/english_player.h"
 #endif
+#if CONFIG_FEATURE_MUSIC_PLAYER
+#include "features/music_player/media_player.h"
+#endif
 #include "mcp_server.h"
 #include "mqtt_protocol.h"
 #include "settings.h"
@@ -73,6 +76,22 @@ Application::Application() : notify_player_(audio_service_) {
         .skip_unhandled_events = true,
     };
     esp_timer_create(&restart_timer_args, &session_restart_timer_);
+
+#if CONFIG_FEATURE_MUSIC_PLAYER
+    esp_timer_create_args_t music_window_args = {
+        .callback =
+            [](void* arg) {
+                static_cast<Application*>(arg)->Schedule([]() {
+                    Application::GetInstance().EndMusicCommandWindow();
+                });
+            },
+        .arg = this,
+        .dispatch_method = ESP_TIMER_TASK,
+        .name = "music_window",
+        .skip_unhandled_events = true,
+    };
+    esp_timer_create(&music_window_args, &music_window_timer_);
+#endif
 }
 
 Application::~Application() {
@@ -124,10 +143,32 @@ void Application::Initialize() {
         notify_player_.OnPlaybackProgress(playback_id, media_position_ms);
     };
     audio_service_.SetCallbacks(callbacks);
+#if CONFIG_FEATURE_MUSIC_PLAYER
+    MediaPlayer::GetInstance().SetAudioService(&audio_service_);
+#endif
 
     // Add state change listeners
     state_machine_.AddStateChangeListener([this](DeviceState old_state, DeviceState new_state) {
         xEventGroupSetBits(event_group_, MAIN_EVENT_STATE_CHANGED);
+#if CONFIG_FEATURE_MUSIC_PLAYER
+        MediaPlayer::GetInstance().OnDeviceStateChanged(static_cast<int>(old_state),
+                                                        static_cast<int>(new_state));
+        if (music_mode_.load()) {
+            if (new_state == kDeviceStateListening) {
+                if (music_window_active_.load()) {
+                    ArmMusicCommandWindow();
+                } else {
+                    // A late channel open after the window expired must not
+                    // leave the microphone on while music plays.
+                    StopListening();
+                }
+            } else if (music_window_timer_ != nullptr) {
+                // Do not let the window expire while the assistant is talking
+                // or the device is reconnecting.
+                esp_timer_stop(music_window_timer_);
+            }
+        }
+#endif
     });
 
     // Start the clock timer to update the status bar
@@ -685,6 +726,19 @@ void Application::InitializeProtocol() {
             } else if (strcmp(state->valuestring, "stop") == 0) {
                 Schedule([this]() {
                     if (GetDeviceState() == kDeviceStateSpeaking) {
+#if CONFIG_FEATURE_MUSIC_PLAYER
+                        if (music_mode_.load()) {
+                            // Music mode: after a music command keep the short
+                            // command window open; otherwise return to Idle so
+                            // playback starts and the microphone closes.
+                            if (music_window_active_.load()) {
+                                SetDeviceState(kDeviceStateListening);
+                            } else {
+                                SetDeviceState(kDeviceStateIdle);
+                            }
+                            return;
+                        }
+#endif
                         if (dictation_active_.load() && dictation_command_mode_.load()) {
                             // Keep taking adjustment commands for another 5s.
                             SetDeviceState(kDeviceStateListening);
@@ -937,11 +991,100 @@ void Application::EndDictationCommandMode(const char* reason) {
     }
 }
 
+#if CONFIG_FEATURE_MUSIC_PLAYER
+void Application::EnterMusicMode() {
+    music_mode_.store(true);
+    // A play request should start the song, not open a command window: clear
+    // the window so the next TTS stop returns to Idle and playback begins.
+    music_window_active_.store(false);
+    if (music_window_timer_ != nullptr) {
+        esp_timer_stop(music_window_timer_);
+    }
+    MediaPlayer::GetInstance().SetCommandWindowActive(false);
+    if (auto display = Board::GetInstance().GetDisplay()) {
+        display->ShowMusicPlayer(true);
+    }
+    // If the tool ran silently while the device is still listening, leave the
+    // server session so the queued track can start.
+    Schedule([this]() {
+        if (music_mode_.load() && GetDeviceState() == kDeviceStateListening) {
+            StopListening();
+        }
+    });
+    ESP_LOGI(TAG, "Music mode entered");
+}
+
+void Application::LeaveMusicMode() {
+    if (!music_mode_.exchange(false)) {
+        return;
+    }
+    music_window_active_.store(false);
+    if (music_window_timer_ != nullptr) {
+        esp_timer_stop(music_window_timer_);
+    }
+    MediaPlayer::GetInstance().SetCommandWindowActive(false);
+    MediaPlayer::GetInstance().Stop();
+    if (auto display = Board::GetInstance().GetDisplay()) {
+        display->ShowMusicPlayer(false);
+    }
+    if (GetDeviceState() == kDeviceStateListening) {
+        StopListening();
+    }
+    ESP_LOGI(TAG, "Music mode left");
+}
+
+void Application::ExtendMusicCommandWindow() {
+    if (!music_mode_.load()) {
+        return;
+    }
+    music_window_active_.store(true);
+    ArmMusicCommandWindow();
+}
+
+void Application::ArmMusicCommandWindow() {
+    if (!music_mode_.load() || music_window_timer_ == nullptr) {
+        return;
+    }
+    const auto state = GetDeviceState();
+    // While the assistant is talking the window is armed again as soon as the
+    // turn ends; starting it now would expire in the middle of the reply.
+    if (state == kDeviceStateSpeaking || state == kDeviceStateConnecting ||
+        state == kDeviceStateNotifying) {
+        return;
+    }
+    MediaPlayer::GetInstance().SetCommandWindowActive(true);
+    esp_timer_stop(music_window_timer_);
+    esp_timer_start_once(music_window_timer_, 5000 * 1000);
+    if (state == kDeviceStateIdle) {
+        StartListening();
+    }
+}
+
+void Application::EndMusicCommandWindow() {
+    if (!music_mode_.load()) {
+        return;
+    }
+    music_window_active_.store(false);
+    MediaPlayer::GetInstance().SetCommandWindowActive(false);
+    ESP_LOGI(TAG, "Music command window expired");
+    if (GetDeviceState() == kDeviceStateListening) {
+        StopListening();
+    }
+}
+#endif  // CONFIG_FEATURE_MUSIC_PLAYER
+
 void Application::HandleToggleChatEvent() {
     if (dictation_active_.load()) {
         ESP_LOGI(TAG, "听写中，忽略对话按键");
         return;
     }
+#if CONFIG_FEATURE_MUSIC_PLAYER
+    if (music_mode_.load()) {
+        // A manual button turn behaves like a wake word: open the command
+        // window instead of letting the listener be stopped immediately.
+        music_window_active_.store(true);
+    }
+#endif
     auto state = GetDeviceState();
 
     if (state == kDeviceStateNotifying) {
@@ -1083,6 +1226,13 @@ void Application::HandleWakeWordDetectedEvent() {
     auto state = GetDeviceState();
     auto wake_word = audio_service_.GetLastWakeWord();
     ESP_LOGI(TAG, "Wake word detected: %s (state: %d)", wake_word.c_str(), (int)state);
+#if CONFIG_FEATURE_MUSIC_PLAYER
+    if (music_mode_.load()) {
+        // Waking up during music opens (or refreshes) the command window and
+        // keeps the music page on screen.
+        music_window_active_.store(true);
+    }
+#endif
     if (auto display = Board::GetInstance().GetDisplay()) {
         display->OnWakeWordDetected();
     }

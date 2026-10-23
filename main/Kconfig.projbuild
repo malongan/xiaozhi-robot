@@ -31,6 +31,15 @@ config FEATURE_BLE_KEYBOARD
         pages, pairing management and the Bluetooth settings row. Disable it
         to build a firmware without the BLE keyboard feature pack.
 
+config FEATURE_MUSIC_PLAYER
+    bool "Enable SD card music player"
+    default n
+    help
+        Enable the local music player: SD-card library index (/sdcard/music),
+        MP3/AAC/M4A/FLAC/WAV/OGG decoding, the drawer music page and the
+        self.music.* MCP tools. Disable it to build a firmware without the
+        music feature pack and without the local decoders.
+
 choice
     prompt "Flash Assets"
     default FLASH_DEFAULT_ASSETS if !USE_EMOTE_MESSAGE_STYLE
