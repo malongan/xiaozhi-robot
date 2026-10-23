@@ -7,6 +7,9 @@
 #if CONFIG_FEATURE_BLE_KEYBOARD
 #include "features/ble_keyboard/media_ble.h"
 #endif
+#if CONFIG_FEATURE_MUSIC_PLAYER
+#include "features/music_player/music_library.h"
+#endif
 
 #include <esp_lcd_panel_io.h>
 #include <esp_lcd_panel_ops.h>
@@ -259,7 +262,7 @@ protected:
         uint32_t color_top;
         uint32_t color_bottom;
     };
-    static constexpr int kDrawerTileCount = 5;
+    static constexpr int kDrawerTileCount = 6;
     static const DrawerTileSpec kDrawerSpecs[kDrawerTileCount];
     lv_obj_t* drawer_screen_ = nullptr;
     lv_obj_t* drawer_back_icon_ = nullptr;
@@ -279,14 +282,99 @@ protected:
     void OpenStrokePage();
     void OpenMediaPage();
     void OpenFileServicePage();
+    void OpenMusicPage();
     bool DrawerAlwaysEnabled() const { return true; }
     bool DrawerEnglishEnabled() const;
     bool DrawerStrokeEnabled() const;
     bool DrawerBleKeyboardEnabled() const;
+    bool DrawerMusicEnabled() const;
     static void OnDrawerHandleClicked(lv_event_t* e);
     static void OnDrawerBackClicked(lv_event_t* e);
     static void OnDrawerTileClicked(lv_event_t* e);
     static void OnDrawerHintTimer(lv_timer_t* timer);
+
+    // iPod-style music page (lazily created on first open). Only the visibility
+    // flag is kept when the feature pack is disabled, because the shared
+    // drawer/chat layout code reads it.
+    bool music_screen_visible_ = false;
+#if CONFIG_FEATURE_MUSIC_PLAYER
+    enum MusicView {
+        kMusicViewRoot = 0,
+        kMusicViewNow,
+        kMusicViewSongs,
+        kMusicViewArtists,
+        kMusicViewAlbums,
+        kMusicViewArtistSongs,
+        kMusicViewAlbumSongs,
+    };
+    struct MusicNavState {
+        int view = kMusicViewRoot;
+        int page = 0;
+        std::string filter;
+    };
+    static constexpr int kMusicRows = 5;
+    lv_obj_t* music_screen_ = nullptr;
+    lv_obj_t* music_list_ = nullptr;
+    lv_obj_t* music_list_rows_[kMusicRows] = {};
+    lv_obj_t* music_now_panel_ = nullptr;
+    lv_obj_t* music_now_title_ = nullptr;
+    lv_obj_t* music_now_artist_ = nullptr;
+    lv_obj_t* music_now_album_ = nullptr;
+    lv_obj_t* music_now_time_ = nullptr;
+    lv_obj_t* music_now_total_ = nullptr;
+    lv_obj_t* music_progress_ = nullptr;
+    lv_obj_t* music_header_label_ = nullptr;
+    lv_obj_t* music_play_icon_ = nullptr;
+    lv_obj_t* music_wheel_prev_ = nullptr;
+    lv_obj_t* music_wheel_play_ = nullptr;
+    lv_obj_t* music_wheel_next_ = nullptr;
+    lv_obj_t* music_hub_ = nullptr;
+    lv_timer_t* music_tick_timer_ = nullptr;
+    // Header pager: two 39 px tap targets that also cover the page number in
+    // the middle (tap left half = previous page, right half = next page).
+    lv_obj_t* music_pager_ = nullptr;
+    lv_obj_t* music_pager_prev_ = nullptr;
+    lv_obj_t* music_pager_next_ = nullptr;
+    lv_obj_t* music_pager_count_ = nullptr;
+    // Thin iPod-style position bar on the right edge of the list.
+    lv_obj_t* music_scroll_track_ = nullptr;
+    lv_obj_t* music_scroll_thumb_ = nullptr;
+    int music_view_ = kMusicViewRoot;
+    int music_page_ = 0;
+    std::string music_filter_;
+    std::vector<MusicNavState> music_nav_stack_;
+    std::vector<int> music_view_items_;
+    std::vector<std::string> music_view_names_;
+    int music_row_kind_[kMusicRows] = {};
+    int music_row_value_[kMusicRows] = {};
+    int music_scan_ticks_ = 0;
+    int music_last_count_ = -1;
+    void SetupMusicScreen();
+    void ShowMusicScreen(bool show);
+    void MusicBack();
+    void MusicSelectRow(int row);
+    void SetMusicView(int view, const std::string& filter, int page, bool remember = true);
+    void RefreshMusicViewItems();
+    int MusicPageCount() const;
+    void MusicChangePage(int delta);
+    void RenderMusicList();
+    void RenderMusicNowPlaying();
+    void UpdateMusicPager();
+    void UpdateMusicProgress();
+    void RebindMusicFonts(const lv_font_t* text_font, const lv_font_t* icon_font,
+                          const lv_font_t* large_icon_font);
+    static void OnMusicBackClicked(lv_event_t* e);
+    static void OnMusicRowClicked(lv_event_t* e);
+    static void OnMusicPrevClicked(lv_event_t* e);
+    static void OnMusicPlayClicked(lv_event_t* e);
+    static void OnMusicNextClicked(lv_event_t* e);
+    static void OnMusicPagePrevClicked(lv_event_t* e);
+    static void OnMusicPageNextClicked(lv_event_t* e);
+    static void OnMusicMenuClicked(lv_event_t* e);
+    static void OnMusicHubLongPressed(lv_event_t* e);
+    static void OnMusicTick(lv_timer_t* timer);
+#endif  // CONFIG_FEATURE_MUSIC_PLAYER
+
     lv_obj_t* media_hint_ = nullptr;
     lv_obj_t* media_bt_icon_ = nullptr;
     lv_obj_t* media_title_ = nullptr;
@@ -337,6 +425,8 @@ protected:
 
     // Procedural avatar animation (breathing, blink, state motion).
     lv_timer_t* avatar_anim_timer_ = nullptr;
+    // Current animation frame period (ms); 40 active, 66 idle, 100 dozing.
+    uint32_t avatar_period_ms_ = 40;
     AvatarMood avatar_mood_ = kAvatarMoodIdle;
     uint32_t avatar_anim_epoch_ = 0;
     uint32_t avatar_blink_at_ = 0;
@@ -451,6 +541,7 @@ public:
     virtual void SetEmotion(const char* emotion) override;
     virtual void SetAvatarMood(AvatarMood mood) override;
     virtual void OnWakeWordDetected() override;
+    virtual void ShowMusicPlayer(bool show) override;
     virtual void SetIpAddress(const std::string& ip) override;
     virtual void SetChatMessage(const char* role, const char* content) override;
     virtual void ClearChatMessages() override;

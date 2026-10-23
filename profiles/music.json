@@ -1,0 +1,11 @@
+{
+  "name": "music",
+  "description": "仅 SD 卡音乐播放器，用于验证功能包隔离",
+  "features": {
+    "english_dictation": false,
+    "stroke_order": false,
+    "ble_keyboard": false,
+    "web_file_transfer": false,
+    "music_player": true
+  }
+}

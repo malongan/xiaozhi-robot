@@ -5,6 +5,7 @@
     "english_dictation": true,
     "stroke_order": true,
     "ble_keyboard": true,
-    "web_file_transfer": true
+    "web_file_transfer": true,
+    "music_player": true
   }
 }

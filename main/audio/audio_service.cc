@@ -180,6 +180,9 @@ void AudioService::Stop() {
     {
         std::lock_guard<std::mutex> lock(audio_queue_mutex_);
         ++playback_generation_;
+#if CONFIG_FEATURE_MUSIC_PLAYER
+        ++media_generation_;
+#endif
         audio_encode_queue_.clear();
         audio_decode_queue_.clear();
         audio_playback_queue_.clear();
@@ -628,6 +631,60 @@ bool AudioService::PushPacketToDecodeQueue(std::unique_ptr<AudioStreamPacket> pa
     return true;
 }
 
+#if CONFIG_FEATURE_MUSIC_PLAYER
+bool AudioService::PushPlaybackPcm(std::vector<int16_t>&& pcm, uint32_t generation,
+                                   int wait_ms) {
+    if (pcm.empty()) {
+        return true;
+    }
+    std::unique_lock<std::mutex> lock(audio_queue_mutex_);
+    const uint32_t stream_generation = playback_generation_;
+    const bool ready = audio_queue_cv_.wait_for(
+        lock, std::chrono::milliseconds(wait_ms), [this, generation, stream_generation]() {
+            return service_stopped_.load() || generation != media_generation_ ||
+                   stream_generation != playback_generation_ ||
+                   audio_playback_queue_.size() < MAX_PLAYBACK_TASKS_IN_QUEUE;
+        });
+    if (!ready || service_stopped_.load() || generation != media_generation_ ||
+        stream_generation != playback_generation_) {
+        return false;
+    }
+    playback_drained_notified_ = false;
+    AudioTask task;
+    task.type = kAudioTaskTypeDecodeToPlaybackQueue;
+    task.pcm = std::move(pcm);
+    task.is_media = true;
+    task.media_generation = generation;
+    audio_playback_queue_.push_back(std::move(task));
+    audio_queue_cv_.notify_all();
+    return true;
+}
+
+void AudioService::SetMediaGeneration(uint32_t generation) {
+    std::lock_guard<std::mutex> lock(audio_queue_mutex_);
+    if (generation == media_generation_) {
+        return;
+    }
+    media_generation_ = generation;
+    if (!audio_playback_queue_.empty()) {
+        // Keep server/TTS chunks, drop queued music chunks from older tracks.
+        std::vector<AudioTask> keep;
+        keep.reserve(audio_playback_queue_.size());
+        while (!audio_playback_queue_.empty()) {
+            auto task = std::move(audio_playback_queue_.front());
+            audio_playback_queue_.pop_front();
+            if (!task.is_media) {
+                keep.push_back(std::move(task));
+            }
+        }
+        for (auto& task : keep) {
+            audio_playback_queue_.push_back(std::move(task));
+        }
+    }
+    audio_queue_cv_.notify_all();
+}
+#endif  // CONFIG_FEATURE_MUSIC_PLAYER
+
 std::unique_ptr<AudioStreamPacket> AudioService::PopPacketFromSendQueue() {
     std::lock_guard<std::mutex> lock(audio_queue_mutex_);
     if (audio_send_queue_.empty()) {
@@ -800,6 +857,9 @@ void AudioService::ResetDecoder() {
     {
         std::lock_guard<std::mutex> lock(audio_queue_mutex_);
         ++playback_generation_;
+#if CONFIG_FEATURE_MUSIC_PLAYER
+        ++media_generation_;
+#endif
         std::unique_lock<std::mutex> decoder_lock(decoder_mutex_);
         if (opus_decoder_ != nullptr) {
             esp_opus_dec_reset(opus_decoder_);

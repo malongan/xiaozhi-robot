@@ -21,7 +21,7 @@ main/features/<id>/
 └── <资源>/          # 仅本功能使用的页面、字体、前端资源
 ```
 
-- 功能 ID 用小写蛇形：`english_dictation`、`stroke_order`、`ble_keyboard`、`web_file_transfer`。
+- 功能 ID 用小写蛇形：`english_dictation`、`stroke_order`、`ble_keyboard`、`web_file_transfer`、`music_player`。
 - Kconfig 统一为 `CONFIG_FEATURE_<ID大写下划线>`。
 - 源码用 `git mv` 迁移，保留 Git 历史，不要复制后再删。
 - 前端/字体等资源跟着功能目录走；共享资源才留在 `main/` 或 `main/display/`。
@@ -133,7 +133,8 @@ bool LcdDisplay::DrawerWebFileTransferEnabled() const {
     "english_dictation": false,
     "stroke_order": false,
     "ble_keyboard": false,
-    "web_file_transfer": false
+    "web_file_transfer": false,
+    "music_player": false
   }
 }
 ```
@@ -147,7 +148,7 @@ export IDF_PYTHON_ENV_PATH=$HOME/.espressif/python_env/idf6.1_py3.12_env
 source "$HOME/esp/esp-idf/export.sh"
 
 python3 scripts/feature_build.py --list
-for p in base english stroke keyboard web_file_transfer full; do
+for p in base english stroke keyboard web_file_transfer music full; do
     python3 scripts/feature_build.py --profile "$p"
 done
 ```

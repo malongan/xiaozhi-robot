@@ -17,6 +17,9 @@
 #include "display.h"
 #include "lvgl_image.h"
 #include "lvgl_theme.h"
+#if CONFIG_FEATURE_MUSIC_PLAYER
+#include "features/music_player/media_player.h"
+#endif
 #include "settings.h"
 
 #define TAG "MCP"
@@ -115,6 +118,110 @@ void McpServer::AddCommonTools() {
                 });
     }
 #endif
+
+#if CONFIG_FEATURE_MUSIC_PLAYER
+    // Local music playback from the SD card.
+    auto& media_player = MediaPlayer::GetInstance();
+    AddTool("self.music.play",
+            "Play music stored on the SD card. Use this whenever the user asks to play a song, "
+            "an artist or an album (for example: \"play some music\", \"play Jay Chou\", "
+            "\"play Qing Tian\"). You can call it with no arguments to start shuffled playback of "
+            "the whole library.\n"
+            "Args:\n"
+            "  `query`: song title or a search keyword, empty to play everything.\n"
+            "  `artist`: optional artist filter.\n"
+            "  `album`: optional album filter.\n"
+            "  `track_id`: optional exact track id from a previous result.\n"
+            "  `shuffle`: shuffle the playback queue (default true).\n"
+            "Return:\n"
+            "  A JSON object with `ok`, `state` and the resolved `track`. If `error` is "
+            "`ambiguous`, ask the user to choose one of the returned `candidates` and call again "
+            "with the chosen `track_id`.\n"
+            "The music screen opens automatically and the track starts as soon as your reply "
+            "ends. After that the user can wake the device and ask to change tracks; use "
+            "`self.music.stop` when the user asks to stop the music or to leave the player.",
+            PropertyList({Property("query", kPropertyTypeString, ""),
+                          Property("artist", kPropertyTypeString, ""),
+                          Property("album", kPropertyTypeString, ""),
+                          Property("track_id", kPropertyTypeInteger, 0),
+                          Property("shuffle", kPropertyTypeBoolean, true)}),
+            [&media_player](const PropertyList& properties) -> ReturnValue {
+                const std::string result =
+                    media_player.PlayRequest(properties["query"].value<std::string>(),
+                                             properties["artist"].value<std::string>(),
+                                             properties["album"].value<std::string>(),
+                                             properties["track_id"].value<int>(),
+                                             properties["shuffle"].value<bool>());
+                // Pin the music page and start playback as soon as the reply
+                // ends; the wake word only opens the command window from here.
+                if (result.find("\"ok\":true") != std::string::npos) {
+                    Application::GetInstance().EnterMusicMode();
+                }
+                return result;
+            });
+
+    AddTool("self.music.pause", "Pause the music that is currently playing.",
+            PropertyList(), [&media_player](const PropertyList& properties) -> ReturnValue {
+                (void)properties;
+                Application::GetInstance().ExtendMusicCommandWindow();
+                return media_player.PauseRequest();
+            });
+
+    AddTool("self.music.resume", "Resume the paused music.",
+            PropertyList(), [&media_player](const PropertyList& properties) -> ReturnValue {
+                (void)properties;
+                Application::GetInstance().ExtendMusicCommandWindow();
+                return media_player.ResumeRequest();
+            });
+
+    AddTool("self.music.stop", "Stop the music player and close the music screen.",
+            PropertyList(), [&media_player](const PropertyList& properties) -> ReturnValue {
+                (void)properties;
+                Application::GetInstance().LeaveMusicMode();
+                return media_player.StopRequest();
+            });
+
+    AddTool("self.music.next", "Skip to the next track.", PropertyList(),
+            [&media_player](const PropertyList& properties) -> ReturnValue {
+                (void)properties;
+                Application::GetInstance().ExtendMusicCommandWindow();
+                return media_player.NextRequest();
+            });
+
+    AddTool("self.music.previous", "Go back to the previous track.", PropertyList(),
+            [&media_player](const PropertyList& properties) -> ReturnValue {
+                (void)properties;
+                Application::GetInstance().ExtendMusicCommandWindow();
+                return media_player.PrevRequest();
+            });
+
+    AddTool("self.music.status",
+            "Get the current music player state (idle/playing/paused/error), the current track "
+            "and the playback position. Use it before answering questions about the music.",
+            PropertyList(), [&media_player](const PropertyList& properties) -> ReturnValue {
+                (void)properties;
+                return media_player.StatusRequest();
+            });
+
+    AddTool("self.music.rescan",
+            "Rebuild the SD-card music index. Call this when the user says they added or removed "
+            "songs on the card and the player still shows the old list.",
+            PropertyList(), [](const PropertyList& properties) -> ReturnValue {
+                (void)properties;
+                auto& library = MusicLibrary::GetInstance();
+                const bool ok = library.Rescan();
+                cJSON* root = cJSON_CreateObject();
+                cJSON_AddBoolToObject(root, "ok", ok);
+                cJSON_AddNumberToObject(root, "track_count", library.Count());
+                char* printed = cJSON_PrintUnformatted(root);
+                std::string result = printed != nullptr ? printed : "{}";
+                if (printed != nullptr) {
+                    cJSON_free(printed);
+                }
+                cJSON_Delete(root);
+                return result;
+            });
+#endif  // CONFIG_FEATURE_MUSIC_PLAYER
 
     // Restore the original tools list to the end of the tools list
     tools_.insert(tools_.end(), std::make_move_iterator(original_tools.begin()),

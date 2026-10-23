@@ -123,6 +123,19 @@ public:
     void SetDictationActive(bool active);
     bool IsDictationActive() const { return dictation_active_.load(); }
 
+#if CONFIG_FEATURE_MUSIC_PLAYER
+    /**
+     * Music mode keeps the music page pinned: a wake word does not close it and
+     * only self.music.stop leaves the mode. While the page is pinned, a wake
+     * word (or any music command) opens a 5-second voice-command window; music
+     * stays paused during the window and resumes when it expires.
+     */
+    void EnterMusicMode();
+    void LeaveMusicMode();
+    void ExtendMusicCommandWindow();
+    bool IsMusicModeActive() const { return music_mode_.load(); }
+#endif
+
     void Reboot();
     void WakeWordInvoke(const std::string& wake_word);
     bool UpgradeFirmware(const std::string& url, const std::string& version = "");
@@ -176,6 +189,13 @@ private:
     std::atomic<bool> dictation_command_mode_{false};
     std::atomic<uint32_t> dictation_command_deadline_ms_{0};
     std::atomic<bool> resume_dictation_on_idle_{false};
+#if CONFIG_FEATURE_MUSIC_PLAYER
+    std::atomic<bool> music_mode_{false};
+    std::atomic<bool> music_window_active_{false};
+    esp_timer_handle_t music_window_timer_ = nullptr;
+    void ArmMusicCommandWindow();
+    void EndMusicCommandWindow();
+#endif
     int clock_ticks_ = 0;
     TaskHandle_t activation_task_handle_ = nullptr;
 

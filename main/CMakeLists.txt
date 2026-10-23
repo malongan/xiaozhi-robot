@@ -71,6 +71,13 @@ if(CONFIG_FEATURE_BLE_KEYBOARD)
     )
 endif()
 
+if(CONFIG_FEATURE_MUSIC_PLAYER)
+    list(APPEND SOURCES
+        "features/music_player/music_library.cc"
+        "features/music_player/media_player.cc"
+    )
+endif()
+
 # Add board common files
 list(APPEND SOURCES
     "boards/common/board.cc"

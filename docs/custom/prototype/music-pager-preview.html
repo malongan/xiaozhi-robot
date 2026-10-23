@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>歌曲列表翻页 · 预览</title>
+<style>
+  :root {
+    --lcd-top: #1b1e22;
+    --lcd-bottom: #121417;
+    --ink: #f2f5fa;
+    --muted: #9aa3b2;
+    --dim: #6b7382;
+    --disabled: #4a5059;
+    --accent: #e05a7a;
+    --row-bg: #24272e;
+    --bar-track: rgba(255, 255, 255, .08);
+    --bar-thumb: rgba(154, 163, 178, .75);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: radial-gradient(900px 600px at 50% 0%, #22262c 0%, #131519 60%, #0d0f11 100%);
+    color: var(--muted);
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    padding: 40px 44px 52px;
+  }
+  h1 { font-size: 18px; font-weight: 600; color: #e8ecf1; margin: 0 0 6px; letter-spacing: .5px; }
+  .note { font-size: 12px; color: #7d858f; margin: 0 0 30px; line-height: 1.7; }
+  .stage { display: flex; gap: 56px; align-items: flex-start; }
+  .frame-wrap { display: flex; flex-direction: column; gap: 12px; align-items: center; }
+  .caption { font-size: 12px; color: #8b939d; letter-spacing: .4px; }
+  .device { position: relative; width: 240px; height: 320px; transform: scale(2); transform-origin: top left; background: #000; border-radius: 6px; }
+  .device-slot { width: 480px; height: 640px; }
+
+  .bezel { position: absolute; left: 8px; top: 8px; width: 224px; height: 176px; background: #0a0b0d; border: 1px solid #262a33; border-radius: 18px; }
+  .lcd { position: absolute; left: 8px; top: 8px; width: 208px; height: 160px; background: linear-gradient(180deg, var(--lcd-top) 0%, var(--lcd-bottom) 100%); border-radius: 12px; overflow: hidden; }
+  .back { position: absolute; left: 4px; top: 1px; width: 20px; height: 22px; font-size: 15px; line-height: 22px; text-align: center; color: var(--muted); }
+  .title { position: absolute; left: 24px; top: 1px; width: 104px; height: 22px; font-size: 13px; line-height: 22px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .pager { position: absolute; right: 4px; top: 0; height: 24px; display: flex; align-items: center; gap: 2px; }
+  .pager .btn { width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 14px; color: var(--muted); }
+  .pager .btn.off { color: var(--disabled); }
+  .pager .count { min-width: 34px; text-align: center; font-size: 10px; letter-spacing: .5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  .list { position: absolute; left: 6px; top: 28px; width: 196px; height: 124px; }
+  .row { position: absolute; left: 2px; width: 188px; height: 24px; background: var(--row-bg); border-radius: 7px; display: flex; align-items: center; padding: 0 8px; font-size: 12px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .scrollbar { position: absolute; right: 1px; top: 0; width: 2px; height: 124px; background: var(--bar-track); border-radius: 2px; }
+  .scrollbar .thumb { position: absolute; left: 0; width: 2px; border-radius: 2px; background: var(--bar-thumb); }
+
+  .wheel { position: absolute; left: 60px; top: 196px; width: 120px; height: 120px; border-radius: 50%; background: radial-gradient(125% 125% at 50% 18%, #23262c 0%, #16181d 55%, #101216 100%); border: 1px solid #2b2f37; box-shadow: 0 6px 12px rgba(0, 0, 0, .55); }
+  .wheel .menu { position: absolute; left: 0; right: 0; top: 7px; text-align: center; font-size: 8px; letter-spacing: 1.4px; color: var(--muted); font-weight: 600; }
+  .wheel .side { position: absolute; top: 50%; transform: translateY(-50%); width: 26px; text-align: center; font-size: 12px; color: var(--muted); }
+  .wheel .prev { left: 7px; }
+  .wheel .next { right: 7px; }
+  .wheel .play { position: absolute; left: 0; right: 0; bottom: 6px; text-align: center; font-size: 12px; color: var(--accent); }
+  .hub { position: absolute; left: 40px; top: 40px; width: 40px; height: 40px; border-radius: 50%; background: #1d2027; border: 1px solid #30343d; }
+</style>
+</head>
+<body>
+  <h1>歌曲列表 · 翻页交互预览</h1>
+  <p class="note">
+    去掉滑动翻页，改为右上角两个翻页按钮：&lt; 1/12 &gt;，点按区域 22×22，不用精确点到箭头。<br>
+    第一页/最后一页对应的箭头置灰；只有一页时整组隐藏。列表右缘保留 iPod 式细滚动条。
+  </p>
+
+  <div class="stage">
+    <div class="frame-wrap">
+      <div class="caption">第 1 页 · 上一页箭头置灰</div>
+      <div class="device-slot"><div class="device">
+        <div class="bezel"></div>
+        <div class="lcd">
+          <div class="back">‹</div>
+          <div class="title">歌曲</div>
+          <div class="pager">
+            <div class="btn off">‹</div>
+            <div class="count">1 / 12</div>
+            <div class="btn">›</div>
+          </div>
+          <div class="list">
+            <div class="row" style="top:0">晴天</div>
+            <div class="row" style="top:24px">稻香</div>
+            <div class="row" style="top:48px">七里香</div>
+            <div class="row" style="top:72px">夜曲</div>
+            <div class="row" style="top:96px">告白气球</div>
+            <div class="scrollbar"><div class="thumb" style="top:0;height:52px"></div></div>
+          </div>
+        </div>
+        <div class="wheel">
+          <div class="menu">MENU</div>
+          <div class="side prev">⏮</div>
+          <div class="side next">⏭</div>
+          <div class="play">⏸</div>
+          <div class="hub"></div>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="frame-wrap">
+      <div class="caption">第 2 页 · 两个箭头都可用，滚动条下移</div>
+      <div class="device-slot"><div class="device">
+        <div class="bezel"></div>
+        <div class="lcd">
+          <div class="back">‹</div>
+          <div class="title">歌曲</div>
+          <div class="pager">
+            <div class="btn">‹</div>
+            <div class="count">2 / 12</div>
+            <div class="btn">›</div>
+          </div>
+          <div class="list">
+            <div class="row" style="top:0">简单爱</div>
+            <div class="row" style="top:24px">东风破</div>
+            <div class="row" style="top:48px">青花瓷</div>
+            <div class="row" style="top:72px">龙卷风</div>
+            <div class="row" style="top:96px">星晴</div>
+            <div class="scrollbar"><div class="thumb" style="top:7px;height:52px"></div></div>
+          </div>
+        </div>
+        <div class="wheel">
+          <div class="menu">MENU</div>
+          <div class="side prev">⏮</div>
+          <div class="side next">⏭</div>
+          <div class="play">⏸</div>
+          <div class="hub"></div>
+        </div>
+      </div></div>
+    </div>
+  </div>
+</body>
+</html>

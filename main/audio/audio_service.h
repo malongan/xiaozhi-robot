@@ -101,6 +101,10 @@ struct AudioTask {
     uint32_t timestamp = 0;
     uint32_t playback_id = 0;
     uint32_t media_position_ms = 0;
+#if CONFIG_FEATURE_MUSIC_PLAYER
+    bool is_media = false;
+    uint32_t media_generation = 0;
+#endif
 };
 
 struct DebugStatistics {
@@ -143,6 +147,13 @@ public:
 
     bool PushPacketToDecodeQueue(std::unique_ptr<AudioStreamPacket> packet, bool wait = false);
     std::unique_ptr<AudioStreamPacket> PopPacketFromSendQueue();
+#if CONFIG_FEATURE_MUSIC_PLAYER
+    // Local media playback path (SD card music). PCM must already be mono at
+    // the codec output sample rate. Generation is used to cancel stale audio
+    // when the track changes or the player is stopped/paused.
+    bool PushPlaybackPcm(std::vector<int16_t>&& pcm, uint32_t generation, int wait_ms = 200);
+    void SetMediaGeneration(uint32_t generation);
+#endif
     void PlaySound(const std::string_view& sound);
     bool ReadAudioData(std::vector<int16_t>& data, int sample_rate, int samples);
     void ResetDecoder();
@@ -194,6 +205,9 @@ private:
     bool output_in_flight_ = false;
     bool playback_drained_notified_ = true;
     uint32_t playback_generation_ = 0;
+#if CONFIG_FEATURE_MUSIC_PLAYER
+    uint32_t media_generation_ = 0;
+#endif
     // For server AEC
     FixedQueue<uint32_t, MAX_TIMESTAMPS_IN_QUEUE> timestamp_queue_;
 

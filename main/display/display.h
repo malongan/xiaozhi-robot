@@ -70,6 +70,9 @@ public:
     virtual void OnWakeWordDetected() {}
     // 英语学习页的界面刷新（每秒更新倒计时）
     virtual void RefreshEnglishScreen() {}
+    // 音乐功能包：由 Application 在语音点播/退出听歌时打开或关闭音乐页。
+    // 没有音乐页的显示实现忽略该回调。
+    virtual void ShowMusicPlayer(bool show) { (void)show; }
     virtual void SetChatMessage(const char* role, const char* content);
     virtual void ClearChatMessages();
     // Whether this display keeps chat history across idle/notification events.

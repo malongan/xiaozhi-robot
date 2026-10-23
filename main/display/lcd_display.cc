@@ -14,6 +14,9 @@
 #if CONFIG_FEATURE_BLE_KEYBOARD
 #include "features/ble_keyboard/media_ble.h"
 #endif
+#if CONFIG_FEATURE_MUSIC_PLAYER
+#include "features/music_player/media_player.h"
+#endif
 #include "wifi_board.h"
 #if CONFIG_FEATURE_WEB_FILE_TRANSFER
 #include "features/web_file_transfer/web_file_server.h"
@@ -422,6 +425,12 @@ LcdDisplay::~LcdDisplay() {
         lv_timer_delete(drawer_hint_timer_);
         drawer_hint_timer_ = nullptr;
     }
+#if CONFIG_FEATURE_MUSIC_PLAYER
+    if (music_tick_timer_ != nullptr) {
+        lv_timer_delete(music_tick_timer_);
+        music_tick_timer_ = nullptr;
+    }
+#endif
     if (stroke_canvas_buf_ != nullptr) {
         heap_caps_free(stroke_canvas_buf_);
         stroke_canvas_buf_ = nullptr;
@@ -492,6 +501,8 @@ const LcdDisplay::DrawerTileSpec LcdDisplay::kDrawerSpecs[LcdDisplay::kDrawerTil
      &LcdDisplay::DrawerStrokeEnabled, false, "笔顺数据未就绪", 0x8B6FE8, 0x6A4FD0},
     {MATERIAL_SYMBOLS_BLUETOOTH, "键盘", &LcdDisplay::OpenMediaPage,
      &LcdDisplay::DrawerBleKeyboardEnabled, false, "蓝牙键盘未启用", 0x4A8FE8, 0x2E6BC8},
+    {MATERIAL_SYMBOLS_MUSIC_NOTE, "音乐", &LcdDisplay::OpenMusicPage,
+     &LcdDisplay::DrawerMusicEnabled, false, "音乐功能未启用", 0xE05A7A, 0xA93C5A},
 };
 
 #if CONFIG_USE_WECHAT_MESSAGE_STYLE
@@ -3802,6 +3813,13 @@ void LcdDisplay::OnWakeWordDetected() {
     if (stroke_screen_visible_) {
         ShowStrokeScreen(false);
     }
+#if CONFIG_FEATURE_MUSIC_PLAYER
+    // Voice-initiated music keeps its page on screen across turns: the wake
+    // word only opens the command window, it does not leave the player.
+    if (music_screen_visible_ && !Application::GetInstance().IsMusicModeActive()) {
+        ShowMusicScreen(false);
+    }
+#endif
     if (settings_screen_visible_) {
         ShowSettingsScreen(false);
     }
@@ -3973,6 +3991,12 @@ void LcdDisplay::SetAvatarMood(AvatarMood mood) {
         // screens so the user sees the dialog immediately.
         ShowMediaScreen(false);
         ShowBluetoothScreen(false);
+#if CONFIG_FEATURE_MUSIC_PLAYER
+        if (music_screen_visible_ && !Application::GetInstance().IsMusicModeActive()) {
+            return_to_drawer_ = false;
+            ShowMusicScreen(false);
+        }
+#endif
         if (settings_screen_visible_) {
             ShowSettingsScreen(false);
         }
@@ -3995,8 +4019,21 @@ void LcdDisplay::AvatarAnimTimerCb(lv_timer_t* timer) {
     }
     if (self->media_screen_visible_ || self->bluetooth_screen_visible_ ||
         self->settings_screen_visible_ || self->stroke_screen_visible_ ||
-        self->english_screen_visible_) {
+        self->english_screen_visible_ || self->music_screen_visible_ ||
+        self->file_service_visible_ || self->drawer_screen_visible_) {
         return;  // Overlay covers the AI screen; no need to animate.
+    }
+
+    // Frame pacing: keep 25 fps while the assistant is active or blinking and
+    // drop to ~15 fps for the subtle idle breathing, ~10 fps while dozing.
+    // Everything else (gaze, blink, expressions) stays exactly as before.
+    const bool busy = self->avatar_mood_ != kAvatarMoodIdle ||
+                      self->avatar_override_ != kAvatarExpressionNone ||
+                      self->avatar_blink_start_ != 0;
+    const uint32_t period_ms = busy ? 40 : (self->avatar_sleeping_ ? 100 : 66);
+    if (self->avatar_period_ms_ != period_ms) {
+        self->avatar_period_ms_ = period_ms;
+        lv_timer_set_period(timer, period_ms);
     }
 
     constexpr float kPi = 3.14159265f;
@@ -4420,7 +4457,7 @@ void LcdDisplay::UpdateMediaBarVisibility() {
     if (media_bar_ != nullptr) {
         const bool show = chat_lines_per_page_ == 5 && !media_screen_visible_ &&
                           !bluetooth_screen_visible_ && !stroke_screen_visible_ &&
-                          !file_service_visible_ && avatar_mood_ == kAvatarMoodIdle;
+                          !file_service_visible_ && !music_screen_visible_ && avatar_mood_ == kAvatarMoodIdle;
         if (show) {
             lv_obj_remove_flag(media_bar_, LV_OBJ_FLAG_HIDDEN);
         } else {
@@ -4431,7 +4468,8 @@ void LcdDisplay::UpdateMediaBarVisibility() {
     const bool drawer_available =
         chat_lines_per_page_ == 5 && !media_screen_visible_ && !bluetooth_screen_visible_ &&
         !stroke_screen_visible_ && !english_screen_visible_ && !settings_screen_visible_ &&
-        !english_setup_visible_ && !file_service_visible_ && avatar_mood_ == kAvatarMoodIdle;
+        !english_setup_visible_ && !file_service_visible_ && !music_screen_visible_ &&
+        avatar_mood_ == kAvatarMoodIdle;
     if (drawer_screen_visible_ && !drawer_available) {
         ShowDrawerScreen(false);
     }
@@ -5583,6 +5621,14 @@ bool LcdDisplay::DrawerBleKeyboardEnabled() const {
 #endif
 }
 
+bool LcdDisplay::DrawerMusicEnabled() const {
+#if CONFIG_FEATURE_MUSIC_PLAYER
+    return true;
+#else
+    return false;
+#endif
+}
+
 void LcdDisplay::RefreshDrawerTiles() {
     for (int i = 0; i < kDrawerTileCount; ++i) {
         if (drawer_tiles_[i] == nullptr) {
@@ -5673,6 +5719,30 @@ void LcdDisplay::OpenMediaPage() {}
 void LcdDisplay::OpenFileServicePage() { ShowFileServiceScreen(true); }
 #else
 void LcdDisplay::OpenFileServicePage() {}
+#endif
+
+#if CONFIG_FEATURE_MUSIC_PLAYER
+void LcdDisplay::OpenMusicPage() {
+    MusicLibrary::GetInstance().StartBackgroundScan();
+    music_nav_stack_.clear();
+    ShowMusicScreen(true);
+    SetMusicView(kMusicViewRoot, "", 0, false);
+}
+#else
+void LcdDisplay::OpenMusicPage() {}
+#endif
+
+#if CONFIG_FEATURE_MUSIC_PLAYER
+void LcdDisplay::ShowMusicPlayer(bool show) {
+    if (show) {
+        OpenMusicPage();
+    } else {
+        return_to_drawer_ = false;
+        ShowMusicScreen(false);
+    }
+}
+#else
+void LcdDisplay::ShowMusicPlayer(bool show) { (void)show; }
 #endif
 
 void LcdDisplay::OnDrawerHandleClicked(lv_event_t* e) {
@@ -6221,6 +6291,9 @@ void LcdDisplay::SetTheme(Theme* theme) {
     RebindStrokeFonts(text_font, icon_font, large_icon_font);
     RebindSettingsFonts(text_font, icon_font, large_icon_font);
     RebindEnglishFonts(text_font, icon_font);
+#if CONFIG_FEATURE_MUSIC_PLAYER
+    RebindMusicFonts(text_font, icon_font, large_icon_font);
+#endif
 
     // Labels that use the icon font must follow the new theme font as well:
     // the old font is freed when the assets are replaced.
@@ -6408,3 +6481,900 @@ void LcdDisplay::SetHideSubtitle(bool hide) {
     }
 #endif
 }
+
+#if CONFIG_FEATURE_MUSIC_PLAYER
+/* -------------------------------------------------------------------------
+ * iPod-style local music page
+ *
+ * Layout (240x320):
+ *   bezel 224x176 @ (8,8) -> LCD 208x160 @ (8,8) -> status bar, list/now view
+ *   click wheel 120x120 @ (60,196)
+ * The page is created lazily on first open and only uses theme fonts so the
+ * asset/theme switch path keeps working without extra font bookkeeping.
+ * ------------------------------------------------------------------------- */
+
+namespace {
+
+constexpr uint32_t kMusicInk = 0xF2F5FA;
+constexpr uint32_t kMusicMuted = 0x9AA3B2;
+constexpr uint32_t kMusicDim = 0x6B7382;
+constexpr uint32_t kMusicAccent = 0xE05A7A;
+constexpr uint32_t kMusicBarBg = 0x2A2E36;
+constexpr uint32_t kMusicRowBg = 0x24272E;
+constexpr uint32_t kMusicChevron = 0x6B7382;
+
+enum MusicRowKind {
+    kMusicRowNone = 0,
+    kMusicRowNowPlaying,
+    kMusicRowShuffleAll,
+    kMusicRowSongs,
+    kMusicRowArtists,
+    kMusicRowAlbums,
+    kMusicRowTrack,
+    kMusicRowArtist,
+    kMusicRowAlbum,
+};
+
+lv_obj_t* MusicMakeLabel(lv_obj_t* parent, const lv_font_t* font, uint32_t color) {
+    lv_obj_t* label = lv_label_create(parent);
+    if (font != nullptr) {
+        lv_obj_set_style_text_font(label, font, 0);
+    }
+    lv_obj_set_style_text_color(label, lv_color_hex(color), 0);
+    lv_label_set_text(label, "");
+    return label;
+}
+
+void MusicFlatten(lv_obj_t* obj) {
+    lv_obj_set_style_bg_opa(obj, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(obj, 0, 0);
+    lv_obj_set_style_radius(obj, 0, 0);
+    lv_obj_set_style_shadow_width(obj, 0, 0);
+    lv_obj_set_style_pad_all(obj, 0, 0);
+    lv_obj_remove_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
+}
+
+}  // namespace
+
+void LcdDisplay::SetupMusicScreen() {
+    if (music_screen_ != nullptr) {
+        return;
+    }
+    auto* theme = static_cast<LvglTheme*>(current_theme_);
+    const lv_font_t* text_font =
+        (theme != nullptr && theme->text_font() != nullptr) ? theme->text_font()->font() : nullptr;
+    const lv_font_t* icon_font =
+        (theme != nullptr && theme->icon_font() != nullptr) ? theme->icon_font()->font() : text_font;
+
+    music_screen_ = lv_obj_create(lv_screen_active());
+    lv_obj_set_size(music_screen_, LV_HOR_RES, LV_VER_RES);
+    lv_obj_set_pos(music_screen_, 0, 0);
+    lv_obj_set_style_bg_color(music_screen_, lv_color_hex(0x000000), 0);
+    lv_obj_set_style_bg_opa(music_screen_, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(music_screen_, 0, 0);
+    lv_obj_set_style_radius(music_screen_, 0, 0);
+    lv_obj_set_style_pad_all(music_screen_, 0, 0);
+    lv_obj_remove_flag(music_screen_, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(music_screen_, LV_OBJ_FLAG_HIDDEN);
+
+    lv_obj_t* bezel = lv_obj_create(music_screen_);
+    lv_obj_set_size(bezel, 224, 176);
+    lv_obj_set_pos(bezel, 8, 8);
+    lv_obj_set_style_bg_color(bezel, lv_color_hex(0x0A0B0D), 0);
+    lv_obj_set_style_bg_opa(bezel, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(bezel, 1, 0);
+    lv_obj_set_style_border_color(bezel, lv_color_hex(0x262A33), 0);
+    lv_obj_set_style_radius(bezel, 18, 0);
+    lv_obj_set_style_pad_all(bezel, 0, 0);
+    lv_obj_remove_flag(bezel, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t* lcd = lv_obj_create(bezel);
+    lv_obj_set_size(lcd, 208, 160);
+    lv_obj_set_pos(lcd, 8, 8);
+    lv_obj_set_style_bg_color(lcd, lv_color_hex(0x1B1E22), 0);
+    lv_obj_set_style_bg_grad_color(lcd, lv_color_hex(0x121417), 0);
+    lv_obj_set_style_bg_grad_dir(lcd, LV_GRAD_DIR_VER, 0);
+    lv_obj_set_style_bg_opa(lcd, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(lcd, 0, 0);
+    lv_obj_set_style_radius(lcd, 12, 0);
+    lv_obj_set_style_pad_all(lcd, 0, 0);
+    lv_obj_remove_flag(lcd, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t* back = MusicMakeLabel(lcd, icon_font, kMusicMuted);
+    lv_label_set_text(back, MATERIAL_SYMBOLS_ARROW_BACK);
+    lv_obj_set_pos(back, 4, 3);
+    lv_obj_set_ext_click_area(back, 8);
+    lv_obj_add_flag(back, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(back, &LcdDisplay::OnMusicBackClicked, LV_EVENT_CLICKED, this);
+
+    music_header_label_ = MusicMakeLabel(lcd, text_font, kMusicInk);
+    lv_obj_set_pos(music_header_label_, 24, 1);
+    lv_obj_set_size(music_header_label_, 100, 22);
+    lv_label_set_long_mode(music_header_label_, LV_LABEL_LONG_DOT);
+    lv_label_set_text(music_header_label_, "iPod");
+
+    music_play_icon_ = MusicMakeLabel(lcd, icon_font, kMusicMuted);
+    lv_obj_set_pos(music_play_icon_, 182, 3);
+    lv_label_set_text(music_play_icon_, MATERIAL_SYMBOLS_PLAY_ARROW);
+
+    // Header pager (lists with more than one page): the two tap targets are
+    // 39 px wide each and reach under the page number, so a tap anywhere in
+    // the number's left half goes back and its right half goes forward.
+    music_pager_ = lv_obj_create(lcd);
+    lv_obj_set_size(music_pager_, 78, 22);
+    lv_obj_set_pos(music_pager_, 126, 0);
+    MusicFlatten(music_pager_);
+    lv_obj_add_flag(music_pager_, LV_OBJ_FLAG_HIDDEN);
+
+    music_pager_prev_ = lv_obj_create(music_pager_);
+    lv_obj_set_size(music_pager_prev_, 39, 22);
+    lv_obj_set_pos(music_pager_prev_, 0, 0);
+    MusicFlatten(music_pager_prev_);
+    lv_obj_add_flag(music_pager_prev_, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(music_pager_prev_, &LcdDisplay::OnMusicPagePrevClicked,
+                        LV_EVENT_CLICKED, this);
+    lv_obj_t* prev_icon = MusicMakeLabel(music_pager_prev_, icon_font, kMusicMuted);
+    lv_label_set_text(prev_icon, MATERIAL_SYMBOLS_KEYBOARD_ARROW_LEFT);
+    lv_obj_align(prev_icon, LV_ALIGN_LEFT_MID, 2, 0);
+
+    music_pager_next_ = lv_obj_create(music_pager_);
+    lv_obj_set_size(music_pager_next_, 39, 22);
+    lv_obj_set_pos(music_pager_next_, 39, 0);
+    MusicFlatten(music_pager_next_);
+    lv_obj_add_flag(music_pager_next_, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(music_pager_next_, &LcdDisplay::OnMusicPageNextClicked,
+                        LV_EVENT_CLICKED, this);
+    lv_obj_t* next_icon = MusicMakeLabel(music_pager_next_, icon_font, kMusicMuted);
+    lv_label_set_text(next_icon, MATERIAL_SYMBOLS_KEYBOARD_ARROW_RIGHT);
+    lv_obj_align(next_icon, LV_ALIGN_RIGHT_MID, -2, 0);
+
+    // Non-clickable, drawn on top: taps on the number fall through to the
+    // half of the pager underneath it.
+    music_pager_count_ = MusicMakeLabel(music_pager_, text_font, kMusicMuted);
+    lv_obj_set_size(music_pager_count_, 40, 22);
+    lv_obj_set_pos(music_pager_count_, 19, 0);
+    lv_obj_set_style_text_align(music_pager_count_, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_text(music_pager_count_, "1/1");
+
+    // Row list.
+    music_list_ = lv_obj_create(lcd);
+    lv_obj_set_size(music_list_, 196, 124);
+    lv_obj_set_pos(music_list_, 6, 28);
+    MusicFlatten(music_list_);
+    for (int i = 0; i < kMusicRows; ++i) {
+        lv_obj_t* row = lv_obj_create(music_list_);
+        lv_obj_set_size(row, 192, 24);
+        lv_obj_set_pos(row, 2, i * 24);
+        lv_obj_set_style_bg_color(row, lv_color_hex(kMusicRowBg), 0);
+        lv_obj_set_style_bg_opa(row, LV_OPA_COVER, 0);
+        lv_obj_set_style_border_width(row, 0, 0);
+        lv_obj_set_style_radius(row, 7, 0);
+        lv_obj_set_style_shadow_width(row, 0, 0);
+        lv_obj_set_style_pad_all(row, 0, 0);
+        lv_obj_set_style_opa(row, LV_OPA_60, LV_STATE_PRESSED);
+        lv_obj_remove_flag(row, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_add_flag(row, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_set_ext_click_area(row, 1);
+        lv_obj_set_user_data(row, reinterpret_cast<void*>(static_cast<intptr_t>(i)));
+        lv_obj_add_event_cb(row, &LcdDisplay::OnMusicRowClicked, LV_EVENT_CLICKED, this);
+
+        lv_obj_t* label = MusicMakeLabel(row, text_font, kMusicInk);
+        lv_obj_set_pos(label, 8, 0);
+        lv_obj_set_size(label, 158, 24);
+        lv_label_set_long_mode(label, LV_LABEL_LONG_DOT);
+
+        lv_obj_t* chevron = MusicMakeLabel(row, icon_font, kMusicChevron);
+        lv_label_set_text(chevron, MATERIAL_SYMBOLS_KEYBOARD_ARROW_RIGHT);
+        lv_obj_align(chevron, LV_ALIGN_RIGHT_MID, -6, 0);
+        lv_obj_add_flag(chevron, LV_OBJ_FLAG_HIDDEN);
+
+        music_list_rows_[i] = row;
+        lv_obj_add_flag(row, LV_OBJ_FLAG_HIDDEN);
+    }
+
+    // Thin position bar: like the iPod scrollbar, only a hint that there are
+    // more pages; the header pager does the actual paging.
+    music_scroll_track_ = lv_obj_create(music_list_);
+    lv_obj_set_size(music_scroll_track_, 2, 124);
+    lv_obj_set_pos(music_scroll_track_, 193, 0);
+    lv_obj_set_style_bg_color(music_scroll_track_, lv_color_hex(kMusicBarBg), 0);
+    lv_obj_set_style_bg_opa(music_scroll_track_, LV_OPA_50, 0);
+    lv_obj_set_style_border_width(music_scroll_track_, 0, 0);
+    lv_obj_set_style_radius(music_scroll_track_, 1, 0);
+    lv_obj_set_style_pad_all(music_scroll_track_, 0, 0);
+    lv_obj_remove_flag(music_scroll_track_, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(music_scroll_track_, LV_OBJ_FLAG_HIDDEN);
+
+    music_scroll_thumb_ = lv_obj_create(music_list_);
+    lv_obj_set_size(music_scroll_thumb_, 2, 40);
+    lv_obj_set_pos(music_scroll_thumb_, 193, 0);
+    lv_obj_set_style_bg_color(music_scroll_thumb_, lv_color_hex(kMusicMuted), 0);
+    lv_obj_set_style_bg_opa(music_scroll_thumb_, LV_OPA_60, 0);
+    lv_obj_set_style_border_width(music_scroll_thumb_, 0, 0);
+    lv_obj_set_style_radius(music_scroll_thumb_, 1, 0);
+    lv_obj_set_style_pad_all(music_scroll_thumb_, 0, 0);
+    lv_obj_remove_flag(music_scroll_thumb_, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(music_scroll_thumb_, LV_OBJ_FLAG_HIDDEN);
+
+    // Now playing panel.
+    music_now_panel_ = lv_obj_create(lcd);
+    lv_obj_set_size(music_now_panel_, 208, 124);
+    lv_obj_set_pos(music_now_panel_, 0, 28);
+    MusicFlatten(music_now_panel_);
+    lv_obj_add_flag(music_now_panel_, LV_OBJ_FLAG_HIDDEN);
+
+    music_now_title_ = MusicMakeLabel(music_now_panel_, text_font, kMusicInk);
+    lv_obj_set_pos(music_now_title_, 6, 2);
+    lv_obj_set_size(music_now_title_, 196, 22);
+    lv_obj_set_style_text_align(music_now_title_, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_long_mode(music_now_title_, LV_LABEL_LONG_DOT);
+
+    music_now_artist_ = MusicMakeLabel(music_now_panel_, text_font, kMusicMuted);
+    lv_obj_set_pos(music_now_artist_, 6, 22);
+    lv_obj_set_size(music_now_artist_, 196, 22);
+    lv_obj_set_style_text_align(music_now_artist_, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_long_mode(music_now_artist_, LV_LABEL_LONG_DOT);
+
+    music_now_album_ = MusicMakeLabel(music_now_panel_, text_font, kMusicDim);
+    lv_obj_set_pos(music_now_album_, 6, 42);
+    lv_obj_set_size(music_now_album_, 196, 22);
+    lv_obj_set_style_text_align(music_now_album_, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_long_mode(music_now_album_, LV_LABEL_LONG_DOT);
+
+    music_progress_ = lv_bar_create(music_now_panel_);
+    lv_obj_set_pos(music_progress_, 12, 72);
+    lv_obj_set_size(music_progress_, 184, 4);
+    lv_bar_set_range(music_progress_, 0, 100);
+    lv_bar_set_value(music_progress_, 0, LV_ANIM_OFF);
+    lv_obj_set_style_bg_color(music_progress_, lv_color_hex(kMusicBarBg), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(music_progress_, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_radius(music_progress_, 2, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(music_progress_, lv_color_hex(kMusicAccent), LV_PART_INDICATOR);
+    lv_obj_set_style_bg_opa(music_progress_, LV_OPA_COVER, LV_PART_INDICATOR);
+    lv_obj_set_style_radius(music_progress_, 2, LV_PART_INDICATOR);
+
+    music_now_time_ = MusicMakeLabel(music_now_panel_, text_font, kMusicDim);
+    lv_obj_set_pos(music_now_time_, 12, 80);
+    lv_obj_set_size(music_now_time_, 70, 22);
+    lv_label_set_text(music_now_time_, "0:00");
+
+    music_now_total_ = MusicMakeLabel(music_now_panel_, text_font, kMusicDim);
+    lv_obj_set_pos(music_now_total_, 126, 80);
+    lv_obj_set_size(music_now_total_, 70, 22);
+    lv_obj_set_style_text_align(music_now_total_, LV_TEXT_ALIGN_RIGHT, 0);
+    lv_label_set_text(music_now_total_, "0:00");
+
+    // Click wheel.
+    lv_obj_t* wheel = lv_obj_create(music_screen_);
+    lv_obj_set_size(wheel, 120, 120);
+    lv_obj_set_pos(wheel, 60, 196);
+    lv_obj_set_style_radius(wheel, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(wheel, lv_color_hex(0x13151A), 0);
+    lv_obj_set_style_bg_opa(wheel, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(wheel, 1, 0);
+    lv_obj_set_style_border_color(wheel, lv_color_hex(0x2B2F37), 0);
+    lv_obj_set_style_pad_all(wheel, 0, 0);
+    lv_obj_set_style_shadow_width(wheel, 6, 0);
+    lv_obj_set_style_shadow_ofs_y(wheel, 2, 0);
+    lv_obj_set_style_shadow_opa(wheel, LV_OPA_30, 0);
+    lv_obj_remove_flag(wheel, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t* menu = MusicMakeLabel(wheel, text_font, kMusicMuted);
+    lv_label_set_text(menu, "MENU");
+    lv_obj_align(menu, LV_ALIGN_TOP_MID, 0, 8);
+    lv_obj_set_ext_click_area(menu, 10);
+    lv_obj_add_flag(menu, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(menu, &LcdDisplay::OnMusicMenuClicked, LV_EVENT_CLICKED, this);
+
+    music_wheel_prev_ = MusicMakeLabel(wheel, icon_font, kMusicMuted);
+    lv_label_set_text(music_wheel_prev_, MATERIAL_SYMBOLS_SKIP_PREVIOUS);
+    lv_obj_align(music_wheel_prev_, LV_ALIGN_LEFT_MID, 10, 0);
+    lv_obj_set_ext_click_area(music_wheel_prev_, 10);
+    lv_obj_add_flag(music_wheel_prev_, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(music_wheel_prev_, &LcdDisplay::OnMusicPrevClicked, LV_EVENT_CLICKED,
+                        this);
+
+    music_wheel_next_ = MusicMakeLabel(wheel, icon_font, kMusicMuted);
+    lv_label_set_text(music_wheel_next_, MATERIAL_SYMBOLS_SKIP_NEXT);
+    lv_obj_align(music_wheel_next_, LV_ALIGN_RIGHT_MID, -10, 0);
+    lv_obj_set_ext_click_area(music_wheel_next_, 10);
+    lv_obj_add_flag(music_wheel_next_, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(music_wheel_next_, &LcdDisplay::OnMusicNextClicked, LV_EVENT_CLICKED,
+                        this);
+
+    music_wheel_play_ = MusicMakeLabel(wheel, icon_font, kMusicAccent);
+    lv_label_set_text(music_wheel_play_, MATERIAL_SYMBOLS_PLAY_ARROW);
+    lv_obj_align(music_wheel_play_, LV_ALIGN_BOTTOM_MID, 0, -6);
+    lv_obj_set_ext_click_area(music_wheel_play_, 10);
+    lv_obj_add_flag(music_wheel_play_, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(music_wheel_play_, &LcdDisplay::OnMusicPlayClicked, LV_EVENT_CLICKED,
+                        this);
+
+    music_hub_ = lv_obj_create(wheel);
+    lv_obj_set_size(music_hub_, 40, 40);
+    lv_obj_center(music_hub_);
+    lv_obj_set_style_radius(music_hub_, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(music_hub_, lv_color_hex(0x1D2027), 0);
+    lv_obj_set_style_bg_opa(music_hub_, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(music_hub_, 1, 0);
+    lv_obj_set_style_border_color(music_hub_, lv_color_hex(0x30343D), 0);
+    lv_obj_set_style_pad_all(music_hub_, 0, 0);
+    lv_obj_remove_flag(music_hub_, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(music_hub_, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(music_hub_, &LcdDisplay::OnMusicHubLongPressed, LV_EVENT_LONG_PRESSED,
+                        this);
+
+    music_tick_timer_ = lv_timer_create(&LcdDisplay::OnMusicTick, 500, this);
+    lv_timer_pause(music_tick_timer_);
+}
+
+void LcdDisplay::ShowMusicScreen(bool show) {
+    if (!show && music_screen_ == nullptr) {
+        return;
+    }
+    DisplayLockGuard lock(this);
+    if (show) {
+        SetupMusicScreen();
+        if (drawer_screen_visible_) {
+            ShowDrawerScreen(false);
+        }
+        if (media_screen_visible_) {
+            ShowMediaScreen(false);
+        }
+        if (bluetooth_screen_visible_) {
+            ShowBluetoothScreen(false);
+        }
+        if (settings_screen_visible_) {
+            ShowSettingsScreen(false);
+        }
+        if (file_service_visible_) {
+            ShowFileServiceScreen(false);
+        }
+        if (english_screen_visible_) {
+#if CONFIG_FEATURE_ENGLISH_DICTATION
+            EnglishPlayer::GetInstance().Stop();
+#endif
+            ShowEnglishScreen(false);
+        }
+        ShowEnglishSetup(false);
+        if (stroke_screen_visible_) {
+            ShowStrokeScreen(false);
+        }
+    }
+    music_screen_visible_ = show;
+    if (show) {
+        lv_obj_remove_flag(music_screen_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_move_foreground(music_screen_);
+        RenderMusicList();
+        UpdateMusicProgress();
+        if (music_tick_timer_ != nullptr) {
+            lv_timer_resume(music_tick_timer_);
+        }
+    } else {
+        lv_obj_add_flag(music_screen_, LV_OBJ_FLAG_HIDDEN);
+        if (music_tick_timer_ != nullptr) {
+            lv_timer_pause(music_tick_timer_);
+        }
+        music_nav_stack_.clear();
+    }
+    UpdateMediaBarVisibility();
+}
+
+void LcdDisplay::MusicBack() {
+    if (!music_nav_stack_.empty()) {
+        const MusicNavState state = music_nav_stack_.back();
+        music_nav_stack_.pop_back();
+        SetMusicView(state.view, state.filter, state.page, false);
+        return;
+    }
+    if (music_view_ != kMusicViewRoot) {
+        SetMusicView(kMusicViewRoot, "", 0, false);
+        return;
+    }
+    const bool to_drawer = return_to_drawer_;
+    ShowMusicScreen(false);
+    if (to_drawer) {
+        CloseSubPageToDrawer();
+    }
+}
+
+int LcdDisplay::MusicPageCount() const {
+    int total = 0;
+    if (music_view_ == kMusicViewSongs || music_view_ == kMusicViewArtistSongs ||
+        music_view_ == kMusicViewAlbumSongs) {
+        total = static_cast<int>(music_view_items_.size());
+    } else if (music_view_ == kMusicViewArtists || music_view_ == kMusicViewAlbums) {
+        total = static_cast<int>(music_view_names_.size());
+    }
+    if (total <= 0) {
+        return 1;
+    }
+    return (total + kMusicRows - 1) / kMusicRows;
+}
+
+void LcdDisplay::MusicChangePage(int delta) {
+    const int pages = MusicPageCount();
+    int next = music_page_ + delta;
+    if (next < 0) {
+        next = 0;
+    }
+    if (next >= pages) {
+        next = pages - 1;
+    }
+    if (next == music_page_) {
+        return;
+    }
+    music_page_ = next;
+    RenderMusicList();
+}
+
+void LcdDisplay::SetMusicView(int view, const std::string& filter, int page, bool remember) {
+    if (music_screen_ == nullptr) {
+        return;
+    }
+    DisplayLockGuard lock(this);
+    if (remember) {
+        MusicNavState state;
+        state.view = music_view_;
+        state.page = music_page_;
+        state.filter = music_filter_;
+        music_nav_stack_.push_back(state);
+    }
+    music_view_ = view;
+    music_filter_ = filter;
+    music_page_ = page;
+    RefreshMusicViewItems();
+    music_page_ = page;
+    RenderMusicList();
+}
+
+void LcdDisplay::RefreshMusicViewItems() {
+    music_view_items_.clear();
+    music_view_names_.clear();
+    auto& library = MusicLibrary::GetInstance();
+    if (music_view_ == kMusicViewSongs) {
+        music_view_items_ = library.AllIndices();
+    } else if (music_view_ == kMusicViewArtistSongs) {
+        music_view_items_ = library.IndicesByArtist(music_filter_);
+    } else if (music_view_ == kMusicViewAlbumSongs) {
+        music_view_items_ = library.IndicesByAlbum(music_filter_);
+    } else if (music_view_ == kMusicViewArtists) {
+        music_view_names_ = library.Artists();
+    } else if (music_view_ == kMusicViewAlbums) {
+        music_view_names_ = library.Albums();
+    }
+}
+
+void LcdDisplay::RenderMusicList() {
+    if (music_screen_ == nullptr) {
+        return;
+    }
+    UpdateMusicPager();
+    if (music_view_ == kMusicViewNow) {
+        if (music_list_ != nullptr) {
+            lv_obj_add_flag(music_list_, LV_OBJ_FLAG_HIDDEN);
+        }
+        if (music_now_panel_ != nullptr) {
+            lv_obj_remove_flag(music_now_panel_, LV_OBJ_FLAG_HIDDEN);
+        }
+        if (music_header_label_ != nullptr) {
+            lv_label_set_text(music_header_label_, "Now Playing");
+        }
+        RenderMusicNowPlaying();
+        return;
+    }
+    if (music_list_ != nullptr) {
+        lv_obj_remove_flag(music_list_, LV_OBJ_FLAG_HIDDEN);
+    }
+    if (music_now_panel_ != nullptr) {
+        lv_obj_add_flag(music_now_panel_, LV_OBJ_FLAG_HIDDEN);
+    }
+
+    const char* title = "iPod";
+    if (music_view_ == kMusicViewSongs) {
+        title = "Songs";
+    } else if (music_view_ == kMusicViewArtists) {
+        title = "Artists";
+    } else if (music_view_ == kMusicViewAlbums) {
+        title = "Albums";
+    } else if (music_view_ == kMusicViewArtistSongs || music_view_ == kMusicViewAlbumSongs) {
+        title = music_filter_.c_str();
+    }
+    if (music_header_label_ != nullptr) {
+        lv_label_set_text(music_header_label_, title);
+    }
+
+    for (int i = 0; i < kMusicRows; ++i) {
+        music_row_kind_[i] = kMusicRowNone;
+        music_row_value_[i] = -1;
+        if (music_list_rows_[i] != nullptr) {
+            lv_obj_add_flag(music_list_rows_[i], LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+
+    int row = 0;
+    auto add_row = [&](int kind, int value, const char* text, bool chevron) {
+        if (row >= kMusicRows || music_list_rows_[row] == nullptr) {
+            return;
+        }
+        lv_obj_t* item = music_list_rows_[row];
+        lv_obj_remove_flag(item, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_t* label = lv_obj_get_child(item, 0);
+        if (label != nullptr) {
+            lv_label_set_text(label, text != nullptr ? text : "");
+        }
+        lv_obj_t* arrow = lv_obj_get_child(item, 1);
+        if (arrow != nullptr) {
+            if (chevron) {
+                lv_obj_remove_flag(arrow, LV_OBJ_FLAG_HIDDEN);
+            } else {
+                lv_obj_add_flag(arrow, LV_OBJ_FLAG_HIDDEN);
+            }
+        }
+        music_row_kind_[row] = kind;
+        music_row_value_[row] = value;
+        row++;
+    };
+
+    auto& library = MusicLibrary::GetInstance();
+    if (music_view_ == kMusicViewRoot) {
+        MusicTrack track;
+        if (MediaPlayer::GetInstance().CurrentTrack(&track)) {
+            add_row(kMusicRowNowPlaying, -1, "Now Playing", true);
+        }
+        add_row(kMusicRowShuffleAll, -1, "Shuffle All", false);
+        add_row(kMusicRowSongs, -1, "Songs", true);
+        add_row(kMusicRowArtists, -1, "Artists", true);
+        add_row(kMusicRowAlbums, -1, "Albums", true);
+        return;
+    }
+
+    if (music_view_ == kMusicViewArtists || music_view_ == kMusicViewAlbums) {
+        if (music_view_names_.empty()) {
+            add_row(kMusicRowNone, -1, library.IsScanning() ? "Scanning SD card..." : "No music",
+                    false);
+            return;
+        }
+        const int start = music_page_ * kMusicRows;
+        for (int i = 0; i < kMusicRows; ++i) {
+            const int index = start + i;
+            if (index >= static_cast<int>(music_view_names_.size())) {
+                break;
+            }
+            add_row(music_view_ == kMusicViewArtists ? kMusicRowArtist : kMusicRowAlbum, index,
+                    music_view_names_[index].c_str(), true);
+        }
+        return;
+    }
+
+    if (music_view_items_.empty()) {
+        add_row(kMusicRowNone, -1, library.IsScanning() ? "Scanning SD card..." : "No music",
+                false);
+        return;
+    }
+    const int start = music_page_ * kMusicRows;
+    for (int i = 0; i < kMusicRows; ++i) {
+        const int index = start + i;
+        if (index >= static_cast<int>(music_view_items_.size())) {
+            break;
+        }
+        MusicTrack track;
+        if (!library.TrackAt(music_view_items_[index], &track)) {
+            continue;
+        }
+        const std::string label = MusicLibrary::DisplayTitle(track);
+        add_row(kMusicRowTrack, index, label.c_str(), false);
+    }
+}
+
+void LcdDisplay::RenderMusicNowPlaying() {
+    if (music_now_panel_ == nullptr) {
+        return;
+    }
+    auto& player = MediaPlayer::GetInstance();
+    MusicTrack track;
+    const bool has_track = player.CurrentTrack(&track);
+    lv_label_set_text(music_now_title_, has_track ? MusicLibrary::DisplayTitle(track).c_str()
+                                                  : "No track");
+    lv_label_set_text(music_now_artist_,
+                      has_track ? MusicLibrary::DisplayArtist(track).c_str() : "");
+    lv_label_set_text(music_now_album_, has_track ? MusicLibrary::DisplayAlbum(track).c_str() : "");
+    const char* state = "Idle";
+    switch (player.state()) {
+        case MediaPlayer::State::kPlaying:
+            state = "Playing";
+            break;
+        case MediaPlayer::State::kPaused:
+            state = "Paused";
+            break;
+        case MediaPlayer::State::kLoading:
+            state = "Loading";
+            break;
+        case MediaPlayer::State::kError:
+            state = "Error";
+            break;
+        default:
+            break;
+    }
+    if (music_now_time_ == nullptr) {
+        return;
+    }
+    lv_label_set_text(music_now_time_,
+                      MusicLibrary::FormatDuration(player.position_ms()).c_str());
+    lv_label_set_text(music_now_total_,
+                      MusicLibrary::FormatDuration(player.duration_ms()).c_str());
+    if (music_progress_ != nullptr) {
+        const uint32_t duration = player.duration_ms();
+        const int percent = duration > 0
+                                ? static_cast<int>(static_cast<uint64_t>(player.position_ms()) *
+                                                   100 / duration)
+                                : 0;
+        lv_bar_set_value(music_progress_, percent, LV_ANIM_OFF);
+    }
+    (void)state;
+}
+
+void LcdDisplay::UpdateMusicPager() {
+    if (music_pager_ == nullptr) {
+        return;
+    }
+    const bool list_view = music_view_ != kMusicViewRoot && music_view_ != kMusicViewNow;
+    const int pages = MusicPageCount();
+    const int total = (music_view_ == kMusicViewArtists || music_view_ == kMusicViewAlbums)
+                          ? static_cast<int>(music_view_names_.size())
+                          : static_cast<int>(music_view_items_.size());
+    const bool show = list_view && pages > 1;
+
+    if (show) {
+        lv_obj_remove_flag(music_pager_, LV_OBJ_FLAG_HIDDEN);
+        lv_label_set_text_fmt(music_pager_count_, "%d/%d", music_page_ + 1, pages);
+        lv_obj_set_style_opa(music_pager_prev_, music_page_ > 0 ? LV_OPA_COVER : LV_OPA_40, 0);
+        lv_obj_set_style_opa(music_pager_next_, music_page_ + 1 < pages ? LV_OPA_COVER : LV_OPA_40,
+                             0);
+    } else {
+        lv_obj_add_flag(music_pager_, LV_OBJ_FLAG_HIDDEN);
+    }
+
+    // The play/pause glyph shares the header corner with the pager.
+    if (music_play_icon_ != nullptr) {
+        if (show) {
+            lv_obj_add_flag(music_play_icon_, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_remove_flag(music_play_icon_, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+
+    if (music_scroll_track_ == nullptr || music_scroll_thumb_ == nullptr) {
+        return;
+    }
+    if (list_view && pages > 1 && total > 0) {
+        lv_obj_remove_flag(music_scroll_track_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(music_scroll_thumb_, LV_OBJ_FLAG_HIDDEN);
+        constexpr int kTrackHeight = 124;
+        int thumb_h = kTrackHeight * kMusicRows / total;
+        if (thumb_h < 12) {
+            thumb_h = 12;
+        }
+        if (thumb_h > kTrackHeight) {
+            thumb_h = kTrackHeight;
+        }
+        lv_obj_set_height(music_scroll_thumb_, thumb_h);
+        const int span = kTrackHeight - thumb_h;
+        const int top = pages > 1 ? (music_page_ * span) / (pages - 1) : 0;
+        lv_obj_set_pos(music_scroll_thumb_, 193, top);
+    } else {
+        lv_obj_add_flag(music_scroll_track_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(music_scroll_thumb_, LV_OBJ_FLAG_HIDDEN);
+    }
+}
+
+void LcdDisplay::UpdateMusicProgress() {
+    auto& player = MediaPlayer::GetInstance();
+    if (music_play_icon_ != nullptr) {
+        lv_label_set_text(music_play_icon_,
+                          player.IsPlaying() ? MATERIAL_SYMBOLS_PAUSE : MATERIAL_SYMBOLS_PLAY_ARROW);
+    }
+    if (music_wheel_play_ != nullptr) {
+        lv_label_set_text(music_wheel_play_,
+                          player.IsPlaying() ? MATERIAL_SYMBOLS_PAUSE : MATERIAL_SYMBOLS_PLAY_ARROW);
+    }
+    if (music_view_ == kMusicViewNow) {
+        RenderMusicNowPlaying();
+    }
+}
+
+void LcdDisplay::MusicSelectRow(int row) {
+    if (row < 0 || row >= kMusicRows) {
+        return;
+    }
+    const int kind = music_row_kind_[row];
+    const int value = music_row_value_[row];
+    auto& player = MediaPlayer::GetInstance();
+    switch (kind) {
+        case kMusicRowNowPlaying:
+            SetMusicView(kMusicViewNow, "", 0);
+            break;
+        case kMusicRowShuffleAll:
+            player.PlayRequest("", "", "", 0, true);
+            SetMusicView(kMusicViewNow, "", 0);
+            break;
+        case kMusicRowSongs:
+            SetMusicView(kMusicViewSongs, "", 0);
+            break;
+        case kMusicRowArtists:
+            SetMusicView(kMusicViewArtists, "", 0);
+            break;
+        case kMusicRowAlbums:
+            SetMusicView(kMusicViewAlbums, "", 0);
+            break;
+        case kMusicRowTrack:
+            if (value >= 0 && value < static_cast<int>(music_view_items_.size())) {
+                player.PlayTrack(music_view_items_[value]);
+                SetMusicView(kMusicViewNow, "", 0);
+            }
+            break;
+        case kMusicRowArtist:
+            if (value >= 0 && value < static_cast<int>(music_view_names_.size())) {
+                SetMusicView(kMusicViewArtistSongs, music_view_names_[value], 0);
+            }
+            break;
+        case kMusicRowAlbum:
+            if (value >= 0 && value < static_cast<int>(music_view_names_.size())) {
+                SetMusicView(kMusicViewAlbumSongs, music_view_names_[value], 0);
+            }
+            break;
+        default:
+            break;
+    }
+}
+
+void LcdDisplay::OnMusicBackClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self != nullptr) {
+        self->MusicBack();
+    }
+}
+
+void LcdDisplay::OnMusicMenuClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self != nullptr) {
+        self->MusicBack();
+    }
+}
+
+void LcdDisplay::OnMusicRowClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    lv_obj_t* row = lv_event_get_target_obj(e);
+    if (self == nullptr || row == nullptr) {
+        return;
+    }
+    const int index = static_cast<int>(
+        reinterpret_cast<intptr_t>(lv_obj_get_user_data(row)));
+    self->MusicSelectRow(index);
+}
+
+void LcdDisplay::OnMusicPrevClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self == nullptr) {
+        return;
+    }
+    if (self->music_view_ != kMusicViewRoot && self->music_view_ != kMusicViewNow) {
+        self->MusicChangePage(-1);
+        return;
+    }
+    MediaPlayer::GetInstance().Prev();
+    self->UpdateMusicProgress();
+}
+
+void LcdDisplay::OnMusicNextClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self == nullptr) {
+        return;
+    }
+    if (self->music_view_ != kMusicViewRoot && self->music_view_ != kMusicViewNow) {
+        self->MusicChangePage(1);
+        return;
+    }
+    MediaPlayer::GetInstance().Next();
+    self->UpdateMusicProgress();
+}
+
+void LcdDisplay::OnMusicPagePrevClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self != nullptr) {
+        self->MusicChangePage(-1);
+    }
+}
+
+void LcdDisplay::OnMusicPageNextClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self != nullptr) {
+        self->MusicChangePage(1);
+    }
+}
+
+void LcdDisplay::OnMusicPlayClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self == nullptr) {
+        return;
+    }
+    MediaPlayer::GetInstance().TogglePlayPause();
+    self->UpdateMusicProgress();
+}
+
+void LcdDisplay::OnMusicHubLongPressed(lv_event_t* e) {
+    Application::GetInstance().ToggleChatState();
+}
+
+void LcdDisplay::OnMusicTick(lv_timer_t* timer) {
+    auto* self = static_cast<LcdDisplay*>(lv_timer_get_user_data(timer));
+    if (self == nullptr || !self->music_screen_visible_) {
+        return;
+    }
+    // Re-check the SD tree every 30 seconds so songs added while the page is
+    // open (for example through the web file transfer) show up without a
+    // reboot. The check stats directories only.
+    if (++self->music_scan_ticks_ >= 60) {
+        self->music_scan_ticks_ = 0;
+        MusicLibrary::GetInstance().StartBackgroundScan();
+    }
+    const int count = MusicLibrary::GetInstance().Count();
+    if (count != self->music_last_count_) {
+        self->music_last_count_ = count;
+        if (self->music_view_ != kMusicViewNow && self->music_view_ != kMusicViewRoot) {
+            self->RefreshMusicViewItems();
+            self->RenderMusicList();
+        }
+    }
+    self->UpdateMusicProgress();
+    if (self->music_view_ == kMusicViewRoot) {
+        self->RenderMusicList();
+    }
+}
+
+void LcdDisplay::RebindMusicFonts(const lv_font_t* text_font, const lv_font_t* icon_font,
+                                  const lv_font_t* large_icon_font) {
+    (void)large_icon_font;
+    if (music_screen_ == nullptr) {
+        return;
+    }
+    lv_obj_t* text_labels[] = {music_header_label_,  music_now_title_, music_now_artist_,
+                               music_now_album_,     music_now_time_,  music_now_total_,
+                               music_pager_count_};
+    for (lv_obj_t* label : text_labels) {
+        if (label != nullptr && text_font != nullptr) {
+            lv_obj_set_style_text_font(label, text_font, 0);
+        }
+    }
+    for (int i = 0; i < kMusicRows; ++i) {
+        if (music_list_rows_[i] == nullptr) {
+            continue;
+        }
+        lv_obj_t* label = lv_obj_get_child(music_list_rows_[i], 0);
+        if (label != nullptr && text_font != nullptr) {
+            lv_obj_set_style_text_font(label, text_font, 0);
+        }
+        lv_obj_t* chevron = lv_obj_get_child(music_list_rows_[i], 1);
+        if (chevron != nullptr && icon_font != nullptr) {
+            lv_obj_set_style_text_font(chevron, icon_font, 0);
+        }
+    }
+    lv_obj_t* icon_labels[] = {music_play_icon_, music_wheel_prev_, music_wheel_play_,
+                               music_wheel_next_};
+    for (lv_obj_t* label : icon_labels) {
+        if (label != nullptr && icon_font != nullptr) {
+            lv_obj_set_style_text_font(label, icon_font, 0);
+        }
+    }
+    lv_obj_t* pager_buttons[] = {music_pager_prev_, music_pager_next_};
+    for (lv_obj_t* button : pager_buttons) {
+        if (button == nullptr) {
+            continue;
+        }
+        lv_obj_t* label = lv_obj_get_child(button, 0);
+        if (label != nullptr && icon_font != nullptr) {
+            lv_obj_set_style_text_font(label, icon_font, 0);
+        }
+    }
+}
+#endif  // CONFIG_FEATURE_MUSIC_PLAYER
