@@ -6,6 +6,7 @@
     "stroke_order": true,
     "ble_keyboard": false,
     "web_file_transfer": true,
-    "music_player": true
+    "music_player": true,
+    "chat_history": false
   }
 }

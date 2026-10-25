@@ -1,0 +1,12 @@
+{
+  "name": "daily",
+  "description": "日常使用：英语听写 + 笔顺 + 聊天记录 + 网络传输，不含蓝牙键盘与音乐播放（省内存）",
+  "features": {
+    "english_dictation": true,
+    "stroke_order": true,
+    "ble_keyboard": false,
+    "web_file_transfer": true,
+    "music_player": false,
+    "chat_history": true
+  }
+}

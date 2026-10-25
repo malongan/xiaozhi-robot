@@ -1,0 +1,11 @@
+{
+  "id": "chat_history",
+  "name": "聊天记录",
+  "description": "把对话记录追加写到 TF 卡，支持离线回看（回看时静音且不响应唤醒词）",
+  "config": "CONFIG_FEATURE_CHAT_HISTORY",
+  "default": false,
+  "depends": [],
+  "sources": [
+    "features/chat_history/chat_log.cc"
+  ]
+}

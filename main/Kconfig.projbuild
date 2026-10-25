@@ -22,6 +22,16 @@ config FEATURE_STROKE_ORDER
         self.stroke.* MCP tools. Disable it to build a firmware without the
         stroke order feature pack.
 
+config FEATURE_CHAT_HISTORY
+    bool "Enable chat history on the TF card"
+    default n
+    help
+        Append every conversation turn to the TF card and add a read-only
+        history page to the drawer. While the page is open the device stays
+        silent and ignores the wake word, so browsing cannot be interrupted
+        by a new turn. Disable it to build a firmware without the chat
+        history feature pack.
+
 config FEATURE_BLE_KEYBOARD
     bool "Enable BLE HID keyboard"
     depends on BT_ENABLED

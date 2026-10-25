@@ -189,6 +189,16 @@ private:
     std::atomic<bool> dictation_command_mode_{false};
     std::atomic<uint32_t> dictation_command_deadline_ms_{0};
     std::atomic<bool> resume_dictation_on_idle_{false};
+#if CONFIG_FEATURE_CHAT_HISTORY
+    // 正在回看聊天记录：期间静音，丢弃服务器下行 TTS
+    std::atomic<bool> chat_history_reviewing_{false};
+
+public:
+    void SetChatHistoryReviewing(bool reviewing) { chat_history_reviewing_.store(reviewing); }
+    bool IsChatHistoryReviewing() const { return chat_history_reviewing_.load(); }
+
+private:
+#endif
 #if CONFIG_FEATURE_MUSIC_PLAYER
     std::atomic<bool> music_mode_{false};
     std::atomic<bool> music_window_active_{false};

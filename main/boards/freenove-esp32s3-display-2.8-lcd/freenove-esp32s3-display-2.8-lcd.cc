@@ -12,11 +12,11 @@
 #include <cstdio>
 
 #include <wifi_station.h>
-#include "freenove_power_monitor.h"
 #include "application.h"
 #include "button.h"
 #include "codecs/es8311_audio_codec.h"
 #include "config.h"
+#include "freenove_power_monitor.h"
 #if CONFIG_FEATURE_ENGLISH_DICTATION
 #include "features/english_dictation/english_dictation_tools.h"
 #include "features/english_dictation/english_tool.h"
@@ -24,6 +24,9 @@
 #if CONFIG_FEATURE_STROKE_ORDER
 #include "features/stroke_order/stroke_order_tools.h"
 #include "features/stroke_order/stroke_tool.h"
+#endif
+#if CONFIG_FEATURE_CHAT_HISTORY
+#include "features/chat_history/chat_log.h"
 #endif
 #include "display/lcd_display.h"
 #include "settings.h"
@@ -161,6 +164,9 @@ private:
             EnglishStore::GetInstance().Init();
             ScheduleAudioCheck();
 #endif
+#if CONFIG_FEATURE_CHAT_HISTORY
+            ChatLog::GetInstance().Init();
+#endif
             ESP_LOGI(TAG, "TF 卡热插拔挂载成功");
         }
     }
@@ -179,6 +185,9 @@ private:
 #if CONFIG_FEATURE_ENGLISH_DICTATION
             EnglishStore::GetInstance().Init();
             ScheduleAudioCheck();
+#endif
+#if CONFIG_FEATURE_CHAT_HISTORY
+            ChatLog::GetInstance().Init();
 #endif
             return;
         }

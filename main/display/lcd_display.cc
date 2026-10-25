@@ -17,6 +17,9 @@
 #if CONFIG_FEATURE_MUSIC_PLAYER
 #include "features/music_player/media_player.h"
 #endif
+#if CONFIG_FEATURE_CHAT_HISTORY
+#include "features/chat_history/chat_log.h"
+#endif
 #include "wifi_board.h"
 #if CONFIG_FEATURE_WEB_FILE_TRANSFER
 #include "features/web_file_transfer/web_file_server.h"
@@ -503,6 +506,13 @@ const LcdDisplay::DrawerTileSpec LcdDisplay::kDrawerSpecs[LcdDisplay::kDrawerTil
      &LcdDisplay::DrawerBleKeyboardEnabled, false, "蓝牙键盘未启用", 0x4A8FE8, 0x2E6BC8},
     {MATERIAL_SYMBOLS_MUSIC_NOTE, "音乐", &LcdDisplay::OpenMusicPage,
      &LcdDisplay::DrawerMusicEnabled, false, "音乐功能未启用", 0xE05A7A, 0xA93C5A},
+#if CONFIG_FEATURE_CHAT_HISTORY
+    {MATERIAL_SYMBOLS_CHAT_BUBBLE, "记录", &LcdDisplay::OpenChatHistoryPage,
+     &LcdDisplay::DrawerChatHistoryEnabled, false, "聊天记录未启用", 0x6E8BA8, 0x4A5F78},
+#else
+    {MATERIAL_SYMBOLS_CHAT_BUBBLE, "记录", &LcdDisplay::OpenChatHistoryPage,
+     &LcdDisplay::DrawerChatHistoryEnabled, true, "聊天记录未启用", 0x6E8BA8, 0x4A5F78},
+#endif
 };
 
 #if CONFIG_USE_WECHAT_MESSAGE_STYLE
@@ -2618,6 +2628,102 @@ void LcdDisplay::SetupUI() {
 #endif
 
     /* 功能抽屉：底部点状把手展开的全屏彩色图标宫格。 */
+#if CONFIG_FEATURE_CHAT_HISTORY
+        // ---- 聊天记录回看页 ----
+        chat_history_screen_ = lv_obj_create(screen);
+        lv_obj_set_size(chat_history_screen_, LV_HOR_RES, LV_VER_RES);
+        lv_obj_set_style_radius(chat_history_screen_, 0, 0);
+        lv_obj_set_style_bg_color(chat_history_screen_, lv_color_hex(0x14161C), 0);
+        lv_obj_set_style_bg_opa(chat_history_screen_, LV_OPA_COVER, 0);
+        lv_obj_set_style_border_width(chat_history_screen_, 0, 0);
+        lv_obj_set_style_pad_all(chat_history_screen_, 0, 0);
+        lv_obj_remove_flag(chat_history_screen_, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_set_scrollbar_mode(chat_history_screen_, LV_SCROLLBAR_MODE_OFF);
+        lv_obj_add_flag(chat_history_screen_, LV_OBJ_FLAG_HIDDEN);
+
+        // 顶栏：返回
+        lv_obj_t* hist_back = lv_button_create(chat_history_screen_);
+        lv_obj_set_size(hist_back, 44, 36);
+        lv_obj_align(hist_back, LV_ALIGN_TOP_LEFT, 4, 2);
+        lv_obj_set_style_bg_opa(hist_back, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_border_width(hist_back, 0, 0);
+        lv_obj_set_style_shadow_width(hist_back, 0, 0);
+        lv_obj_set_style_pad_all(hist_back, 0, 0);
+        lv_obj_set_ext_click_area(hist_back, 8);
+        lv_obj_add_event_cb(hist_back, &LcdDisplay::OnChatHistoryBackClicked, LV_EVENT_PRESSED, this);
+        chat_history_back_icon_ = lv_label_create(hist_back);
+        lv_obj_set_style_text_font(chat_history_back_icon_, icon_font, 0);
+        lv_obj_set_style_text_color(chat_history_back_icon_, lv_color_hex(0xE8E8F0), 0);
+        lv_label_set_text(chat_history_back_icon_, MATERIAL_SYMBOLS_ARROW_BACK);
+        lv_obj_center(chat_history_back_icon_);
+
+        // 标题
+        chat_history_title_ = lv_label_create(chat_history_screen_);
+        lv_obj_set_style_text_font(chat_history_title_, text_font, 0);
+        lv_obj_set_style_text_color(chat_history_title_, lv_color_hex(0xE8E8F0), 0);
+        lv_label_set_text(chat_history_title_, "聊天记录");
+        lv_obj_align(chat_history_title_, LV_ALIGN_TOP_MID, 0, 8);
+
+        // 日期（右上角）
+        chat_history_date_ = lv_label_create(chat_history_screen_);
+        lv_obj_set_style_text_font(chat_history_date_, text_font, 0);
+        lv_obj_set_style_text_color(chat_history_date_, lv_color_hex(0x8A90A0), 0);
+        lv_label_set_text(chat_history_date_, "");
+        lv_obj_align(chat_history_date_, LV_ALIGN_TOP_RIGHT, -8, 10);
+
+        // 正文区：6 行
+        chat_history_body_ = lv_label_create(chat_history_screen_);
+        lv_obj_set_style_text_font(chat_history_body_, text_font, 0);
+        lv_obj_set_style_text_color(chat_history_body_, lv_color_hex(0xD8DCE8), 0);
+        lv_obj_set_style_text_line_space(chat_history_body_, 2, 0);
+        lv_obj_set_width(chat_history_body_, LV_HOR_RES - 16);
+        lv_label_set_long_mode(chat_history_body_, LV_LABEL_LONG_WRAP);
+        lv_label_set_text(chat_history_body_, "");
+        lv_obj_align(chat_history_body_, LV_ALIGN_TOP_LEFT, 8, 44);
+
+        // 底部翻页条
+        lv_obj_t* hist_prev = lv_button_create(chat_history_screen_);
+        lv_obj_set_size(hist_prev, 44, 40);
+        lv_obj_align(hist_prev, LV_ALIGN_BOTTOM_LEFT, 8, -6);
+        lv_obj_set_style_bg_color(hist_prev, lv_color_hex(0x252A36), 0);
+        lv_obj_set_style_bg_opa(hist_prev, LV_OPA_COVER, 0);
+        lv_obj_set_style_radius(hist_prev, 10, 0);
+        lv_obj_set_style_border_width(hist_prev, 0, 0);
+        lv_obj_set_style_shadow_width(hist_prev, 0, 0);
+        lv_obj_set_style_pad_all(hist_prev, 0, 0);
+        lv_obj_add_event_cb(hist_prev, &LcdDisplay::OnChatHistoryPrevClicked, LV_EVENT_PRESSED, this);
+        chat_history_prev_btn_ = hist_prev;
+        lv_obj_t* prev_icon = lv_label_create(hist_prev);
+        lv_obj_set_style_text_font(prev_icon, icon_font, 0);
+        lv_obj_set_style_text_color(prev_icon, lv_color_hex(0xE8E8F0), 0);
+        lv_label_set_text(prev_icon, MATERIAL_SYMBOLS_SKIP_PREVIOUS);
+        lv_obj_center(prev_icon);
+        chat_history_page_label_ = nullptr;
+
+        chat_history_page_label_ = lv_label_create(chat_history_screen_);
+        lv_obj_set_style_text_font(chat_history_page_label_, text_font, 0);
+        lv_obj_set_style_text_color(chat_history_page_label_, lv_color_hex(0x8A90A0), 0);
+        lv_label_set_text(chat_history_page_label_, "-");
+        lv_obj_align(chat_history_page_label_, LV_ALIGN_BOTTOM_MID, 0, -16);
+
+        lv_obj_t* hist_next = lv_button_create(chat_history_screen_);
+        lv_obj_set_size(hist_next, 44, 40);
+        lv_obj_align(hist_next, LV_ALIGN_BOTTOM_RIGHT, -8, -6);
+        lv_obj_set_style_bg_color(hist_next, lv_color_hex(0x252A36), 0);
+        lv_obj_set_style_bg_opa(hist_next, LV_OPA_COVER, 0);
+        lv_obj_set_style_radius(hist_next, 10, 0);
+        lv_obj_set_style_border_width(hist_next, 0, 0);
+        lv_obj_set_style_shadow_width(hist_next, 0, 0);
+        lv_obj_set_style_pad_all(hist_next, 0, 0);
+        lv_obj_add_event_cb(hist_next, &LcdDisplay::OnChatHistoryNextClicked, LV_EVENT_PRESSED, this);
+        chat_history_next_btn_ = hist_next;
+        lv_obj_t* next_icon = lv_label_create(hist_next);
+        lv_obj_set_style_text_font(next_icon, icon_font, 0);
+        lv_obj_set_style_text_color(next_icon, lv_color_hex(0xE8E8F0), 0);
+        lv_label_set_text(next_icon, MATERIAL_SYMBOLS_SKIP_NEXT);
+        lv_obj_center(next_icon);
+#endif  // CONFIG_FEATURE_CHAT_HISTORY
+
     drawer_screen_ = lv_obj_create(screen);
     lv_obj_set_size(drawer_screen_, LV_HOR_RES, LV_VER_RES);
     lv_obj_set_style_radius(drawer_screen_, 0, 0);
@@ -2885,7 +2991,33 @@ void LcdDisplay::SetChatMessage(const char* role, const char* content) {
     if (was_reviewing) {
         ShowNotification("新消息", 1200);
     }
+
+#if CONFIG_FEATURE_CHAT_HISTORY
+    // 记录到 TF 卡。助手回复是逐句流式下发的，这里不能每句存一条，
+    // 否则一句话会被拆成很多碎片：用户消息立即存，助手回复等这一轮
+    // 结束（下一条用户消息或会话结束）时整段存。
+    if (role_str == "user") {
+        FlushPendingAssistantReply();
+        ChatLog::GetInstance().Append("user", text.c_str());
+    } else if (role_str == "assistant") {
+        pending_assistant_reply_ += text;
+        pending_reply_active_ = true;
+    }
+#endif
 }
+
+#if CONFIG_FEATURE_CHAT_HISTORY
+void LcdDisplay::FlushPendingAssistantReply() {
+    if (!pending_reply_active_ || pending_assistant_reply_.empty()) {
+        pending_reply_active_ = false;
+        pending_assistant_reply_.clear();
+        return;
+    }
+    ChatLog::GetInstance().Append("assistant", pending_assistant_reply_.c_str());
+    pending_assistant_reply_.clear();
+    pending_reply_active_ = false;
+}
+#endif
 
 void LcdDisplay::RepairDanglingFonts(const lv_font_t* text_font, const lv_font_t* icon_font,
                                      const lv_font_t* large_icon_font) {
@@ -3625,6 +3757,188 @@ void LcdDisplay::OnSettingsBackClicked(lv_event_t* e) {
         self->CloseSubPageToDrawer();
     }
 }
+
+#if CONFIG_FEATURE_CHAT_HISTORY
+// ---- 聊天记录回看页 ----
+//
+// 页面只读：分页显示当天对话，翻页走内存里的预排版结果。
+// 打开期间切到"回看模式"：关唤醒词、关语音处理、丢弃服务器下行音频，
+// 否则设备随时会被新一轮对话打断。
+
+void LcdDisplay::OpenChatHistoryPage() {
+    ShowChatHistoryScreen(true);
+}
+
+bool LcdDisplay::DrawerChatHistoryEnabled() const {
+    return ChatLog::GetInstance().Ready();
+}
+
+void LcdDisplay::ShowChatHistoryScreen(bool show) {
+    if (chat_history_screen_ == nullptr) {
+        return;
+    }
+    DisplayLockGuard lock(this);
+    chat_history_visible_ = show;
+    if (show) {
+        // 进入回看：静音 + 不响应唤醒词
+        auto& app = Application::GetInstance();
+        app.SetChatHistoryReviewing(true);
+        app.GetAudioService().EnableVoiceProcessing(false);
+        app.GetAudioService().EnableWakeWordDetection(false);
+        chat_history_opened_ms_ =
+            static_cast<uint32_t>(esp_timer_get_time() / 1000);
+        RefreshChatHistoryPage();
+        lv_obj_remove_flag(chat_history_screen_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_move_foreground(chat_history_screen_);
+    } else {
+        lv_obj_add_flag(chat_history_screen_, LV_OBJ_FLAG_HIDDEN);
+        // 退出回看：恢复监听。延迟 2 秒避开用户松手瞬间，
+        // 由 Application 的状态机在回到 Idle 时统一恢复。
+        Application::GetInstance().SetChatHistoryReviewing(false);
+    }
+}
+
+void LcdDisplay::RefreshChatHistoryPage() {
+    if (chat_history_body_ == nullptr) {
+        return;
+    }
+    chat_history_text_.clear();
+    chat_history_page_count_ = 0;
+
+    ChatLog& log = ChatLog::GetInstance();
+    if (!log.Ready()) {
+        lv_label_set_text(chat_history_date_, "存储卡未就绪");
+        lv_label_set_text(chat_history_body_, "插入存储卡后即可记录对话。");
+        lv_label_set_text(chat_history_page_label_, "-");
+        return;
+    }
+
+    const uint32_t day = log.DayAt(0);
+    if (day == 0) {
+        char buf[32];
+        snprintf(buf, sizeof(buf), "%s", "");
+        lv_label_set_text(chat_history_date_, "暂无记录");
+        lv_label_set_text(chat_history_body_,
+                          "还没有对话记录。\n\n和小智聊几句，\n记录会自动存到存储卡。");
+        lv_label_set_text(chat_history_page_label_, "-");
+        return;
+    }
+
+    char date_buf[32];
+    snprintf(date_buf, sizeof(date_buf), "%04u-%02u-%02u", (unsigned)(day / 10000),
+             (unsigned)((day / 100) % 100), (unsigned)(day % 100));
+    chat_history_day_text_ = date_buf;
+    lv_label_set_text(chat_history_date_, date_buf);
+
+    std::vector<ChatLog::Entry> entries;
+    const int count = log.LoadDay(day, entries);
+    if (count <= 0) {
+        lv_label_set_text(chat_history_body_, "这一天的记录读不出来。");
+        lv_label_set_text(chat_history_page_label_, "-");
+        return;
+    }
+
+    // 预先把每条记录排版成行。一行按 16 个汉字估算（240px 宽、18px 字）。
+    const size_t kCharsPerLine = 16;
+    std::vector<std::string> all_lines;
+    for (const auto& e : entries) {
+        // 角色标题行
+        std::string head = (e.role == 0) ? "你" : (e.role == 1 ? "小智" : "系统");
+        all_lines.push_back(head);
+        // 正文按字数折行
+        const std::string& text = e.text;
+        size_t pos = 0;
+        while (pos < text.size()) {
+            // 按 UTF-8 字符边界取一段
+            size_t start = pos;
+            size_t chars = 0;
+            while (pos < text.size() && chars < kCharsPerLine) {
+                unsigned char c = static_cast<unsigned char>(text[pos]);
+                size_t step = 1;
+                if ((c & 0x80) == 0) {
+                    step = 1;
+                } else if ((c & 0xE0) == 0xC0) {
+                    step = 2;
+                } else if ((c & 0xF0) == 0xE0) {
+                    step = 3;
+                } else {
+                    step = 4;
+                }
+                if (pos + step > text.size()) {
+                    step = text.size() - pos;
+                }
+                pos += step;
+                ++chars;
+            }
+            all_lines.push_back(text.substr(start, pos - start));
+        }
+        all_lines.push_back("");  // 条与条之间空一行
+    }
+
+    // 每页的行数：正文区能放下的行数（字体行高由主题决定，这里按 6 行算）
+    const int kLinesPerPage = 6;
+    chat_history_page_count_ =
+        std::max(1, static_cast<int>((all_lines.size() + kLinesPerPage - 1) / kLinesPerPage));
+    for (int p = 0; p < chat_history_page_count_; ++p) {
+        std::string page_text;
+        const size_t begin = static_cast<size_t>(p) * kLinesPerPage;
+        const size_t end = std::min(begin + kLinesPerPage, all_lines.size());
+        for (size_t i = begin; i < end; ++i) {
+            if (!page_text.empty()) {
+                page_text += "\n";
+            }
+            page_text += all_lines[i];
+        }
+        chat_history_text_.push_back(std::move(page_text));
+    }
+    chat_history_page_ = chat_history_page_count_ - 1;  // 默认停在最新一页
+    ChatHistoryTurn(0);
+}
+
+void LcdDisplay::ChatHistoryTurn(int dir) {
+    if (chat_history_text_.empty()) {
+        return;
+    }
+    if (dir != 0) {
+        const int next = chat_history_page_ + dir;
+        if (next < 0 || next >= chat_history_page_count_) {
+            return;
+        }
+        chat_history_page_ = next;
+    }
+    if (chat_history_page_ >= 0 && chat_history_page_ < static_cast<int>(chat_history_text_.size())) {
+        lv_label_set_text(chat_history_body_, chat_history_text_[chat_history_page_].c_str());
+    }
+    char buf[32];
+    snprintf(buf, sizeof(buf), "%d / %d", chat_history_page_ + 1, chat_history_page_count_);
+    lv_label_set_text(chat_history_page_label_, buf);
+}
+
+void LcdDisplay::OnChatHistoryBackClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self == nullptr) {
+        return;
+    }
+    self->ShowChatHistoryScreen(false);
+    self->CloseSubPageToDrawer();
+}
+
+void LcdDisplay::OnChatHistoryPrevClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self != nullptr) {
+        self->MarkUserActivity();
+        self->ChatHistoryTurn(-1);
+    }
+}
+
+void LcdDisplay::OnChatHistoryNextClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self != nullptr) {
+        self->MarkUserActivity();
+        self->ChatHistoryTurn(1);
+    }
+}
+#endif  // CONFIG_FEATURE_CHAT_HISTORY
 
 void LcdDisplay::CloseSubPageToDrawer() {
     if (!return_to_drawer_) {
@@ -7536,3 +7850,15 @@ void LcdDisplay::RebindMusicFonts(const lv_font_t* text_font, const lv_font_t* i
     }
 }
 #endif  // CONFIG_FEATURE_MUSIC_PLAYER
+
+#if !CONFIG_FEATURE_CHAT_HISTORY
+// 功能关闭时抽屉仍保留入口，但只显示"未启用"，不创建页面。
+void LcdDisplay::OpenChatHistoryPage() {}
+void LcdDisplay::ShowChatHistoryScreen(bool show) { (void)show; }
+void LcdDisplay::RefreshChatHistoryPage() {}
+void LcdDisplay::ChatHistoryTurn(int dir) { (void)dir; }
+bool LcdDisplay::DrawerChatHistoryEnabled() const { return false; }
+void LcdDisplay::OnChatHistoryBackClicked(lv_event_t* e) { (void)e; }
+void LcdDisplay::OnChatHistoryPrevClicked(lv_event_t* e) { (void)e; }
+void LcdDisplay::OnChatHistoryNextClicked(lv_event_t* e) { (void)e; }
+#endif

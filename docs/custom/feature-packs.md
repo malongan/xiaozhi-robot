@@ -17,6 +17,7 @@
 | `ble_keyboard` | `CONFIG_FEATURE_BLE_KEYBOARD` | MVP，默认开启，依赖 `BT_ENABLED` |
 | `web_file_transfer` | `CONFIG_FEATURE_WEB_FILE_TRANSFER` | 目标板开启，`full` 启用，依赖 SD 卡与 Wi-Fi |
 | `music_player` | `CONFIG_FEATURE_MUSIC_PLAYER` | 新增，默认关闭；目标板与 `full` 启用，依赖 SD 卡与本地解码器 |
+| `chat_history` | `CONFIG_FEATURE_CHAT_HISTORY` | 新增，默认关闭；`daily`、`chat_history`、`full` 启用，依赖 SD 卡 |
 
 英语功能包包含：
 
@@ -71,6 +72,21 @@
 - 只有 `self.music.stop`（“退出听歌”）才关闭页面并停止播放
 - 相关实现：`Application::EnterMusicMode/LeaveMusicMode/ExtendMusicCommandWindow`、
   `MediaPlayer::SetCommandWindowActive`、`Display::ShowMusicPlayer`
+
+## 聊天记录（chat_history）
+
+把每一轮对话追加写到 TF 卡，抽屉第 7 格"记录"进入只读回看页。
+
+- **存储**：`/sdcard/chatlog/yyyymmdd.log`，24 字节定长头 + 变长 UTF-8 正文，
+  追加写 + `fsync`，断电最多丢最后一批（≤10 条）。
+- **容量**：单条正文 ≤512 B，单日 ≤2 MB，保留 7 天，攒批刷盘（10 条或 30 秒）。
+- **落盘时机**：用户消息即时存；助手回复是流式下发的，攒到这一轮结束整段存，
+  避免一句话被拆成多条碎片。
+- **防打断（三层）**：回看页打开时关唤醒词、关语音处理，并在
+  `OnIncomingAudio` 处静默丢弃服务器下行 TTS。只静音不丢弃会让音频排队，
+  退出回看后一次性播出来。
+- **体积**：相对 `base` 增加 text 10.5 KB、data 0.6 KB、bss 0。
+- **符号**：关闭侧（`base`/`english`）`ChatLog::` 符号数为 0，开启侧（`chat_history`）15 个。
 
 ## 目录约定
 

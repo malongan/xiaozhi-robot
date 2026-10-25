@@ -262,7 +262,7 @@ protected:
         uint32_t color_top;
         uint32_t color_bottom;
     };
-    static constexpr int kDrawerTileCount = 6;
+    static constexpr int kDrawerTileCount = 7;
     static const DrawerTileSpec kDrawerSpecs[kDrawerTileCount];
     lv_obj_t* drawer_screen_ = nullptr;
     lv_obj_t* drawer_back_icon_ = nullptr;
@@ -284,6 +284,38 @@ protected:
     void OpenFileServicePage();
     void OpenMusicPage();
     bool DrawerAlwaysEnabled() const { return true; }
+
+    // ---- 聊天记录回看页 ----
+    // 方法在开关关闭时也有空实现，抽屉入口才不会缺符号。
+    void OpenChatHistoryPage();
+    void ShowChatHistoryScreen(bool show);
+    void RefreshChatHistoryPage();
+    void ChatHistoryTurn(int dir);  // dir = -1 上一页 / +1 下一页
+    bool DrawerChatHistoryEnabled() const;
+    static void OnChatHistoryBackClicked(lv_event_t* e);
+    static void OnChatHistoryPrevClicked(lv_event_t* e);
+    static void OnChatHistoryNextClicked(lv_event_t* e);
+
+#if CONFIG_FEATURE_CHAT_HISTORY
+    lv_obj_t* chat_history_screen_ = nullptr;
+    lv_obj_t* chat_history_back_icon_ = nullptr;
+    lv_obj_t* chat_history_title_ = nullptr;
+    lv_obj_t* chat_history_date_ = nullptr;
+    lv_obj_t* chat_history_body_ = nullptr;
+    lv_obj_t* chat_history_page_label_ = nullptr;
+    lv_obj_t* chat_history_prev_btn_ = nullptr;
+    lv_obj_t* chat_history_next_btn_ = nullptr;
+    std::vector<std::string> chat_history_text_;  // 每页排版好的文本
+    std::string chat_history_day_text_;           // 当前显示的日期
+    int chat_history_page_ = 0;
+    int chat_history_page_count_ = 0;
+    bool chat_history_visible_ = false;
+    uint32_t chat_history_opened_ms_ = 0;
+    // 助手回复流式下发，攒到这一轮结束整段存卡
+    void FlushPendingAssistantReply();
+    std::string pending_assistant_reply_;
+    bool pending_reply_active_ = false;
+#endif
     bool DrawerEnglishEnabled() const;
     bool DrawerStrokeEnabled() const;
     bool DrawerBleKeyboardEnabled() const;

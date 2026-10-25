@@ -71,6 +71,12 @@ if(CONFIG_FEATURE_BLE_KEYBOARD)
     )
 endif()
 
+if(CONFIG_FEATURE_CHAT_HISTORY)
+    list(APPEND SOURCES
+        "features/chat_history/chat_log.cc"
+    )
+endif()
+
 if(CONFIG_FEATURE_MUSIC_PLAYER)
     list(APPEND SOURCES
         "features/music_player/music_library.cc"

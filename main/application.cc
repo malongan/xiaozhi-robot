@@ -1,4 +1,8 @@
 #include "application.h"
+
+#if CONFIG_FEATURE_CHAT_HISTORY
+#include "features/chat_history/chat_log.h"
+#endif
 #include "assets.h"
 #include "assets/lang_config.h"
 #include "audio_codec.h"
@@ -81,9 +85,8 @@ Application::Application() : notify_player_(audio_service_) {
     esp_timer_create_args_t music_window_args = {
         .callback =
             [](void* arg) {
-                static_cast<Application*>(arg)->Schedule([]() {
-                    Application::GetInstance().EndMusicCommandWindow();
-                });
+                static_cast<Application*>(arg)->Schedule(
+                    []() { Application::GetInstance().EndMusicCommandWindow(); });
             },
         .arg = this,
         .dispatch_method = ESP_TIMER_TASK,
@@ -644,6 +647,13 @@ void Application::InitializeProtocol() {
     });
 
     protocol_->OnIncomingAudio([this](std::unique_ptr<AudioStreamPacket> packet) {
+#if CONFIG_FEATURE_CHAT_HISTORY
+        // 回看聊天记录期间必须静音：服务器可能突然推 TTS 下来，
+        // 排进队列会在退出回看后一股脑播出来，打断回看体验。
+        if (chat_history_reviewing_.load()) {
+            return;
+        }
+#endif
         if (GetDeviceState() == kDeviceStateSpeaking) {
             audio_service_.PushPacketToDecodeQueue(std::move(packet));
         }
@@ -958,8 +968,8 @@ void Application::SetDictationActive(bool active) {
     // main task where the state machine and audio service live. Re-check the
     // flag so a wake word that arrives before this task runs still wins.
     Schedule([this]() {
-        if (!dictation_command_mode_.load() &&
-            dictation_active_.load() && GetDeviceState() == kDeviceStateListening) {
+        if (!dictation_command_mode_.load() && dictation_active_.load() &&
+            GetDeviceState() == kDeviceStateListening) {
             StopListening();
         }
     });
@@ -1258,8 +1268,8 @@ void Application::HandleWakeWordDetectedEvent() {
             ;
 
         if (state == kDeviceStateListening) {
-            listening_mode_ = dictation_command_mode_.load() ? kListeningModeAutoStop
-                                                             : GetDefaultListeningMode();
+            listening_mode_ =
+                dictation_command_mode_.load() ? kListeningModeAutoStop : GetDefaultListeningMode();
             protocol_->SendStartListening(listening_mode_);
             audio_service_.ResetDecoder();
             audio_service_.PlaySound(Lang::Sounds::OGG_POPUP);
