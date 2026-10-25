@@ -292,6 +292,7 @@ protected:
     void ToggleBrowsePause();
     void BrowseTurn(int dir);  // dir = -1 上页 / +1 下页
     bool browse_paused_ = false;
+    bool browse_mute_pending_ = false;  // 正在播报，等说完再静音
     lv_obj_t* browse_pause_badge_ = nullptr;  // 暂停时的状态提示
 
     // ---- 聊天记录回看页 ----

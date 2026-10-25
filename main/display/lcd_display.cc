@@ -3016,6 +3016,7 @@ void LcdDisplay::CancelBrowsePauseIfAny() {
     }
     ESP_LOGW(TAG, "待机时复位翻页暂停");
     browse_paused_ = false;
+    browse_mute_pending_ = false;
     Application::GetInstance().SetChatHistoryReviewing(false);
 }
 
@@ -3030,6 +3031,12 @@ void LcdDisplay::EnforceBrowseStatus() {
     // 进入暂停时如果正在播报，当时没关麦克风；等这一轮播完（不再 Speaking）
     // 再关掉，既不断句，也不让设备偷偷继续听。
     if (app.GetDeviceState() != kDeviceStateSpeaking) {
+        if (browse_mute_pending_) {
+            // 刚才在播报，等它说完的这一刻才真正静音
+            browse_mute_pending_ = false;
+            app.SetChatHistoryReviewing(true);
+            ESP_LOGW(TAG, "播报结束，进入静音等待");
+        }
         audio.EnableVoiceProcessing(false);
         audio.EnableWakeWordDetection(false);
     }
@@ -4002,16 +4009,18 @@ void LcdDisplay::EnterBrowsePause() {
     auto& app = Application::GetInstance();
     auto& audio = app.GetAudioService();
     ESP_LOGW(TAG, "进入翻页暂停，设备状态=%d", static_cast<int>(app.GetDeviceState()));
-    app.SetChatHistoryReviewing(true);
 
-    // 正在播报时不要立刻掐掉语音：EnableVoiceProcessing(false) 会重置
-    // 解码器，正在念的回复会突然断在半句。让它把这句说完，期间只关唤醒词。
-    // 播放结束后由 LeaveBrowsePause/状态机恢复麦克风。
+    // 正在播报时必须先让它说完：
+    //  * SetChatHistoryReviewing(true) 会让 OnIncomingAudio 直接丢弃后续语音包
+    //  * EnableVoiceProcessing(false) 会 ResetDecoder()，把正在解码的语音掐断
+    // 这两件事都不能在 Speaking 期间做。等播完由 EnforceBrowseStatus() 接手静音。
     const bool speaking = (app.GetDeviceState() == kDeviceStateSpeaking);
+    browse_mute_pending_ = speaking;
     if (!speaking) {
+        app.SetChatHistoryReviewing(true);
         audio.EnableVoiceProcessing(false);
+        audio.EnableWakeWordDetection(false);
     }
-    audio.EnableWakeWordDetection(false);
 
     // 暂停时把位置拉到最新一页，用户往前翻
     follow_latest_ = false;
@@ -4025,6 +4034,7 @@ void LcdDisplay::LeaveBrowsePause() {
         return;
     }
     browse_paused_ = false;
+    browse_mute_pending_ = false;
     ESP_LOGW(TAG, "退出翻页暂停，恢复对话");
     auto& app = Application::GetInstance();
     auto& audio = app.GetAudioService();
@@ -4343,10 +4353,13 @@ void LcdDisplay::OnMicButtonClicked(lv_event_t* e) {
         if (lv_indev_t* indev = lv_indev_active(); indev != nullptr) {
             lv_indev_wait_release(indev);
         }
-        self->LeaveBrowsePause();
+        // 顺序很重要：GoToPage() 内部"翻页即暂停"，如果先 LeaveBrowsePause()
+        // 再 GoToPage()，会被重新拉回暂停，表现为"要点两次才进聆听"。
+        // 所以先跳回最新页（此时仍在暂停态，不会重复触发），再退出暂停。
         if (!self->chat_pages_.empty()) {
             self->GoToPage(static_cast<int>(self->chat_pages_.size()) - 1, false);
         }
+        self->LeaveBrowsePause();
         Application::GetInstance().ResumeListeningFromBrowse();
         return;
     }
@@ -4412,6 +4425,17 @@ void LcdDisplay::SetAvatarMood(AvatarMood mood) {
     ESP_LOGI(TAG, "avatar mood %d -> %d (stroke=%d settings=%d)", (int)previous_mood, (int)mood,
              stroke_screen_visible_, settings_screen_visible_);
     MarkUserActivity();
+#if CONFIG_FEATURE_CHAT_HISTORY
+    // 播报刚结束就立刻静音（不等下一次每秒 tick），否则最后几帧还会漏出来
+    if (browse_paused_ && browse_mute_pending_ && mood != kAvatarMoodSpeaking) {
+        browse_mute_pending_ = false;
+        auto& app = Application::GetInstance();
+        app.SetChatHistoryReviewing(true);
+        app.GetAudioService().EnableVoiceProcessing(false);
+        app.GetAudioService().EnableWakeWordDetection(false);
+        ESP_LOGW(TAG, "播报结束，立即进入静音等待");
+    }
+#endif
     avatar_mood_ = mood;
     avatar_anim_epoch_ = lv_tick_get();
     avatar_blink_at_ = avatar_anim_epoch_ + 2600 + (esp_random() % 3500);
