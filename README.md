@@ -11,6 +11,7 @@
 > - 2026-10-22 版本说明：[docs/custom/release-20261022.md](docs/custom/release-20261022.md)
 > - 2026-10-22 r2 版本说明：内部 RAM 优化 + 启动提速 + 蓝牙运行时开关：[docs/custom/release-20261022-r2.md](docs/custom/release-20261022-r2.md)
 > - 2026-10-23 版本说明（音乐功能包 + 头像动画降频）：[docs/custom/release-20261023-music.md](docs/custom/release-20261023-music.md)
+> - 2026-10-25 版本说明（充电状态修复 + BOOT 长按关机）：[docs/custom/release-20261025.md](docs/custom/release-20261025.md)
 > - 2026-10-22 r3 版本说明：听写语音调节 + 同词循环/拼音修复：[docs/custom/release-20261022-r3.md](docs/custom/release-20261022-r3.md)
 > - 功能包与组合构建：[docs/custom/feature-packs.md](docs/custom/feature-packs.md)
 > - 功能包开发指导：[docs/custom/feature-development-guide.md](docs/custom/feature-development-guide.md)
@@ -21,7 +22,10 @@
 > - 界面预览：[docs/custom/](docs/custom/)
 >
 > **固件下载（定制版 + 官方回退）**：<https://github.com/malongan/xiaozhi-robot/releases>
-> - `custom-final-20261022-r3` 最新定制版：听写语音调节 + 同词循环/拼音修复
+> - `custom-final-20261025` 最新定制版：充电状态修复 + BOOT 长按关机
+> - `custom-final-20261023-r2` 音乐浅色皮肤 + MENU 修复
+> - `custom-final-20261023` 音乐功能包 + 头像动画降频
+> - `custom-final-20261022-r3` 听写语音调节 + 同词循环/拼音修复
 > - `custom-final-20261022-r2` 上一版：蓝牙开关 + 内存/启动优化
 > - `custom-final-20261022` 6MB 分区首个稳定版：设置/网络卡片 + 三面板键盘
 > - `v2.5.2` 官方版：上游原版，用于对照/回退（含本板构建镜像）

@@ -420,3 +420,12 @@ CI 状态（2026-10-23）：`main` 的 Build Boards 共 20 个 job，19 个通�
 - 音乐索引是 `/sdcard/music` 的编译期固定路径，最多 1000 首、3 层目录；不做拖动定位与单曲循环。
 - profile 目前只切换功能包开关，不负责板型或分区差异；板型仍以根目录 `sdkconfig` 为准。
 - 这是编译期组合，不是运行时插件；ELF 动态加载仍不采用。
+
+## 版本记录
+
+| 标签 | 内容 |
+|---|---|
+| `custom-feature-packs-20261023` | 功能包拆分合并到 `main`（英语/笔顺/蓝牙键盘/网络传输） |
+| `custom-final-20261023` | 新增 `music_player` 功能包（第五个包） |
+| `custom-final-20261023-r2` | 音乐浅色皮肤 + MENU 修复 |
+| `custom-final-20261025` | 充电状态修复（板级 `freenove_power_monitor`）+ BOOT 长按关机；八个 profile 全量重编译 |
