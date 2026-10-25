@@ -107,6 +107,8 @@ public:
      * Sends MAIN_EVENT_START_LISTENING to be handled in Run()
      */
     void StartListening();
+    // 从"翻页暂停"回到聆听（处理所有中间状态）
+    void ResumeListeningFromBrowse();
 
     /**
      * Stop listening (event-based, thread-safe)

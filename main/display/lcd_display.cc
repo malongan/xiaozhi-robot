@@ -4289,13 +4289,10 @@ void LcdDisplay::OnAvatarReleased(lv_event_t* e) {
             lv_indev_wait_release(indev);  // 吃掉随后可能的 CLICKED
         }
         self->LeaveBrowsePause();
-        // 让状态机重新进入监听（原来在待机则回到待机即可，唤醒词已恢复）
-        Application::GetInstance().Schedule([]() {
-            auto& app = Application::GetInstance();
-            if (app.GetDeviceState() == kDeviceStateIdle) {
-                app.StartListening();
-            }
-        });
+        // 真正回到聆听：LeaveBrowsePause() 只改界面，这里走状态机。
+        // 之前只在 Idle 下调用 StartListening()，设备停在 Listening 时
+        // 就什么也没发生，看起来像"退回了待机"。
+        Application::GetInstance().ResumeListeningFromBrowse();
     }
 #endif
 }

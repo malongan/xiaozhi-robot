@@ -952,6 +952,29 @@ void Application::RestartAfterSessionClose(const std::string& wake_word) {
 
 void Application::StartListening() { xEventGroupSetBits(event_group_, MAIN_EVENT_START_LISTENING); }
 
+void Application::ResumeListeningFromBrowse() {
+    // 翻页浏览结束：把设备从"暂停"拉回聆听。
+    // HandleStartListeningEvent() 只在 Idle/Speaking 下起作用，而暂停时
+    // 设备可能停在 Listening（甚至半关闭的状态），所以先归位到 Idle，
+    // 再走正常的开启监听流程。
+    Schedule([this]() {
+        auto state = GetDeviceState();
+        ESP_LOGI(TAG, "从浏览恢复聆听，当前状态 %d", static_cast<int>(state));
+        if (state == kDeviceStateListening) {
+            // 已经在听：重启一次音频处理，确保麦克风真的打开
+            StartListeningAudio();
+            return;
+        }
+        if (state != kDeviceStateIdle) {
+            if (state == kDeviceStateSpeaking) {
+                AbortSpeaking(kAbortReasonNone);
+            }
+            SetDeviceState(kDeviceStateIdle);
+        }
+        StartListening();
+    });
+}
+
 void Application::StopListening() { xEventGroupSetBits(event_group_, MAIN_EVENT_STOP_LISTENING); }
 
 void Application::SetDictationActive(bool active) {

@@ -23,6 +23,7 @@
                 "CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=256",
                 "CONFIG_FEATURE_WEB_FILE_TRANSFER=y",
                 "CONFIG_FEATURE_MUSIC_PLAYER=y",
+                "CONFIG_WAKE_WORD_DETECTION_IN_LISTENING=y",
                 "CONFIG_PARTITION_TABLE_CUSTOM_FILENAME=\"partitions/v2/16m_app6m.csv\"",
                 "CONFIG_COMPILER_OPTIMIZATION_PERF=y",
                 "CONFIG_LOG_DEFAULT_LEVEL_WARN=y",

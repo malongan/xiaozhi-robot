@@ -42,6 +42,15 @@ def set_kconfig(text, symbol, enabled):
     return text.rstrip() + "\n" + value + "\n"
 
 
+# 所有 profile 都需要的定制项：板级 config.json 的 sdkconfig_append 只对
+# scripts/build.py 生效，feature_build.py 复制的是根 sdkconfig，这里补齐。
+ALWAYS_APPEND = {
+    # 聆听状态下也保持唤醒词检测：否则一轮说完进入聆听后叫不醒，
+    # 必须等超时回到待机，体感就是"要喊好几次"。
+    "CONFIG_WAKE_WORD_DETECTION_IN_LISTENING": True,
+}
+
+
 def prepare_config(profile, features, sdkconfig, output):
     missing = [name for name in profile["features"] if name not in features]
     if missing:
@@ -50,6 +59,10 @@ def prepare_config(profile, features, sdkconfig, output):
     text = sdkconfig.read_text(encoding="utf-8")
     for name, enabled in profile["features"].items():
         text = set_kconfig(text, features[name]["config"], enabled)
+    for symbol, enabled in ALWAYS_APPEND.items():
+        text = set_kconfig(text, symbol, enabled)
+    for symbol, enabled in profile.get("sdkconfig", {}).items():
+        text = set_kconfig(text, symbol, enabled)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(text, encoding="utf-8")
 
