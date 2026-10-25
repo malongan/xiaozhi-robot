@@ -3008,11 +3008,30 @@ void LcdDisplay::SetChatMessage(const char* role, const char* content) {
 }
 
 #if CONFIG_FEATURE_CHAT_HISTORY
+void LcdDisplay::CancelBrowsePauseIfAny() {
+    // 已经回到待机，暂停状态没有意义了。必须复位，否则
+    // EnforceBrowseStatus() 会继续把唤醒词关着，设备就喊不醒了。
+    if (!browse_paused_) {
+        return;
+    }
+    ESP_LOGW(TAG, "待机时复位翻页暂停");
+    browse_paused_ = false;
+    Application::GetInstance().SetChatHistoryReviewing(false);
+}
+
 void LcdDisplay::EnforceBrowseStatus() {
     // 翻页浏览时状态栏固定"等待"：状态机可能在 Listening/Speaking 之间
     // 来回切，不强制的话"等待"会被立刻覆盖回"聆听中"。
     if (!browse_paused_) {
         return;
+    }
+    auto& app = Application::GetInstance();
+    auto& audio = app.GetAudioService();
+    // 进入暂停时如果正在播报，当时没关麦克风；等这一轮播完（不再 Speaking）
+    // 再关掉，既不断句，也不让设备偷偷继续听。
+    if (app.GetDeviceState() != kDeviceStateSpeaking) {
+        audio.EnableVoiceProcessing(false);
+        audio.EnableWakeWordDetection(false);
     }
     DisplayLockGuard lock(this);
     if (status_label_ != nullptr) {
@@ -3981,9 +4000,19 @@ void LcdDisplay::EnterBrowsePause() {
     }
     browse_paused_ = true;
     auto& app = Application::GetInstance();
+    auto& audio = app.GetAudioService();
+    ESP_LOGW(TAG, "进入翻页暂停，设备状态=%d", static_cast<int>(app.GetDeviceState()));
     app.SetChatHistoryReviewing(true);
-    app.GetAudioService().EnableVoiceProcessing(false);
-    app.GetAudioService().EnableWakeWordDetection(false);
+
+    // 正在播报时不要立刻掐掉语音：EnableVoiceProcessing(false) 会重置
+    // 解码器，正在念的回复会突然断在半句。让它把这句说完，期间只关唤醒词。
+    // 播放结束后由 LeaveBrowsePause/状态机恢复麦克风。
+    const bool speaking = (app.GetDeviceState() == kDeviceStateSpeaking);
+    if (!speaking) {
+        audio.EnableVoiceProcessing(false);
+    }
+    audio.EnableWakeWordDetection(false);
+
     // 暂停时把位置拉到最新一页，用户往前翻
     follow_latest_ = false;
     DisplayLockGuard lock(this);
@@ -3996,7 +4025,14 @@ void LcdDisplay::LeaveBrowsePause() {
         return;
     }
     browse_paused_ = false;
-    Application::GetInstance().SetChatHistoryReviewing(false);
+    ESP_LOGW(TAG, "退出翻页暂停，恢复对话");
+    auto& app = Application::GetInstance();
+    auto& audio = app.GetAudioService();
+    app.SetChatHistoryReviewing(false);
+    // 暂停期间关掉了唤醒词检测（EnforceBrowseStatus 每秒都会关），
+    // 退出时必须显式恢复，否则设备"听着但叫不醒"。
+    audio.EnableWakeWordDetection(audio.IsAfeWakeWord());
+    audio.EnableVoiceProcessing(true);
     // 恢复对话：回到最新并重新开启监听由状态机负责
     follow_latest_ = true;
     DisplayLockGuard lock(this);
@@ -4006,6 +4042,7 @@ void LcdDisplay::LeaveBrowsePause() {
 void LcdDisplay::ToggleBrowsePause() {
     if (browse_paused_) {
         LeaveBrowsePause();
+        Application::GetInstance().ResumeListeningFromBrowse();
     } else {
         EnterBrowsePause();
     }
@@ -4281,20 +4318,8 @@ void LcdDisplay::OnAvatarReleased(lv_event_t* e) {
         return;
     }
     self->HidePressRing();
-#if CONFIG_FEATURE_CHAT_HISTORY
-    // 暂停浏览中点头像 = 回到对话：恢复监听、回到最新一页。
-    // 抬起时触发，长按仍走 StartNewSession()（长按后 LVGL 不再派发这个事件）。
-    if (self->browse_paused_ && lv_event_get_code(e) == LV_EVENT_RELEASED) {
-        if (lv_indev_t* indev = lv_indev_active(); indev != nullptr) {
-            lv_indev_wait_release(indev);  // 吃掉随后可能的 CLICKED
-        }
-        self->LeaveBrowsePause();
-        // 真正回到聆听：LeaveBrowsePause() 只改界面，这里走状态机。
-        // 之前只在 Idle 下调用 StartListening()，设备停在 Listening 时
-        // 就什么也没发生，看起来像"退回了待机"。
-        Application::GetInstance().ResumeListeningFromBrowse();
-    }
-#endif
+    // 暂停态的恢复统一放在 OnMicButtonClicked 里处理：头像也绑了那个回调，
+    // 两处都恢复会重复触发。
 }
 
 void LcdDisplay::OnMicButtonClicked(lv_event_t* e) {
@@ -4310,6 +4335,22 @@ void LcdDisplay::OnMicButtonClicked(lv_event_t* e) {
             self->ShowDrawerScreen(false);
         }
     }
+#if CONFIG_FEATURE_CHAT_HISTORY
+    // 暂停浏览中点头像 = 回到聆听。
+    // 必须先处理这一支：下面的 ToggleChatState() 会把握手状态切回待机，
+    // 之前就是它盖掉了恢复逻辑，所以看起来"点了还是待机"。
+    if (self != nullptr && self->browse_paused_) {
+        if (lv_indev_t* indev = lv_indev_active(); indev != nullptr) {
+            lv_indev_wait_release(indev);
+        }
+        self->LeaveBrowsePause();
+        if (!self->chat_pages_.empty()) {
+            self->GoToPage(static_cast<int>(self->chat_pages_.size()) - 1, false);
+        }
+        Application::GetInstance().ResumeListeningFromBrowse();
+        return;
+    }
+#endif
     if (self != nullptr && !self->chat_pages_.empty()) {
         // Continue the conversation from the live page.
         self->GoToPage(static_cast<int>(self->chat_pages_.size()) - 1, false);

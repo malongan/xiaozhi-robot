@@ -74,6 +74,8 @@ public:
     virtual void TickChatHistory() {}
     // 翻页浏览期间每秒强制状态栏显示"等待"
     virtual void EnforceBrowseStatus() {}
+    // 回到待机时复位翻页暂停（防止唤醒词被永久关闭）
+    virtual void CancelBrowsePauseIfAny() {}
     // 英语学习页的界面刷新（每秒更新倒计时）
     virtual void RefreshEnglishScreen() {}
     // 音乐功能包：由 Application 在语音点播/退出听歌时打开或关闭音乐页。

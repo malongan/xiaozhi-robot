@@ -954,23 +954,33 @@ void Application::StartListening() { xEventGroupSetBits(event_group_, MAIN_EVENT
 
 void Application::ResumeListeningFromBrowse() {
     // 翻页浏览结束：把设备从"暂停"拉回聆听。
-    // HandleStartListeningEvent() 只在 Idle/Speaking 下起作用，而暂停时
-    // 设备可能停在 Listening（甚至半关闭的状态），所以先归位到 Idle，
-    // 再走正常的开启监听流程。
+    //
+    // 状态机对转移有白名单校验（IsValidTransition），非法转移会静默失败，
+    // 所以这里只走两条明确合法的路径，并且用 session_restart_timer_ 把
+    // "置 idle" 和 "开监听" 拆到两个事件循环回合，避免后一次状态变更
+    // 把监听请求吃掉。
     Schedule([this]() {
         auto state = GetDeviceState();
-        ESP_LOGI(TAG, "从浏览恢复聆听，当前状态 %d", static_cast<int>(state));
+        ESP_LOGW(TAG, "从浏览恢复聆听，当前状态 %d，通道=%d", static_cast<int>(state),
+                 protocol_ != nullptr && protocol_->IsAudioChannelOpened() ? 1 : 0);
         if (state == kDeviceStateListening) {
-            // 已经在听：重启一次音频处理，确保麦克风真的打开
+            // 已经在听：重启音频处理，确保麦克风真的打开
             StartListeningAudio();
             return;
         }
-        if (state != kDeviceStateIdle) {
-            if (state == kDeviceStateSpeaking) {
-                AbortSpeaking(kAbortReasonNone);
-            }
-            SetDeviceState(kDeviceStateIdle);
+        if (state == kDeviceStateSpeaking) {
+            AbortSpeaking(kAbortReasonNone);
         }
+        // 用户主动发起，用 manual-stop：不会被 VAD 立刻收掉
+        SetListeningMode(kListeningModeManualStop);
+        if (state != kDeviceStateIdle) {
+            SetDeviceState(kDeviceStateIdle);
+            // 下一回合再开监听（见上面注释）
+            esp_timer_stop(session_restart_timer_);
+            ESP_ERROR_CHECK(esp_timer_start_once(session_restart_timer_, 300 * 1000));
+            return;
+        }
+        // 已经是 idle：HandleStartListeningEvent() 在 idle 下是合法且完整的路径
         StartListening();
     });
 }
@@ -1410,6 +1420,9 @@ void Application::HandleStateChangedEvent() {
                 // 用户开口才写，中途关机就丢了。
                 display->FlushPendingAssistantReply();
                 ChatLog::GetInstance().Flush();
+                // 兜底：万一暂停标志没被清理，唤醒词会一直是关的，
+                // 设备就"看着在听、喊不醒"。回到待机时强制复位。
+                display->CancelBrowsePauseIfAny();
 #endif
                 if (!display->KeepsChatHistory()) {
                     display->ClearChatMessages();  // Clear messages first

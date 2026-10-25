@@ -324,6 +324,7 @@ protected:
     void FlushPendingAssistantReply() override;
     void TickChatHistory() override;  // 每秒调用：静默超时就把助手回复落盘
     void EnforceBrowseStatus() override;  // 暂停期间固定显示"等待"
+    void CancelBrowsePauseIfAny() override;  // 回到待机时复位暂停状态
     std::string pending_assistant_reply_;
     bool pending_reply_active_ = false;
     uint32_t pending_reply_last_ms_ = 0;  // 最后一句到达时间，用于静默超时落盘
