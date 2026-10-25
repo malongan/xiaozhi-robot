@@ -11,7 +11,7 @@
 #include <cstdio>
 
 #include <wifi_station.h>
-#include "adc_battery_monitor.h"
+#include "freenove_power_monitor.h"
 #include "application.h"
 #include "button.h"
 #include "codecs/es8311_audio_codec.h"
@@ -51,7 +51,7 @@ private:
     i2c_master_bus_handle_t codec_i2c_bus_;
     esp_lcd_touch_handle_t touch_handle_ = nullptr;
     esp_lcd_panel_io_handle_t touch_io_handle_ = nullptr;
-    AdcBatteryMonitor* adc_battery_monitor_;
+    FreenovePowerMonitor* power_monitor_ = nullptr;
     esp_timer_handle_t sd_retry_timer_ = nullptr;
 
     static bool MountSdSdmmc() {
@@ -195,8 +195,9 @@ private:
     }
 
     void InitializeBatteryMonitor() {
-        adc_battery_monitor_ =
-            new AdcBatteryMonitor(ADC_UNIT_1, ADC_CHANNEL_8, 200000, 200000, GPIO_NUM_NC);
+        // 板载 TP4054 的 CHRG 没有引到 ESP32，默认用电压变化推断充电状态；
+        // 若把 CHRG 焊到空闲脚（IO2/IO3/IO14/IO21），把引脚填在这里即可直读。
+        power_monitor_ = new FreenovePowerMonitor(BATTERY_CHARGING_DETECT_PIN);
     }
 
     void InitializeTouch() {
@@ -377,9 +378,12 @@ public:
     }
 
     virtual bool GetBatteryLevel(int& level, bool& charging, bool& discharging) override {
-        charging = adc_battery_monitor_->IsCharging();
-        discharging = adc_battery_monitor_->IsDischarging();
-        level = adc_battery_monitor_->GetBatteryLevel();
+        if (power_monitor_ == nullptr || !power_monitor_->IsBatteryPresent()) {
+            return false;  // 没接电池时不显示电池图标
+        }
+        charging = power_monitor_->IsCharging();
+        discharging = !charging;
+        level = power_monitor_->GetBatteryLevel();
         return true;
     }
 };

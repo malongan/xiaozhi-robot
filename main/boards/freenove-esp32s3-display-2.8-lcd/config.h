@@ -63,4 +63,11 @@
 #define DISPLAY_BACKLIGHT_OUTPUT_INVERT false
 #define DISPLAY_SPI_MODE 0
 
+// 电池充电状态检测脚。
+// ES3C28P/FNK0104 板载 TP4054 的 CHRG 脚没有连到 ESP32，默认无法硬件直读，
+// 固件用电池电压阶跃/斜率推断。若自行把 TP4054 的 CHRG 飞到空闲脚
+// （IO2/IO3/IO14/IO21 之一），把下面的 GPIO_NUM_NC 改成对应引脚，
+// 并在 CHRG 与 3.3V 之间加 10K 上拉即可得到准确的充电状态（低电平=充电中）。
+#define BATTERY_CHARGING_DETECT_PIN GPIO_NUM_NC
+
 #endif  // _BOARD_CONFIG_H_
