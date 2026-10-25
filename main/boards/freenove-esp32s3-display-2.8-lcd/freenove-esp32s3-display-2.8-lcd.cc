@@ -4,6 +4,7 @@
 #include <esp_lcd_touch.h>
 #include <esp_lcd_touch_ft5x06.h>
 #include <esp_lvgl_port.h>
+#include <esp_sleep.h>
 #include <esp_vfs_fat.h>
 #include <sdmmc_cmd.h>
 
@@ -281,6 +282,39 @@ private:
         ESP_ERROR_CHECK(spi_bus_initialize(LCD_SPI_HOST, &buscfg, SPI_DMA_CH_AUTO));
     }
 
+    // 软件关机：关闭背光与屏幕后进入 deep sleep，BOOT 键低电平唤醒。
+    // 注意：插着 USB 时硬件仍在供电，deep sleep 只是把功耗降到最低、屏幕全灭，
+    // 真正的断电需要拔掉 Type-C 或电池。
+    void PowerOff() {
+        ESP_LOGW(TAG, "BOOT long press: power off");
+        if (display_ != nullptr) {
+            display_->ShowNotification("正在关机", 1200);
+        }
+        GetAudioCodec()->SetOutputVolume(0);
+        GetBacklight()->SetBrightness(0);
+        vTaskDelay(pdMS_TO_TICKS(300));
+
+        // 关键：必须等按键松开再睡，否则低电平唤醒条件立刻满足，
+        // 刚进 deep sleep 就被唤醒，看起来像重启。
+        for (int i = 0; i < 100 && gpio_get_level(BOOT_BUTTON_GPIO) == 0; ++i) {
+            vTaskDelay(pdMS_TO_TICKS(50));
+        }
+        if (gpio_get_level(BOOT_BUTTON_GPIO) == 0) {
+            ESP_LOGW(TAG, "BOOT still held, skip power off");
+            GetBacklight()->RestoreBrightness();
+            return;
+        }
+
+        // GPIO0 是 RTC GPIO，可作 ext0 唤醒源；板上已有上拉，按下为低电平
+        esp_err_t err = esp_sleep_enable_ext0_wakeup(BOOT_BUTTON_GPIO, 0);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "ext0 wakeup on BOOT failed: %s", esp_err_to_name(err));
+            esp_restart();
+            return;
+        }
+        esp_deep_sleep_start();
+    }
+
     void InitializeButtons() {
         boot_button_.OnClick([this]() {
             auto& app = Application::GetInstance();
@@ -289,6 +323,7 @@ private:
             }
             app.ToggleChatState();
         });
+        boot_button_.OnLongPress([this]() { PowerOff(); });
     }
 
     void InitializeLcdDisplay() {
@@ -336,7 +371,8 @@ private:
     }
 
 public:
-    FreenoveESP32S3Display() : boot_button_(BOOT_BUTTON_GPIO) {
+    // BOOT 键长按 1.5s 识别为关机（单击仍是原来切换对话/配网）
+    FreenoveESP32S3Display() : boot_button_(BOOT_BUTTON_GPIO, false, 1500, 0) {
         // This build uses the dark UI (white glowing avatar on black).
         // Apply it once so a later manual theme change still persists.
         {
@@ -345,6 +381,9 @@ public:
                 display_settings.SetString("theme", "dark");
                 display_settings.SetBool("dark_default", true);
             }
+        }
+        if (esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_EXT0) {
+            ESP_LOGW(TAG, "wake up from power-off (BOOT button)");
         }
         InitializeI2c();
         InitializeBatteryMonitor();
