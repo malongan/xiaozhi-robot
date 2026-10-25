@@ -1171,6 +1171,11 @@ void Application::HandleToggleChatEvent() {
         AbortSpeaking(kAbortReasonNone);
     } else if (state == kDeviceStateListening) {
         protocol_->CloseAudioChannel();
+        // 手动结束会话：不能只关通道就完事。MQTT 下 OnAudioChannelClosed
+        // 不一定回调，状态会卡在 Listening，而 Listening 不重启唤醒词检测，
+        // 表现就是"点了待机之后喊不醒"。这里主动归位到 idle。
+        ESP_LOGW(TAG, "手动结束聆听，回到待机");
+        SetDeviceState(kDeviceStateIdle);
     }
 }
 

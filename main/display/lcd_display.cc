@@ -3030,6 +3030,12 @@ void LcdDisplay::EnforceBrowseStatus() {
     auto& audio = app.GetAudioService();
     // 进入暂停时如果正在播报，当时没关麦克风；等这一轮播完（不再 Speaking）
     // 再关掉，既不断句，也不让设备偷偷继续听。
+    // 保险：设备已经回到待机且没有在播报，说明暂停实际结束了。
+    // 此时若还继续关唤醒词，就会出现"点回待机后喊不醒"。
+    if (app.GetDeviceState() == kDeviceStateIdle && !browse_mute_pending_) {
+        CancelBrowsePauseIfAny();
+        return;
+    }
     if (app.GetDeviceState() != kDeviceStateSpeaking) {
         if (browse_mute_pending_) {
             // 刚才在播报，等它说完的这一刻才真正静音
