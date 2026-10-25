@@ -204,8 +204,11 @@ void ChatLog::Flush() {
         unlink(path.c_str());
         day_bytes_ = 0;
     }
-    if (AppendToFile(pending_.data(), static_cast<int>(pending_.size()), day)) {
-        total_count_ += static_cast<int>(pending_.size());
+    const int flushed = static_cast<int>(pending_.size());
+    if (AppendToFile(pending_.data(), flushed, day)) {
+        total_count_ += flushed;
+        ESP_LOGW(TAG, "已写入 %d 条记录，累计 %d 条（%08u.log %u B）", flushed, total_count_,
+                 (unsigned)day, (unsigned)day_bytes_);
     }
     pending_.clear();
     last_flush_sec_ = NowSec();
