@@ -3002,11 +3002,38 @@ void LcdDisplay::SetChatMessage(const char* role, const char* content) {
     } else if (role_str == "assistant") {
         pending_assistant_reply_ += text;
         pending_reply_active_ = true;
+        pending_reply_last_ms_ = static_cast<uint32_t>(esp_timer_get_time() / 1000);
     }
 #endif
 }
 
 #if CONFIG_FEATURE_CHAT_HISTORY
+void LcdDisplay::EnforceBrowseStatus() {
+    // 翻页浏览时状态栏固定"等待"：状态机可能在 Listening/Speaking 之间
+    // 来回切，不强制的话"等待"会被立刻覆盖回"聆听中"。
+    if (!browse_paused_) {
+        return;
+    }
+    DisplayLockGuard lock(this);
+    if (status_label_ != nullptr) {
+        lv_label_set_text(status_label_, "等待  ·  点头像继续");
+    }
+}
+
+void LcdDisplay::TickChatHistory() {
+    // 助手回复攒在内存里等这一轮结束。如果设备一直不回 idle
+    // （连续对话、或用户没再说话），就靠"静默 8 秒"兜底落盘，
+    // 否则最后一段回复会丢。
+    if (!pending_reply_active_ || pending_assistant_reply_.empty()) {
+        return;
+    }
+    const uint32_t now = static_cast<uint32_t>(esp_timer_get_time() / 1000);
+    if (now - pending_reply_last_ms_ >= 8000) {
+        FlushPendingAssistantReply();
+        ChatLog::GetInstance().Flush();
+    }
+}
+
 void LcdDisplay::FlushPendingAssistantReply() {
     if (!pending_reply_active_ || pending_assistant_reply_.empty()) {
         pending_reply_active_ = false;
@@ -3184,6 +3211,13 @@ void LcdDisplay::GoToPage(int index, bool show_indicator) {
         index = last;
     }
     if (index != page_index_) {
+#if CONFIG_FEATURE_CHAT_HISTORY
+        // 翻页即自动暂停：静音、不响应唤醒词，翻看历史不会被打断。
+        // 恢复靠点头像（OnAvatarReleased）。
+        if (!browse_paused_) {
+            EnterBrowsePause();
+        }
+#endif
         page_index_ = index;
         follow_latest_ = (index == last);
         RenderCurrentPage();
@@ -3815,8 +3849,6 @@ void LcdDisplay::RefreshChatHistoryPage() {
 
     const uint32_t day = log.DayAt(0);
     if (day == 0) {
-        char buf[32];
-        snprintf(buf, sizeof(buf), "%s", "");
         lv_label_set_text(chat_history_date_, "暂无记录");
         lv_label_set_text(chat_history_body_,
                           "还没有对话记录。\n\n和小智聊几句，\n记录会自动存到存储卡。");
@@ -3838,51 +3870,47 @@ void LcdDisplay::RefreshChatHistoryPage() {
         return;
     }
 
-    // 预先把每条记录排版成行。一行按 16 个汉字估算（240px 宽、18px 字）。
-    const size_t kCharsPerLine = 16;
+    // 按真实字体宽度排版：把每条消息折成显示行，再按屏幕高度切片分页。
+    // 之前按固定字数折行，长句会被切成不连贯的碎片，屏幕也填不满。
+    const lv_font_t* font = SafeTextFont();
+    if (font == nullptr) {
+        font = lv_obj_get_style_text_font(chat_history_body_, LV_PART_MAIN);
+    }
+    const lv_coord_t body_width = LV_HOR_RES - 16;
+    const lv_coord_t line_h = (font != nullptr ? font->line_height : 18) + 2;
+
+    // 正文区高度：从 44 到 底部按钮上方
+    const lv_coord_t body_top = 44;
+    const lv_coord_t body_bottom = LV_VER_RES - 52;
+    const int lines_per_page = std::max(1, static_cast<int>((body_bottom - body_top) / line_h));
+
+    // 逐条消息折行，标题行（"你："）与正文首行同排
     std::vector<std::string> all_lines;
     for (const auto& e : entries) {
-        // 角色标题行
-        std::string head = (e.role == 0) ? "你" : (e.role == 1 ? "小智" : "系统");
-        all_lines.push_back(head);
-        // 正文按字数折行
-        const std::string& text = e.text;
-        size_t pos = 0;
-        while (pos < text.size()) {
-            // 按 UTF-8 字符边界取一段
-            size_t start = pos;
-            size_t chars = 0;
-            while (pos < text.size() && chars < kCharsPerLine) {
-                unsigned char c = static_cast<unsigned char>(text[pos]);
-                size_t step = 1;
-                if ((c & 0x80) == 0) {
-                    step = 1;
-                } else if ((c & 0xE0) == 0xC0) {
-                    step = 2;
-                } else if ((c & 0xF0) == 0xE0) {
-                    step = 3;
-                } else {
-                    step = 4;
-                }
-                if (pos + step > text.size()) {
-                    step = text.size() - pos;
-                }
-                pos += step;
-                ++chars;
+        const char* who = (e.role == 0) ? "你：" : (e.role == 1 ? "小智：" : "系统：");
+        const std::string full = std::string(who) + e.text;
+        std::vector<uint32_t> starts;
+        WrapChatText(full, font, body_width, starts);
+        for (size_t i = 0; i < starts.size(); ++i) {
+            const size_t begin = starts[i];
+            const size_t finish = (i + 1 < starts.size()) ? starts[i + 1] : full.size();
+            std::string line = full.substr(begin, finish - begin);
+            // 去掉行尾换行符
+            while (!line.empty() && (line.back() == '\n' || line.back() == '\r')) {
+                line.pop_back();
             }
-            all_lines.push_back(text.substr(start, pos - start));
+            all_lines.push_back(std::move(line));
         }
         all_lines.push_back("");  // 条与条之间空一行
     }
 
-    // 每页的行数：正文区能放下的行数（字体行高由主题决定，这里按 6 行算）
-    const int kLinesPerPage = 6;
-    chat_history_page_count_ =
-        std::max(1, static_cast<int>((all_lines.size() + kLinesPerPage - 1) / kLinesPerPage));
+    // 按每页行数切片
+    chat_history_page_count_ = std::max(
+        1, static_cast<int>((all_lines.size() + lines_per_page - 1) / lines_per_page));
     for (int p = 0; p < chat_history_page_count_; ++p) {
         std::string page_text;
-        const size_t begin = static_cast<size_t>(p) * kLinesPerPage;
-        const size_t end = std::min(begin + kLinesPerPage, all_lines.size());
+        const size_t begin = static_cast<size_t>(p) * lines_per_page;
+        const size_t end = std::min(begin + static_cast<size_t>(lines_per_page), all_lines.size());
         for (size_t i = begin; i < end; ++i) {
             if (!page_text.empty()) {
                 page_text += "\n";
@@ -3937,6 +3965,68 @@ void LcdDisplay::OnChatHistoryNextClicked(lv_event_t* e) {
         self->MarkUserActivity();
         self->ChatHistoryTurn(1);
     }
+}
+#endif  // CONFIG_FEATURE_CHAT_HISTORY
+
+#if CONFIG_FEATURE_CHAT_HISTORY
+// ---- 暂停浏览 ----
+//
+// 在原来的对话框里翻页看历史，不切页面、文字保持连续。
+// 暂停期间：关唤醒词、关语音处理、丢弃服务器下行音频，
+// 这样翻页不会被打断；再点一下头像恢复对话。
+
+void LcdDisplay::EnterBrowsePause() {
+    if (browse_paused_) {
+        return;
+    }
+    browse_paused_ = true;
+    auto& app = Application::GetInstance();
+    app.SetChatHistoryReviewing(true);
+    app.GetAudioService().EnableVoiceProcessing(false);
+    app.GetAudioService().EnableWakeWordDetection(false);
+    // 暂停时把位置拉到最新一页，用户往前翻
+    follow_latest_ = false;
+    DisplayLockGuard lock(this);
+    // 状态栏从"聆听中"切成"等待"：用户一眼能看出设备现在是静音的
+    SetStatus("等待  ·  点头像继续");
+}
+
+void LcdDisplay::LeaveBrowsePause() {
+    if (!browse_paused_) {
+        return;
+    }
+    browse_paused_ = false;
+    Application::GetInstance().SetChatHistoryReviewing(false);
+    // 恢复对话：回到最新并重新开启监听由状态机负责
+    follow_latest_ = true;
+    DisplayLockGuard lock(this);
+    SetStatus(Lang::Strings::LISTENING);
+}
+
+void LcdDisplay::ToggleBrowsePause() {
+    if (browse_paused_) {
+        LeaveBrowsePause();
+    } else {
+        EnterBrowsePause();
+    }
+}
+
+void LcdDisplay::BrowseTurn(int dir) {
+    if (chat_pages_.empty()) {
+        return;
+    }
+    if (!browse_paused_) {
+        EnterBrowsePause();
+    }
+    const int next = page_index_ + dir;
+    if (next < 0 || next >= static_cast<int>(chat_pages_.size())) {
+        return;
+    }
+    page_index_ = next;
+    follow_latest_ = false;
+    DisplayLockGuard lock(this);
+    RenderCurrentPage();
+    ShowPageIndicator();
 }
 #endif  // CONFIG_FEATURE_CHAT_HISTORY
 
@@ -4187,9 +4277,27 @@ void LcdDisplay::OnAvatarPressed(lv_event_t* e) {
 
 void LcdDisplay::OnAvatarReleased(lv_event_t* e) {
     auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
-    if (self != nullptr) {
-        self->HidePressRing();
+    if (self == nullptr) {
+        return;
     }
+    self->HidePressRing();
+#if CONFIG_FEATURE_CHAT_HISTORY
+    // 暂停浏览中点头像 = 回到对话：恢复监听、回到最新一页。
+    // 抬起时触发，长按仍走 StartNewSession()（长按后 LVGL 不再派发这个事件）。
+    if (self->browse_paused_ && lv_event_get_code(e) == LV_EVENT_RELEASED) {
+        if (lv_indev_t* indev = lv_indev_active(); indev != nullptr) {
+            lv_indev_wait_release(indev);  // 吃掉随后可能的 CLICKED
+        }
+        self->LeaveBrowsePause();
+        // 让状态机重新进入监听（原来在待机则回到待机即可，唤醒词已恢复）
+        Application::GetInstance().Schedule([]() {
+            auto& app = Application::GetInstance();
+            if (app.GetDeviceState() == kDeviceStateIdle) {
+                app.StartListening();
+            }
+        });
+    }
+#endif
 }
 
 void LcdDisplay::OnMicButtonClicked(lv_event_t* e) {
@@ -7861,4 +7969,11 @@ bool LcdDisplay::DrawerChatHistoryEnabled() const { return false; }
 void LcdDisplay::OnChatHistoryBackClicked(lv_event_t* e) { (void)e; }
 void LcdDisplay::OnChatHistoryPrevClicked(lv_event_t* e) { (void)e; }
 void LcdDisplay::OnChatHistoryNextClicked(lv_event_t* e) { (void)e; }
+#endif
+
+#if !CONFIG_FEATURE_CHAT_HISTORY
+void LcdDisplay::EnterBrowsePause() {}
+void LcdDisplay::LeaveBrowsePause() {}
+void LcdDisplay::ToggleBrowsePause() {}
+void LcdDisplay::BrowseTurn(int dir) { (void)dir; }
 #endif

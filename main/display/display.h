@@ -68,6 +68,12 @@ public:
     // A wake word starts a new conversation turn; pages that belong to the
     // previous turn (e.g. the stroke demo) can close themselves here.
     virtual void OnWakeWordDetected() {}
+    // 一轮对话结束时把攒着的助手回复落盘（聊天记录功能用）
+    virtual void FlushPendingAssistantReply() {}
+    // 每秒调用：聊天记录的超时落盘
+    virtual void TickChatHistory() {}
+    // 翻页浏览期间每秒强制状态栏显示"等待"
+    virtual void EnforceBrowseStatus() {}
     // 英语学习页的界面刷新（每秒更新倒计时）
     virtual void RefreshEnglishScreen() {}
     // 音乐功能包：由 Application 在语音点播/退出听歌时打开或关闭音乐页。

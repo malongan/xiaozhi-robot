@@ -30,9 +30,11 @@ public:
     static constexpr uint32_t kMaxDayBytes = 2u * 1024u * 1024u;
     // 保留天数。
     static constexpr int kKeepDays = 7;
-    // 攒批刷盘：攒够这么多条或超过这个间隔才真正落盘，减少 TF 卡写入。
-    static constexpr int kFlushCount = 10;
-    static constexpr uint32_t kFlushIntervalSec = 30;
+    // 立即刷盘：一条消息就写卡。对话是不可重现的数据，丢一条就是丢了，
+    // 而一小时的对话也就几十条，写入量对 TF 卡寿命没有影响。
+    // 保留 kFlushIntervalSec 只用于"有未落盘数据且长时间没动静"的兜底。
+    static constexpr int kFlushCount = 1;
+    static constexpr uint32_t kFlushIntervalSec = 5;
 
     static ChatLog& GetInstance();
 

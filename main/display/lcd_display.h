@@ -285,6 +285,15 @@ protected:
     void OpenMusicPage();
     bool DrawerAlwaysEnabled() const { return true; }
 
+    // ---- 暂停浏览（在主对话页翻页看历史，期间不响应唤醒词）----
+    void EnterBrowsePause();
+    void LeaveBrowsePause();
+    bool IsBrowsePaused() const { return browse_paused_; }
+    void ToggleBrowsePause();
+    void BrowseTurn(int dir);  // dir = -1 上页 / +1 下页
+    bool browse_paused_ = false;
+    lv_obj_t* browse_pause_badge_ = nullptr;  // 暂停时的状态提示
+
     // ---- 聊天记录回看页 ----
     // 方法在开关关闭时也有空实现，抽屉入口才不会缺符号。
     void OpenChatHistoryPage();
@@ -312,9 +321,12 @@ protected:
     bool chat_history_visible_ = false;
     uint32_t chat_history_opened_ms_ = 0;
     // 助手回复流式下发，攒到这一轮结束整段存卡
-    void FlushPendingAssistantReply();
+    void FlushPendingAssistantReply() override;
+    void TickChatHistory() override;  // 每秒调用：静默超时就把助手回复落盘
+    void EnforceBrowseStatus() override;  // 暂停期间固定显示"等待"
     std::string pending_assistant_reply_;
     bool pending_reply_active_ = false;
+    uint32_t pending_reply_last_ms_ = 0;  // 最后一句到达时间，用于静默超时落盘
 #endif
     bool DrawerEnglishEnabled() const;
     bool DrawerStrokeEnabled() const;

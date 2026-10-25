@@ -355,6 +355,11 @@ void Application::Run() {
             clock_ticks_++;
             auto display = Board::GetInstance().GetDisplay();
             display->UpdateStatusBar();
+#if CONFIG_FEATURE_CHAT_HISTORY
+            display->TickChatHistory();
+            // 翻页浏览期间状态栏固定显示"等待"，不让状态机改回"聆听中"
+            display->EnforceBrowseStatus();
+#endif
 
             if (dictation_command_mode_.load()) {
                 const uint32_t deadline = dictation_command_deadline_ms_.load();
@@ -1377,6 +1382,12 @@ void Application::HandleStateChangedEvent() {
             // otherwise wipe the status, emotion, and chat message.
             if (last_error_message_.empty()) {
                 display->SetStatus(Lang::Strings::STANDBY);
+#if CONFIG_FEATURE_CHAT_HISTORY
+                // 回到待机说明这一轮结束了：助手回复落盘，避免等下一轮
+                // 用户开口才写，中途关机就丢了。
+                display->FlushPendingAssistantReply();
+                ChatLog::GetInstance().Flush();
+#endif
                 if (!display->KeepsChatHistory()) {
                     display->ClearChatMessages();  // Clear messages first
                 }
