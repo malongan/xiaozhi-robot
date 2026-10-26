@@ -436,7 +436,8 @@ void Application::HandleActivationDoneEvent() {
     SystemInfo::PrintHeapStats();
     SetDeviceState(kDeviceStateIdle);
 
-    has_server_time_ = ota_->HasServerTime();
+    // 后台化路径下 ota_ 已移交给后台任务，这里必须判空
+    has_server_time_ = ota_ != nullptr ? ota_->HasServerTime() : has_server_time_;
 
     // Protocol start may have already raised MAIN_EVENT_ERROR. Do not replace
     // that alert with the "ready" UI/sound — the main loop can process both
@@ -444,7 +445,8 @@ void Application::HandleActivationDoneEvent() {
     const bool has_error = !last_error_message_.empty();
     if (!has_error) {
         auto display = Board::GetInstance().GetDisplay();
-        std::string message = std::string(Lang::Strings::VERSION) + ota_->GetCurrentVersion();
+        std::string message = std::string(Lang::Strings::VERSION) +
+                              (ota_ != nullptr ? ota_->GetCurrentVersion() : "");
         display->ShowNotification(message.c_str());
         display->SetChatMessage("system", "");
     }
@@ -478,11 +480,22 @@ void Application::ActivationTask() {
     const bool has_cache = ota_->RestoreCachedConfig();
     if (has_cache) {
         ESP_LOGW(TAG, "有缓存配置，先建链，版本检查转后台");
+        // 建链不依赖这次 HTTP（配置已在 NVS），先把协议拉起来、立刻通知可用。
         InitializeProtocol();
+
+        // ota_ 的归属转交给后台任务：主循环的 HandleActivationDoneEvent()
+        // 会 ota_.reset()，若后台还在用它就是 use-after-free（实测会崩）。
+        // 这里把指针移出去，之后 ota_ 恒为 nullptr，后台任务结束自行释放。
+        // 先移交所有权，再发完成信号（主循环会 ota_.reset()）
+        background_ota_ = std::move(ota_);
         xEventGroupSetBits(event_group_, MAIN_EVENT_ACTIVATION_DONE);
-        // 后台检查版本：升级、激活码等结果都在这个任务里异步处理，
-        // 不再阻塞启动。
-        CheckNewVersion();
+        xTaskCreate(
+            [](void* arg) {
+                Application* app = static_cast<Application*>(arg);
+                app->RunBackgroundVersionCheck();
+                vTaskDelete(NULL);
+            },
+            "ota_bg", 4096 * 2, this, 2, nullptr);
         return;
     }
 
@@ -554,6 +567,20 @@ void Application::CheckAssetsVersion() {
     assets.Apply();
     display->SetChatMessage("system", "");
     display->SetEmotion("robot_2");
+}
+
+void Application::RunBackgroundVersionCheck() {
+    // 把移交过来的 OTA 对象接回 ota_，复用 CheckNewVersion() 的完整逻辑
+    // （升级、激活码、MarkCurrentVersionValid 都照旧）。
+    // 这个任务结束后 ota_ 置空，不会再被主循环碰到。
+    if (background_ota_ == nullptr) {
+        return;
+    }
+    // 等待激活完成事件被主循环处理完，避免与 HandleActivationDoneEvent 竞争
+    vTaskDelay(pdMS_TO_TICKS(500));
+    ota_ = std::move(background_ota_);
+    CheckNewVersion();
+    ota_.reset();
 }
 
 void Application::CheckNewVersion() {

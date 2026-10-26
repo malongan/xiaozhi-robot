@@ -237,6 +237,10 @@ private:
     // Helper methods
     void CheckAssetsVersion();
     void CheckNewVersion();
+    // 有缓存配置时的后台版本检查：独占地持有 OTA 对象，
+    // 结束时自行释放（主循环的 ota_ 已被 release，恒为 nullptr）。
+    void RunBackgroundVersionCheck();
+    std::unique_ptr<Ota> background_ota_;
     void InitializeProtocol();
     void ShowActivationCode(const std::string& code, const std::string& message);
     void SetListeningMode(ListeningMode mode);
