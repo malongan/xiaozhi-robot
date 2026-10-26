@@ -33,6 +33,34 @@ size_t Utf8SafeTruncate(const std::string& text, size_t limit) {
     return cut;
 }
 
+// CRC16/Modbus 查表。逐位版本每条记录要做「字节数 × 8」次循环，
+// 查表后降到每字节一次索引。结果与逐位版本完全一致，磁盘格式不变。
+const uint16_t* Crc16Table() {
+    static uint16_t table[256];
+    static bool ready = false;
+    if (!ready) {
+        for (int i = 0; i < 256; ++i) {
+            uint16_t crc = static_cast<uint16_t>(i);
+            for (int b = 0; b < 8; ++b) {
+                crc = (crc & 1) ? static_cast<uint16_t>((crc >> 1) ^ 0xA001) : (crc >> 1);
+            }
+            table[i] = crc;
+        }
+        ready = true;
+    }
+    return table;
+}
+
+uint16_t Crc16(const std::string& text) {
+    const uint16_t* table = Crc16Table();
+    uint16_t crc = 0xFFFF;
+    for (size_t k = 0; k < text.size(); ++k) {
+        crc =
+            static_cast<uint16_t>((crc >> 8) ^ table[(crc ^ static_cast<uint8_t>(text[k])) & 0xFF]);
+    }
+    return crc;
+}
+
 bool ParseDayFile(const char* name, uint32_t* day) {
     // 期望 yyyymmdd.log
     size_t len = strlen(name);
@@ -237,13 +265,7 @@ bool ChatLog::AppendToFile(const Pending* batch, int count, uint32_t day) {
         head[13] = 0;
         head[14] = 0;
         head[15] = 0;
-        uint16_t crc = 0xFFFF;
-        for (size_t k = 0; k < item.text.size(); ++k) {
-            crc ^= static_cast<uint8_t>(item.text[k]);
-            for (int b = 0; b < 8; ++b) {
-                crc = (crc & 1) ? static_cast<uint16_t>((crc >> 1) ^ 0xA001) : (crc >> 1);
-            }
-        }
+        const uint16_t crc = Crc16(item.text);
         head[16] = static_cast<uint8_t>(crc & 0xFF);
         head[17] = static_cast<uint8_t>((crc >> 8) & 0xFF);
         if (fwrite(head, 1, kHeaderBytes, f) != kHeaderBytes) {

@@ -23,8 +23,12 @@ public:
     bool HasWebsocketConfig() { return has_websocket_config_; }
     bool HasActivationCode() { return has_activation_code_; }
     bool HasServerTime() { return has_server_time_; }
+    // 从 NVS 恢复上次下发的 mqtt/websocket 配置。
+    // 返回 true 表示缓存可用，启动可以先建链、把版本检查放到后台。
+    bool RestoreCachedConfig();
     bool StartUpgrade(std::function<void(int progress, size_t speed)> callback);
-    static bool Upgrade(const std::string& firmware_url, std::function<void(int progress, size_t speed)> callback);
+    static bool Upgrade(const std::string& firmware_url,
+                        std::function<void(int progress, size_t speed)> callback);
     void MarkCurrentVersionValid();
 
     const std::string& GetFirmwareVersion() const { return firmware_version_; }
@@ -58,4 +62,4 @@ private:
     std::unique_ptr<Http> SetupHttp();
 };
 
-#endif // _OTA_H
+#endif  // _OTA_H

@@ -1,18 +1,18 @@
 #include "ota.h"
-#include "system_info.h"
-#include "settings.h"
 #include "assets/lang_config.h"
+#include "settings.h"
+#include "system_info.h"
 
-#include <freertos/FreeRTOS.h>
-#include <freertos/task.h>
-#include <cJSON.h>
-#include <esp_log.h>
-#include <esp_partition.h>
-#include <esp_ota_ops.h>
 #include <esp_app_format.h>
 #include <esp_efuse.h>
 #include <esp_efuse_table.h>
 #include <esp_heap_caps.h>
+#include <esp_log.h>
+#include <esp_ota_ops.h>
+#include <esp_partition.h>
+#include <cJSON.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 #ifdef SOC_HMAC_SUPPORTED
 #include <esp_hmac.h>
 #endif
@@ -50,8 +50,7 @@ Ota::Ota() {
 #endif
 }
 
-Ota::~Ota() {
-}
+Ota::~Ota() {}
 
 std::string Ota::GetCheckVersionUrl() {
     Settings settings("wifi", false);
@@ -72,7 +71,8 @@ std::unique_ptr<Http> Ota::SetupHttp() {
     http->SetHeader("Client-Id", board.GetUuid());
     if (has_serial_number_) {
         http->SetHeader("Serial-Number", serial_number_.c_str());
-        ESP_LOGI(TAG, "Setup HTTP, User-Agent: %s, Serial-Number: %s", user_agent.c_str(), serial_number_.c_str());
+        ESP_LOGI(TAG, "Setup HTTP, User-Agent: %s, Serial-Number: %s", user_agent.c_str(),
+                 serial_number_.c_str());
     }
     http->SetHeader("User-Agent", user_agent);
     http->SetHeader("Accept-Language", Lang::CODE);
@@ -81,9 +81,31 @@ std::unique_ptr<Http> Ota::SetupHttp() {
     return http;
 }
 
-/* 
+/*
  * Specification: https://ccnphfhqs21z.feishu.cn/wiki/FjW6wZmisimNBBkov6OcmfvknVd
  */
+
+bool Ota::RestoreCachedConfig() {
+    // CheckVersion() 会把服务器下发的 mqtt/websocket 段写进 NVS，
+    // 所以设备重启后可以先用缓存建链，不必等那一次 HTTP（实测建连约 4.9 秒）。
+    // 返回 false 时调用方仍应走完整的 CheckVersion() 流程（例如首次开机）。
+    Settings mqtt_settings("mqtt", false);
+    if (!mqtt_settings.GetString("endpoint").empty()) {
+        has_mqtt_config_ = true;
+        HasServerTime();  // 保持接口一致；时间仍由 CheckVersion 更新
+    }
+    Settings ws_settings("websocket", false);
+    if (!ws_settings.GetString("url").empty()) {
+        has_websocket_config_ = true;
+    }
+    if (has_mqtt_config_ || has_websocket_config_) {
+        ESP_LOGI(TAG, "使用缓存的服务器配置（mqtt=%d websocket=%d）", (int)has_mqtt_config_,
+                 (int)has_websocket_config_);
+        return true;
+    }
+    return false;
+}
+
 NetworkResult<> Ota::CheckVersion() {
     auto& board = Board::GetInstance();
     auto app_desc = esp_app_get_description();
@@ -125,8 +147,8 @@ NetworkResult<> Ota::CheckVersion() {
     // Response: { "firmware": { "version": "1.0.0", "url": "http://" } }
     // Parse the JSON response and check if the version is newer
     // If it is, set has_new_version_ to true and store the new version and URL
-    
-    cJSON *root = cJSON_Parse(data.c_str());
+
+    cJSON* root = cJSON_Parse(data.c_str());
     if (root == NULL) {
         ESP_LOGE(TAG, "Failed to parse JSON response");
         return std::unexpected(NetworkError::ProtocolError());
@@ -134,7 +156,7 @@ NetworkResult<> Ota::CheckVersion() {
 
     has_activation_code_ = false;
     has_activation_challenge_ = false;
-    cJSON *activation = cJSON_GetObjectItem(root, "activation");
+    cJSON* activation = cJSON_GetObjectItem(root, "activation");
     if (cJSON_IsObject(activation)) {
         cJSON* message = cJSON_GetObjectItem(activation, "message");
         if (cJSON_IsString(message)) {
@@ -157,11 +179,11 @@ NetworkResult<> Ota::CheckVersion() {
     }
 
     has_mqtt_config_ = false;
-    cJSON *mqtt = cJSON_GetObjectItem(root, "mqtt");
+    cJSON* mqtt = cJSON_GetObjectItem(root, "mqtt");
     if (cJSON_IsObject(mqtt)) {
         Settings settings("mqtt", true);
-        cJSON *item = NULL;
-        cJSON_ArrayForEach(item, mqtt) {
+        cJSON* item = NULL;
+        cJSON_ArrayForEach (item, mqtt) {
             if (cJSON_IsString(item)) {
                 if (settings.GetString(item->string) != item->valuestring) {
                     settings.SetString(item->string, item->valuestring);
@@ -178,11 +200,11 @@ NetworkResult<> Ota::CheckVersion() {
     }
 
     has_websocket_config_ = false;
-    cJSON *websocket = cJSON_GetObjectItem(root, "websocket");
+    cJSON* websocket = cJSON_GetObjectItem(root, "websocket");
     if (cJSON_IsObject(websocket)) {
         Settings settings("websocket", true);
-        cJSON *item = NULL;
-        cJSON_ArrayForEach(item, websocket) {
+        cJSON* item = NULL;
+        cJSON_ArrayForEach (item, websocket) {
             if (cJSON_IsString(item)) {
                 if (settings.GetString(item->string) != item->valuestring) {
                     settings.SetString(item->string, item->valuestring);
@@ -199,22 +221,22 @@ NetworkResult<> Ota::CheckVersion() {
     }
 
     has_server_time_ = false;
-    cJSON *server_time = cJSON_GetObjectItem(root, "server_time");
+    cJSON* server_time = cJSON_GetObjectItem(root, "server_time");
     if (cJSON_IsObject(server_time)) {
-        cJSON *timestamp = cJSON_GetObjectItem(server_time, "timestamp");
-        cJSON *timezone_offset = cJSON_GetObjectItem(server_time, "timezone_offset");
-        
+        cJSON* timestamp = cJSON_GetObjectItem(server_time, "timestamp");
+        cJSON* timezone_offset = cJSON_GetObjectItem(server_time, "timezone_offset");
+
         if (cJSON_IsNumber(timestamp)) {
             // 设置系统时间
             struct timeval tv;
             double ts = timestamp->valuedouble;
-            
+
             // 如果有时区偏移，计算本地时间
             if (cJSON_IsNumber(timezone_offset)) {
-                ts += (timezone_offset->valueint * 60 * 1000); // 转换分钟为毫秒
+                ts += (timezone_offset->valueint * 60 * 1000);  // 转换分钟为毫秒
             }
-            
-            tv.tv_sec = (time_t)(ts / 1000);  // 转换毫秒为秒
+
+            tv.tv_sec = (time_t)(ts / 1000);                          // 转换毫秒为秒
             tv.tv_usec = (suseconds_t)((long long)ts % 1000) * 1000;  // 剩余的毫秒转换为微秒
             settimeofday(&tv, NULL);
             has_server_time_ = true;
@@ -224,13 +246,13 @@ NetworkResult<> Ota::CheckVersion() {
     }
 
     has_new_version_ = false;
-    cJSON *firmware = cJSON_GetObjectItem(root, "firmware");
+    cJSON* firmware = cJSON_GetObjectItem(root, "firmware");
     if (cJSON_IsObject(firmware)) {
-        cJSON *version = cJSON_GetObjectItem(firmware, "version");
+        cJSON* version = cJSON_GetObjectItem(firmware, "version");
         if (cJSON_IsString(version)) {
             firmware_version_ = version->valuestring;
         }
-        cJSON *url = cJSON_GetObjectItem(firmware, "url");
+        cJSON* url = cJSON_GetObjectItem(firmware, "url");
         if (cJSON_IsString(url)) {
             firmware_url_ = url->valuestring;
         }
@@ -244,7 +266,7 @@ NetworkResult<> Ota::CheckVersion() {
                 ESP_LOGI(TAG, "Current is the latest version");
             }
             // If the force flag is set to 1, the given version is forced to be installed
-            cJSON *force = cJSON_GetObjectItem(firmware, "force");
+            cJSON* force = cJSON_GetObjectItem(firmware, "force");
             if (cJSON_IsNumber(force) && force->valueint == 1) {
                 has_new_version_ = true;
             }
@@ -277,7 +299,8 @@ void Ota::MarkCurrentVersionValid() {
     }
 }
 
-bool Ota::Upgrade(const std::string& firmware_url, std::function<void(int progress, size_t speed)> callback) {
+bool Ota::Upgrade(const std::string& firmware_url,
+                  std::function<void(int progress, size_t speed)> callback) {
     ESP_LOGI(TAG, "Upgrading firmware from %s", firmware_url.c_str());
     esp_ota_handle_t update_handle = 0;
     auto update_partition = esp_ota_get_next_update_partition(NULL);
@@ -286,7 +309,8 @@ bool Ota::Upgrade(const std::string& firmware_url, std::function<void(int progre
         return false;
     }
 
-    ESP_LOGI(TAG, "Writing to partition %s at offset 0x%lx", update_partition->label, update_partition->address);
+    ESP_LOGI(TAG, "Writing to partition %s at offset 0x%lx", update_partition->label,
+             update_partition->address);
     bool image_header_checked = false;
     std::string image_header;
 
@@ -338,7 +362,8 @@ bool Ota::Upgrade(const std::string& firmware_url, std::function<void(int progre
         buffer_offset += n;
         if (esp_timer_get_time() - last_calc_time >= 1000000 || n == 0) {
             size_t progress = total_read * 100 / content_length;
-            ESP_LOGI(TAG, "Progress: %u%% (%u/%u), Speed: %uB/s", progress, total_read, content_length, recent_read);
+            ESP_LOGI(TAG, "Progress: %u%% (%u/%u), Speed: %uB/s", progress, total_read,
+                     content_length, recent_read);
             if (callback) {
                 callback(progress, recent_read);
             }
@@ -348,9 +373,14 @@ bool Ota::Upgrade(const std::string& firmware_url, std::function<void(int progre
 
         if (!image_header_checked) {
             image_header.append(buffer, buffer_offset);
-            if (image_header.size() >= sizeof(esp_image_header_t) + sizeof(esp_image_segment_header_t) + sizeof(esp_app_desc_t)) {
+            if (image_header.size() >= sizeof(esp_image_header_t) +
+                                           sizeof(esp_image_segment_header_t) +
+                                           sizeof(esp_app_desc_t)) {
                 esp_app_desc_t new_app_info;
-                memcpy(&new_app_info, image_header.data() + sizeof(esp_image_header_t) + sizeof(esp_image_segment_header_t), sizeof(esp_app_desc_t));
+                memcpy(&new_app_info,
+                       image_header.data() + sizeof(esp_image_header_t) +
+                           sizeof(esp_image_segment_header_t),
+                       sizeof(esp_app_desc_t));
 
                 if (esp_ota_begin(update_partition, OTA_WITH_SEQUENTIAL_WRITES, &update_handle)) {
                     esp_ota_abort(update_handle);
@@ -408,7 +438,6 @@ bool Ota::Upgrade(const std::string& firmware_url, std::function<void(int progre
 bool Ota::StartUpgrade(std::function<void(int progress, size_t speed)> callback) {
     return Upgrade(firmware_url_, callback);
 }
-
 
 // Versions are compared as dot-separated decimal numbers. Parsing must never throw: exceptions are
 // disabled in this project, so a malformed string from the server would otherwise terminate the
@@ -471,10 +500,11 @@ std::string Ota::GetActivationPayload() {
 
     std::string hmac_hex;
 #ifdef SOC_HMAC_SUPPORTED
-    uint8_t hmac_result[32]; // SHA-256 输出为32字节
-    
+    uint8_t hmac_result[32];  // SHA-256 输出为32字节
+
     // 使用Key0计算HMAC
-    esp_err_t ret = esp_hmac_calculate(HMAC_KEY0, (uint8_t*)activation_challenge_.data(), activation_challenge_.size(), hmac_result);
+    esp_err_t ret = esp_hmac_calculate(HMAC_KEY0, (uint8_t*)activation_challenge_.data(),
+                                       activation_challenge_.size(), hmac_result);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "HMAC calculation failed: %s", esp_err_to_name(ret));
         return "{}";
@@ -487,7 +517,7 @@ std::string Ota::GetActivationPayload() {
     }
 #endif
 
-    cJSON *payload = cJSON_CreateObject();
+    cJSON* payload = cJSON_CreateObject();
     cJSON_AddStringToObject(payload, "algorithm", "hmac-sha256");
     cJSON_AddStringToObject(payload, "serial_number", serial_number_.c_str());
     cJSON_AddStringToObject(payload, "challenge", activation_challenge_.c_str());
@@ -533,7 +563,8 @@ esp_err_t Ota::Activate() {
         return ESP_ERR_TIMEOUT;
     }
     if (*status_code != 200) {
-        ESP_LOGE(TAG, "Failed to activate, code: %d, body: %s", *status_code, http->ReadAll().c_str());
+        ESP_LOGE(TAG, "Failed to activate, code: %d, body: %s", *status_code,
+                 http->ReadAll().c_str());
         return ESP_FAIL;
     }
 

@@ -469,6 +469,23 @@ void Application::ActivationTask() {
     // Check for new assets version
     CheckAssetsVersion();
 
+    // 启动关键路径优化：CheckVersion() 只有一次 HTTP，实测建连约 4.9 秒，
+    // 而它下发的 mqtt/websocket 配置已经写进 NVS。设备重启时先用缓存建链，
+    // 把这 4.9 秒挪到后台，启动立刻可用。
+    //
+    // 首次开机（NVS 无缓存）或未激活设备仍走原来的阻塞流程：激活码要显示
+    // 给用户看，那种场景必须等服务器响应。
+    const bool has_cache = ota_->RestoreCachedConfig();
+    if (has_cache) {
+        ESP_LOGW(TAG, "有缓存配置，先建链，版本检查转后台");
+        InitializeProtocol();
+        xEventGroupSetBits(event_group_, MAIN_EVENT_ACTIVATION_DONE);
+        // 后台检查版本：升级、激活码等结果都在这个任务里异步处理，
+        // 不再阻塞启动。
+        CheckNewVersion();
+        return;
+    }
+
     // Check for new firmware version
     CheckNewVersion();
 

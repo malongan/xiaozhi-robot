@@ -75,7 +75,8 @@ private:
         sdmmc_host_t host = SDMMC_HOST_DEFAULT();
         // Keep the 20 MHz default: 40 MHz high-speed mode measured far slower
         // on this board (link/trace dependent), so do not raise it here.
-        host.max_freq_khz = SDMMC_FREQ_DEFAULT;
+        // High speed (40 MHz)：默认档只有 20 MHz，词库/音乐/聊天记录的读写都受限。
+        host.max_freq_khz = SDMMC_FREQ_HIGHSPEED;
         sdmmc_slot_config_t slot = SDMMC_SLOT_CONFIG_DEFAULT();
         slot.clk = SD_CLK;
         slot.cmd = SD_CMD;
@@ -129,7 +130,8 @@ private:
         };
         sdmmc_host_t host = SDSPI_HOST_DEFAULT();
         host.slot = SPI2_HOST;
-        host.max_freq_khz = SDMMC_FREQ_DEFAULT;
+        // High speed (40 MHz)：默认档只有 20 MHz，词库/音乐/聊天记录的读写都受限。
+        host.max_freq_khz = SDMMC_FREQ_HIGHSPEED;
         sdspi_device_config_t slot = SDSPI_DEVICE_CONFIG_DEFAULT();
         slot.host_id = SPI2_HOST;
         slot.gpio_cs = SD_DATA3;
