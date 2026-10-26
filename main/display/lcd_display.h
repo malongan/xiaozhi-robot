@@ -207,6 +207,16 @@ protected:
     lv_obj_t* settings_bt_status_ = nullptr;
     lv_obj_t* settings_back_icon_ = nullptr;
     lv_obj_t* settings_vol_minus_icon_ = nullptr;
+    lv_obj_t* settings_power_switch_ = nullptr;
+    lv_obj_t* settings_power_label_ = nullptr;
+    lv_obj_t* settings_idle_label_ = nullptr;
+    lv_obj_t* settings_idle_value_ = nullptr;
+    lv_obj_t* settings_idle_minus_icon_ = nullptr;
+    lv_obj_t* settings_idle_plus_icon_ = nullptr;
+    lv_obj_t* settings_standby_label_ = nullptr;
+    lv_obj_t* settings_standby_value_ = nullptr;
+    lv_obj_t* settings_standby_minus_icon_ = nullptr;
+    lv_obj_t* settings_standby_plus_icon_ = nullptr;
     lv_obj_t* settings_vol_plus_icon_ = nullptr;
     lv_obj_t* settings_bright_minus_icon_ = nullptr;
     lv_obj_t* settings_bright_plus_icon_ = nullptr;
@@ -504,6 +514,11 @@ protected:
     static void BtToggleTask(void* param);
     static void OnSettingsBtForgetClicked(lv_event_t* e);
     static void OnRebootClicked(lv_event_t* e);
+    static void OnSettingsPowerSaveToggleClicked(lv_event_t* e);
+    static void OnSettingsIdleDownClicked(lv_event_t* e);
+    static void OnSettingsIdleUpClicked(lv_event_t* e);
+    static void OnSettingsStandbyBrightDownClicked(lv_event_t* e);
+    static void OnSettingsStandbyBrightUpClicked(lv_event_t* e);
     void ShowSettingsScreen(bool show);
     void UpdateSettingsValues();
     void RebindSettingsFonts(const lv_font_t* text_font, const lv_font_t* icon_font,

@@ -29,6 +29,7 @@
 #include "features/chat_history/chat_log.h"
 #endif
 #include "display/lcd_display.h"
+#include "power_save_timer.h"
 #include "settings.h"
 #include "wifi_board.h"
 
@@ -56,9 +57,16 @@ private:
     esp_lcd_touch_handle_t touch_handle_ = nullptr;
     esp_lcd_panel_io_handle_t touch_io_handle_ = nullptr;
     FreenovePowerMonitor* power_monitor_ = nullptr;
+    PowerSaveTimer* power_save_timer_ = nullptr;
     esp_timer_handle_t sd_retry_timer_ = nullptr;
+    /* 关机流程需要直接操作屏幕与 SD：持有句柄才能发 SLPIN、卸载文件系统。 */
+    esp_lcd_panel_io_handle_t panel_io_ = nullptr;
+    sdmmc_card_t* sd_card_ = nullptr;
+    /* 轮询 LVGL 输入空闲时间：触摸屏幕即退出省电并重置空闲计时，
+       否则进省电后背光一直暗着，只能靠按键或重启恢复。 */
+    esp_timer_handle_t touch_wake_timer_ = nullptr;
 
-    static bool MountSdSdmmc() {
+    bool MountSdSdmmc() {
         esp_vfs_fat_mount_config_t mount_cfg = {
             .format_if_mount_failed = false,
             .max_files = 10,
@@ -86,6 +94,7 @@ private:
             return false;
         }
         sdmmc_card_print_info(stdout, card);
+        sd_card_ = card;
         ESP_LOGI(TAG, "TF 卡 SDMMC 挂载成功");
         DIR* dir = opendir(SD_MOUNT_POINT);
         if (dir != nullptr) {
@@ -100,7 +109,7 @@ private:
         return true;
     }
 
-    static bool MountSdSdspi() {
+    bool MountSdSdspi() {
         spi_bus_config_t bus_cfg = {
             .mosi_io_num = SD_CMD,
             .miso_io_num = SD_DATA0,
@@ -134,6 +143,7 @@ private:
             spi_bus_free(SPI2_HOST);
             return false;
         }
+        sd_card_ = card;
         ESP_LOGI(TAG, "TF 卡 SDSPI 模式挂载成功");
         return true;
     }
@@ -291,17 +301,18 @@ private:
         ESP_ERROR_CHECK(spi_bus_initialize(LCD_SPI_HOST, &buscfg, SPI_DMA_CH_AUTO));
     }
 
-    // 软件关机：关闭背光与屏幕后进入 deep sleep，BOOT 键低电平唤醒。
-    // 注意：插着 USB 时硬件仍在供电，deep sleep 只是把功耗降到最低、屏幕全灭，
-    // 真正的断电需要拔掉 Type-C 或电池。
+    // 软件关机：先尽量关断外设，再进 deep sleep（BOOT 键低电平唤醒）。
+    // deep sleep 只能把 ESP32 本体降到 µA 级，屏幕、codec、SD 卡、指示灯仍连着
+    // 电源在吃电（整机约 1~3mA），所以关机前主动关：音频输出/PA、背光、WS2812、
+    // 屏幕 SLPIN、SD 卸载。做完落在百 µA 量级，电池能放几个月。
+    // 注意：插着 USB 时供电路径仍在，真正断电仍需拔线或拔电池。
     void PowerOff() {
         ESP_LOGW(TAG, "BOOT long press: power off");
         if (display_ != nullptr) {
             display_->ShowNotification("正在关机", 1200);
         }
-        GetAudioCodec()->SetOutputVolume(0);
-        GetBacklight()->SetBrightness(0);
-        vTaskDelay(pdMS_TO_TICKS(300));
+        // 留时间把提示画出来，再开始关外设
+        vTaskDelay(pdMS_TO_TICKS(900));
 
         // 关键：必须等按键松开再睡，否则低电平唤醒条件立刻满足，
         // 刚进 deep sleep 就被唤醒，看起来像重启。
@@ -310,11 +321,38 @@ private:
         }
         if (gpio_get_level(BOOT_BUTTON_GPIO) == 0) {
             ESP_LOGW(TAG, "BOOT still held, skip power off");
-            GetBacklight()->RestoreBrightness();
             return;
         }
 
-        // GPIO0 是 RTC GPIO，可作 ext0 唤醒源；板上已有上拉，按下为低电平
+        // 1) 音频：静音 -> 关 PA 输出 -> 关麦克风输入
+        if (auto* codec = GetAudioCodec(); codec != nullptr) {
+            codec->SetOutputVolume(0);
+            codec->EnableOutput(false);
+            codec->EnableInput(false);
+        }
+        // 2) 背光与指示灯
+        GetBacklight()->SetBrightness(0);
+        if (auto* led = static_cast<SingleLed*>(GetLed()); led != nullptr) {
+            led->TurnOff();
+        }
+        // 3) 屏幕：DISPOFF(0x28) + SLPIN(0x10)。下次开机驱动 init 会重新发
+        //    SLPOUT，不用在这里考虑唤醒后的恢复。
+        if (panel_io_ != nullptr) {
+            esp_lcd_panel_io_tx_param(panel_io_, 0x28, nullptr, 0);
+            esp_lcd_panel_io_tx_param(panel_io_, 0x10, nullptr, 0);
+            vTaskDelay(pdMS_TO_TICKS(120));
+        }
+        // 4) SD 卡：停掉重试定时器并卸载文件系统，让卡进 idle 减少漏电
+        if (sd_retry_timer_ != nullptr) {
+            esp_timer_stop(sd_retry_timer_);
+        }
+        if (sd_card_ != nullptr) {
+            esp_vfs_fat_sdcard_unmount(SD_MOUNT_POINT, sd_card_);
+            sd_card_ = nullptr;
+        }
+
+        // ext0 走 RTC IO，RTC 外设域必须保持供电，否则按键唤醒失效
+        esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
         esp_err_t err = esp_sleep_enable_ext0_wakeup(BOOT_BUTTON_GPIO, 0);
         if (err != ESP_OK) {
             ESP_LOGE(TAG, "ext0 wakeup on BOOT failed: %s", esp_err_to_name(err));
@@ -324,8 +362,67 @@ private:
         esp_deep_sleep_start();
     }
 
+    void InitializePowerSaveTimer() {
+        Settings power_settings("power", false);
+        if (!power_settings.GetBool("power_save_enabled", true)) {
+            ESP_LOGI(TAG, "Idle power save disabled by settings");
+            return;
+        }
+        const int idle_seconds = static_cast<int>(power_settings.GetInt("idle_seconds", 60));
+        /* cpu_max_freq 240 保持满频上限，空闲时由 PM 自动降到 40MHz。
+           allow_light_sleep=false：不真睡，Wi-Fi 长连接不掉；
+           keep_wake_word=true：省电时仍保持唤醒词和麦克风，喊一声就能醒，
+           只靠降背光和降频省电。 */
+        power_save_timer_ = new PowerSaveTimer(240, idle_seconds, -1, false, true);
+        power_save_timer_->OnEnterSleepMode([this]() {
+            Settings settings("power", false);
+            const uint8_t standby =
+                static_cast<uint8_t>(settings.GetInt("standby_brightness", 10));
+            GetBacklight()->SetBrightness(standby, false);
+            ESP_LOGI(TAG, "Idle power save: backlight -> %u%%", standby);
+        });
+        power_save_timer_->OnExitSleepMode([this]() {
+            GetBacklight()->RestoreBrightness();
+            ESP_LOGI(TAG, "Idle power save: backlight restored");
+        });
+        power_save_timer_->SetEnabled(true);
+
+        /* 每 500ms 看一次 LVGL 输入空闲时间，触摸后立即恢复背光并重置计时。 */
+        if (touch_wake_timer_ == nullptr) {
+            esp_timer_create_args_t args = {
+                .callback = [](void* arg) {
+                    auto self = static_cast<FreenoveESP32S3Display*>(arg);
+                    if (self == nullptr || self->power_save_timer_ == nullptr) {
+                        return;
+                    }
+                    if (!lvgl_port_lock(50)) {
+                        return;
+                    }
+                    const uint32_t inactive_ms = lv_display_get_inactive_time(nullptr);
+                    lvgl_port_unlock();
+                    if (inactive_ms < 1200) {
+                        self->power_save_timer_->WakeUp();
+                    }
+                },
+                .arg = this,
+                .dispatch_method = ESP_TIMER_TASK,
+                .name = "touch_wake",
+                .skip_unhandled_events = true,
+            };
+            if (esp_timer_create(&args, &touch_wake_timer_) == ESP_OK) {
+                esp_timer_start_periodic(touch_wake_timer_, 500000);
+            } else {
+                ESP_LOGW(TAG, "failed to create touch wake timer");
+            }
+        }
+        ESP_LOGI(TAG, "Idle power save enabled: %d s", idle_seconds);
+    }
+
     void InitializeButtons() {
         boot_button_.OnClick([this]() {
+            if (power_save_timer_ != nullptr) {
+                power_save_timer_->WakeUp();
+            }
             auto& app = Application::GetInstance();
             if (app.GetDeviceState() == kDeviceStateStarting) {
                 EnterWifiConfigMode();
@@ -349,6 +446,7 @@ private:
         io_config.lcd_cmd_bits = 8;
         io_config.lcd_param_bits = 8;
         ESP_ERROR_CHECK(esp_lcd_new_panel_io_spi(LCD_SPI_HOST, &io_config, &panel_io));
+        panel_io_ = panel_io;
 
         // 初始化液晶屏驱动芯片
         ESP_LOGD(TAG, "Install LCD driver");
@@ -403,6 +501,7 @@ public:
         InitializeButtons();
         InitializeTools();
         GetBacklight()->SetBrightness(100);
+        InitializePowerSaveTimer();
     }
 
     virtual Led* GetLed() override {

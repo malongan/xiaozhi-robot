@@ -17,6 +17,9 @@ public:
 
     void OnStateChanged() override;
 
+    // 关机前主动熄灭指示灯（WS2812 点亮时十几 mA，关机流程需要关掉）
+    void TurnOff();
+
 private:
     std::mutex mutex_;
     TaskHandle_t blink_task_ = nullptr;
@@ -33,7 +36,6 @@ private:
     void Blink(int times, int interval_ms);
     void StartContinuousBlink(int interval_ms);
     void TurnOn();
-    void TurnOff();
     void SetColor(uint8_t r, uint8_t g, uint8_t b);
 };
 

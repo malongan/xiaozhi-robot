@@ -2207,8 +2207,10 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_bg_opa(settings_screen_, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(settings_screen_, 0, 0);
     lv_obj_set_style_pad_all(settings_screen_, 0, 0);
-    lv_obj_remove_flag(settings_screen_, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_scrollbar_mode(settings_screen_, LV_SCROLLBAR_MODE_OFF);
+    /* Settings content can overflow the 320px screen; allow vertical touch scrolling. */
+    lv_obj_add_flag(settings_screen_, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scroll_dir(settings_screen_, LV_DIR_VER);
+    lv_obj_set_scrollbar_mode(settings_screen_, LV_SCROLLBAR_MODE_AUTO);
     lv_obj_add_flag(settings_screen_, LV_OBJ_FLAG_HIDDEN);
 
     auto settings_back = lv_button_create(settings_screen_);
@@ -2445,10 +2447,63 @@ void LcdDisplay::SetupUI() {
                         LV_EVENT_VALUE_CHANGED, this);
 #endif  // CONFIG_FEATURE_BLE_KEYBOARD
 
+    /* Power saving card: idle timeout + standby backlight */
+    lv_obj_t* settings_power_card = make_card(settings_screen_, 8, 280, 224, 130);
+    make_divider(settings_power_card, 10, 42, 204);
+    make_divider(settings_power_card, 10, 84, 204);
+
+    make_icon(settings_power_card, 10, 11, MATERIAL_SYMBOLS_BATTERY_ANDROID_FRAME_BOLT,
+              kDarkGood);
+    settings_power_label_ = make_text_label(settings_power_card, "空闲省电");
+    lv_obj_set_pos(settings_power_label_, 34, 10);
+    settings_power_switch_ = lv_switch_create(settings_power_card);
+    lv_obj_set_size(settings_power_switch_, 34, 20);
+    lv_obj_set_pos(settings_power_switch_, 180, 8);
+    lv_obj_set_style_bg_color(settings_power_switch_, lv_color_hex(kDarkCardControl),
+                              LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(settings_power_switch_, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_border_width(settings_power_switch_, 0, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(settings_power_switch_, lv_color_hex(kDarkTeal),
+                              static_cast<lv_style_selector_t>(LV_PART_INDICATOR) |
+                                  LV_STATE_CHECKED);
+    lv_obj_set_style_bg_opa(settings_power_switch_, LV_OPA_COVER,
+                            static_cast<lv_style_selector_t>(LV_PART_INDICATOR) |
+                                LV_STATE_CHECKED);
+    lv_obj_set_style_bg_color(settings_power_switch_, lv_color_hex(kDarkMuted), LV_PART_KNOB);
+    lv_obj_set_style_bg_color(settings_power_switch_, lv_color_hex(0xFFFFFF),
+                              static_cast<lv_style_selector_t>(LV_PART_KNOB) | LV_STATE_CHECKED);
+    lv_obj_set_style_pad_all(settings_power_switch_, 2, LV_PART_KNOB);
+    lv_obj_add_event_cb(settings_power_switch_, &LcdDisplay::OnSettingsPowerSaveToggleClicked,
+                        LV_EVENT_VALUE_CHANGED, this);
+
+    make_icon(settings_power_card, 10, 53, MATERIAL_SYMBOLS_SCHEDULE, kDarkBlue);
+    settings_idle_label_ = make_text_label(settings_power_card, "空闲时长");
+    lv_obj_set_pos(settings_idle_label_, 34, 52);
+    settings_idle_value_ = make_text_label(settings_power_card, "60s");
+    lv_obj_set_width(settings_idle_value_, 44);
+    lv_obj_set_style_text_align(settings_idle_value_, LV_TEXT_ALIGN_RIGHT, 0);
+    lv_obj_set_pos(settings_idle_value_, 94, 52);
+    settings_idle_minus_icon_ = make_adjust_button(settings_power_card, 142, 45, "-",
+                                                   &LcdDisplay::OnSettingsIdleDownClicked);
+    settings_idle_plus_icon_ = make_adjust_button(settings_power_card, 180, 45, "+",
+                                                  &LcdDisplay::OnSettingsIdleUpClicked);
+
+    make_icon(settings_power_card, 10, 95, MATERIAL_SYMBOLS_BRIGHTNESS_6, kDarkOrange);
+    settings_standby_label_ = make_text_label(settings_power_card, "待机亮度");
+    lv_obj_set_pos(settings_standby_label_, 34, 94);
+    settings_standby_value_ = make_text_label(settings_power_card, "10%");
+    lv_obj_set_width(settings_standby_value_, 44);
+    lv_obj_set_style_text_align(settings_standby_value_, LV_TEXT_ALIGN_RIGHT, 0);
+    lv_obj_set_pos(settings_standby_value_, 94, 94);
+    settings_standby_minus_icon_ = make_adjust_button(
+        settings_power_card, 142, 87, "-", &LcdDisplay::OnSettingsStandbyBrightDownClicked);
+    settings_standby_plus_icon_ = make_adjust_button(
+        settings_power_card, 180, 87, "+", &LcdDisplay::OnSettingsStandbyBrightUpClicked);
+
     /* Reboot */
     lv_obj_t* settings_reboot = lv_button_create(settings_screen_);
     lv_obj_set_size(settings_reboot, 224, 34);
-    lv_obj_set_pos(settings_reboot, 8, 280);
+    lv_obj_set_pos(settings_reboot, 8, 420);
     lv_obj_set_style_radius(settings_reboot, 10, 0);
     lv_obj_set_style_bg_color(settings_reboot, lv_color_hex(0x17151A), 0);
     lv_obj_set_style_bg_opa(settings_reboot, LV_OPA_COVER, 0);
@@ -3486,6 +3541,22 @@ void LcdDisplay::UpdateSettingsValues() {
         lv_label_set_text_fmt(settings_mic_value_, "%ddB",
                               static_cast<int>(codec->input_gain()));
     }
+    Settings power_settings("power", false);
+    if (settings_power_switch_ != nullptr) {
+        if (power_settings.GetBool("power_save_enabled", true)) {
+            lv_obj_add_state(settings_power_switch_, LV_STATE_CHECKED);
+        } else {
+            lv_obj_remove_state(settings_power_switch_, LV_STATE_CHECKED);
+        }
+    }
+    if (settings_idle_value_ != nullptr) {
+        lv_label_set_text_fmt(settings_idle_value_, "%ds",
+                              static_cast<int>(power_settings.GetInt("idle_seconds", 60)));
+    }
+    if (settings_standby_value_ != nullptr) {
+        lv_label_set_text_fmt(settings_standby_value_, "%d%%",
+                              static_cast<int>(power_settings.GetInt("standby_brightness", 10)));
+    }
     auto& wifi = WifiManager::GetInstance();
     const bool wifi_connected = wifi.IsConnected();
     if (settings_wifi_status_ != nullptr) {
@@ -4141,6 +4212,78 @@ void LcdDisplay::OnBrightnessUpClicked(lv_event_t* e) {
         backlight->SetBrightness(static_cast<uint8_t>(brightness), true);
         self->UpdateSettingsValues();
     }
+}
+
+/* Power saving settings, persisted in the "power" NVS namespace. */
+static constexpr int kIdleStepSeconds = 10;
+static constexpr int kIdleMinSeconds = 10;
+static constexpr int kIdleMaxSeconds = 600;
+static constexpr int kStandbyBrightStep = 5;
+static constexpr int kStandbyBrightMin = 5;
+static constexpr int kStandbyBrightMax = 50;
+
+void LcdDisplay::OnSettingsPowerSaveToggleClicked(lv_event_t* e) {
+    auto* sw = static_cast<lv_obj_t*>(lv_event_get_target(e));
+    if (sw != nullptr) {
+        Settings settings("power", true);
+        settings.SetBool("power_save_enabled", lv_obj_has_state(sw, LV_STATE_CHECKED));
+    }
+}
+
+void LcdDisplay::OnSettingsIdleDownClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self == nullptr) {
+        return;
+    }
+    Settings settings("power", true);
+    int idle = settings.GetInt("idle_seconds", 60) - kIdleStepSeconds;
+    if (idle < kIdleMinSeconds) {
+        idle = kIdleMinSeconds;
+    }
+    settings.SetInt("idle_seconds", idle);
+    self->UpdateSettingsValues();
+}
+
+void LcdDisplay::OnSettingsIdleUpClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self == nullptr) {
+        return;
+    }
+    Settings settings("power", true);
+    int idle = settings.GetInt("idle_seconds", 60) + kIdleStepSeconds;
+    if (idle > kIdleMaxSeconds) {
+        idle = kIdleMaxSeconds;
+    }
+    settings.SetInt("idle_seconds", idle);
+    self->UpdateSettingsValues();
+}
+
+void LcdDisplay::OnSettingsStandbyBrightDownClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self == nullptr) {
+        return;
+    }
+    Settings settings("power", true);
+    int brightness = settings.GetInt("standby_brightness", 10) - kStandbyBrightStep;
+    if (brightness < kStandbyBrightMin) {
+        brightness = kStandbyBrightMin;
+    }
+    settings.SetInt("standby_brightness", brightness);
+    self->UpdateSettingsValues();
+}
+
+void LcdDisplay::OnSettingsStandbyBrightUpClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self == nullptr) {
+        return;
+    }
+    Settings settings("power", true);
+    int brightness = settings.GetInt("standby_brightness", 10) + kStandbyBrightStep;
+    if (brightness > kStandbyBrightMax) {
+        brightness = kStandbyBrightMax;
+    }
+    settings.SetInt("standby_brightness", brightness);
+    self->UpdateSettingsValues();
 }
 
 void LcdDisplay::OnMicGainDownClicked(lv_event_t* e) {

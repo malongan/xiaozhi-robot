@@ -7,8 +7,11 @@
 #define TAG "PowerSaveTimer"
 
 
-PowerSaveTimer::PowerSaveTimer(int cpu_max_freq, int seconds_to_sleep, int seconds_to_shutdown)
-    : cpu_max_freq_(cpu_max_freq), seconds_to_sleep_(seconds_to_sleep), seconds_to_shutdown_(seconds_to_shutdown) {
+PowerSaveTimer::PowerSaveTimer(int cpu_max_freq, int seconds_to_sleep, int seconds_to_shutdown,
+                               bool allow_light_sleep, bool keep_wake_word)
+    : cpu_max_freq_(cpu_max_freq), seconds_to_sleep_(seconds_to_sleep),
+      seconds_to_shutdown_(seconds_to_shutdown), allow_light_sleep_(allow_light_sleep),
+      keep_wake_word_(keep_wake_word) {
     esp_timer_create_args_t timer_args = {
         .callback = [](void* arg) {
             auto self = static_cast<PowerSaveTimer*>(arg);
@@ -61,6 +64,11 @@ void PowerSaveTimer::OnShutdownRequest(std::function<void()> callback) {
 
 void PowerSaveTimer::PowerSaveCheck() {
     auto& app = Application::GetInstance();
+    if (in_sleep_mode_ && !app.CanEnterSleepMode()) {
+        /* 省电期间出现交互（喊醒、对话、播放），立刻恢复满频与背光，
+           不必等用户去点屏幕或进设置。 */
+        WakeUp();
+    }
     if (!in_sleep_mode_ && !app.CanEnterSleepMode()) {
         ticks_ = 0;
         return;
@@ -76,23 +84,25 @@ void PowerSaveTimer::PowerSaveCheck() {
             }
 
             if (cpu_max_freq_ != -1) {
-                // Disable wake word detection
-                auto& audio_service = app.GetAudioService();
-                is_wake_word_running_ = audio_service.IsWakeWordRunning();
-                if (is_wake_word_running_) {
-                    audio_service.EnableWakeWordDetection(false);
-                    vTaskDelay(pdMS_TO_TICKS(100));
-                }
-                // Disable audio input
-                auto codec = Board::GetInstance().GetAudioCodec();
-                if (codec) {
-                    codec->EnableInput(false);
+                if (!keep_wake_word_) {
+                    // Disable wake word detection
+                    auto& audio_service = app.GetAudioService();
+                    is_wake_word_running_ = audio_service.IsWakeWordRunning();
+                    if (is_wake_word_running_) {
+                        audio_service.EnableWakeWordDetection(false);
+                        vTaskDelay(pdMS_TO_TICKS(100));
+                    }
+                    // Disable audio input
+                    auto codec = Board::GetInstance().GetAudioCodec();
+                    if (codec) {
+                        codec->EnableInput(false);
+                    }
                 }
 
                 esp_pm_config_t pm_config = {
                     .max_freq_mhz = cpu_max_freq_,
                     .min_freq_mhz = 40,
-                    .light_sleep_enable = true,
+                    .light_sleep_enable = allow_light_sleep_,
                 };
                 esp_pm_configure(&pm_config);
             }
@@ -120,7 +130,7 @@ void PowerSaveTimer::WakeUp() {
             // Enable wake word detection
             auto& app = Application::GetInstance();
             auto& audio_service = app.GetAudioService();
-            if (is_wake_word_running_) {
+            if (!keep_wake_word_ && is_wake_word_running_) {
                 audio_service.EnableWakeWordDetection(true);
             }
         }

@@ -48,6 +48,16 @@ ALWAYS_APPEND = {
     # 聆听状态下也保持唤醒词检测：否则一轮说完进入聆听后叫不醒，
     # 必须等超时回到待机，体感就是"要喊好几次"。
     "CONFIG_WAKE_WORD_DETECTION_IN_LISTENING": True,
+    # 空闲省电：开启动态电源管理后 power_save_timer 的 esp_pm_configure
+    # 才能真正降频（240 -> 40MHz）。不启用 light sleep，保连接、保唤醒词。
+    "CONFIG_PM_ENABLE": True,
+    "CONFIG_FREERTOS_USE_TICKLESS_IDLE": True,
+    # 日志默认级别 WARN -> INFO。WARN 下所有 ESP_LOGI 在编译期被裁掉，
+    # 排查省电/SD/Wi-Fi 只能靠屏幕，串口一片空白。
+    # 注意：CONFIG_LOG_MAXIMUM_EQUALS_DEFAULT=y 时最大级别跟随默认值，
+    # 所以只改 choice 项即可，无需单独写 CONFIG_LOG_DEFAULT_LEVEL=3。
+    "CONFIG_LOG_DEFAULT_LEVEL_WARN": False,
+    "CONFIG_LOG_DEFAULT_LEVEL_INFO": True,
 }
 
 
