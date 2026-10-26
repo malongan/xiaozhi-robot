@@ -238,7 +238,10 @@ SpiLcdDisplay::SpiLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_h
 
     ESP_LOGI(TAG, "Initialize LVGL port");
     lvgl_port_cfg_t port_cfg = ESP_LVGL_PORT_INIT_CONFIG();
-    port_cfg.task_priority = 1;
+    // 2：与 opus_codec 持平，低于 audio_output(4)。
+    // 原来 1 是系统最低档，音频忙时 UI 被饿死；试过 3 会抢编码任务时间片，
+    // 实测出现「Encode queue is full」丢帧，所以取 2。
+    port_cfg.task_priority = 2;
 #if CONFIG_SOC_CPU_CORES_NUM > 1
     port_cfg.task_affinity = 1;
 #endif
@@ -303,7 +306,9 @@ RgbLcdDisplay::RgbLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_h
 
     ESP_LOGI(TAG, "Initialize LVGL port");
     lvgl_port_cfg_t port_cfg = ESP_LVGL_PORT_INIT_CONFIG();
-    port_cfg.task_priority = 1;
+    // 3：高于 opus_codec(2)、低于 audio_output(4)。原来是 1（最低档），
+    // 音频忙时 UI 会被饿死，点击和翻页不跟手。
+    port_cfg.task_priority = 2;
     port_cfg.timer_period_ms = 50;
     lvgl_port_init(&port_cfg);
 
