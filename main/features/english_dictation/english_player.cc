@@ -165,7 +165,10 @@ void EnglishPlayer::CycleSpeak() {
 }
 
 void EnglishPlayer::CycleInterval() {
-    static const int kSteps[] = {5, 10, 15, 20, 30, 0};
+    // 只在固定间隔里循环。以前末尾还有一个 0（手动模式），点几次就会切进去，
+    // next_tick_ 变成 0 之后 Tick() 直接 return，听写看起来就是「卡住不动了」。
+    // 手动翻页本来就有「下一个」按钮，不需要把间隔设成 0 来表达。
+    static const int kSteps[] = {5, 10, 15, 20, 30};
     constexpr int kCount = sizeof(kSteps) / sizeof(kSteps[0]);
     int idx = 0;
     for (int i = 0; i < kCount; ++i) {
@@ -175,18 +178,15 @@ void EnglishPlayer::CycleInterval() {
         }
     }
     interval_ = kSteps[idx];
-    if (interval_ > 0) {
-        ESP_LOGI(TAG, "间隔改为 %d 秒", interval_);
-    } else {
-        ESP_LOGI(TAG, "间隔改为手动");
-    }
-    // 立刻按新间隔重新计时（next_tick_ 用毫秒）；手动模式不再自动翻页
+    ESP_LOGI(TAG, "间隔改为 %d 秒", interval_);
+    // 立刻按新间隔重新计时（next_tick_ 用毫秒）
     if (active_) {
         if (pending_cn_) {
             next_tick_ = NowMs() + 200;
         } else {
-            next_tick_ =
-                interval_ > 0 ? NowMs() + static_cast<uint32_t>(interval_) * 1000 + 1000 : 0;
+            next_tick_ = NowMs() + static_cast<uint32_t>(interval_) * 1000 + 1000;
+            // 若上一轮停在「设备忙等重试」或手动暂停，重置状态让它继续走
+            retry_current_ = false;
         }
     }
 }
@@ -433,7 +433,9 @@ bool EnglishPlayer::PlayCurrent() {
     const bool state_busy =
         app.GetDeviceState() != kDeviceStateIdle && app.GetDeviceState() != kDeviceStateListening;
     if (server_busy || state_busy) {
-        ESP_LOGI(TAG, "设备忙，稍后重试：%s", store.WordAt(current_).data());
+        ESP_LOGW(TAG, "设备忙，稍后重试：%s (server_busy=%d state_busy=%d state=%d)", 
+                 store.WordAt(current_).data(), (int)server_busy, (int)state_busy,
+                 (int)app.GetDeviceState());
         next_tick_ = NowMs() + 500;
         retry_current_ = true;
         return false;

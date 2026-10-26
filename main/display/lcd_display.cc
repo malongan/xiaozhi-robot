@@ -2141,7 +2141,7 @@ void LcdDisplay::SetupUI() {
             {"听写", "词卡", nullptr, nullptr, nullptr, nullptr},
         };
         static const int kChipValues[4][6] = {
-            {5, 10, 20, 30, 0, 0}, {5, 10, 15, 20, 30, 0}, {0, 1, 2, 0, 0, 0}, {0, 1, 0, 0, 0, 0}};
+            {5, 10, 20, 30, 0, 0}, {5, 10, 15, 20, 30, 60}, {0, 1, 2, 0, 0, 0}, {0, 1, 0, 0, 0, 0}};
         static const char* kGroupNames[4] = {"词数", "间隔", "播报", "模式"};
         static const int kGroupRows[4] = {2, 2, 1, 1};
         static const int kGroupY[4] = {0, 60, 120, 150};
