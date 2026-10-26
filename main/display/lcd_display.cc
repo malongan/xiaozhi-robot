@@ -2722,12 +2722,13 @@ void LcdDisplay::SetupUI() {
         lv_obj_set_style_text_font(chat_history_title_, text_font, 0);
         lv_obj_set_style_text_color(chat_history_title_, lv_color_hex(0xE8E8F0), 0);
         lv_label_set_text(chat_history_title_, "聊天记录");
-        lv_obj_align(chat_history_title_, LV_ALIGN_TOP_MID, 0, 8);
+        // 靠左贴着返回按钮：240px 宽屏上如果居中，会和右上角的日期重叠
+        lv_obj_align(chat_history_title_, LV_ALIGN_TOP_LEFT, 52, 8);
 
         // 日期（右上角）
         chat_history_date_ = lv_label_create(chat_history_screen_);
         lv_obj_set_style_text_font(chat_history_date_, text_font, 0);
-        lv_obj_set_style_text_color(chat_history_date_, lv_color_hex(0x8A90A0), 0);
+        lv_obj_set_style_text_color(chat_history_date_, lv_color_hex(0x6E7484), 0);
         lv_label_set_text(chat_history_date_, "");
         lv_obj_align(chat_history_date_, LV_ALIGN_TOP_RIGHT, -8, 10);
 
@@ -3965,7 +3966,8 @@ void LcdDisplay::RefreshChatHistoryPage() {
     }
 
     char date_buf[32];
-    snprintf(date_buf, sizeof(date_buf), "%04u-%02u-%02u", (unsigned)(day / 10000),
+    // 年份只留两位（2026-10-26 -> 26/10/26），240px 宽屏上才不会挤到标题
+    snprintf(date_buf, sizeof(date_buf), "%02u/%02u/%02u", (unsigned)((day / 10000) % 100),
              (unsigned)((day / 100) % 100), (unsigned)(day % 100));
     chat_history_day_text_ = date_buf;
     lv_label_set_text(chat_history_date_, date_buf);
