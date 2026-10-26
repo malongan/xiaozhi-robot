@@ -165,10 +165,7 @@ void EnglishPlayer::CycleSpeak() {
 }
 
 void EnglishPlayer::CycleInterval() {
-    // 只在固定间隔里循环。以前末尾还有一个 0（手动模式），点几次就会切进去，
-    // next_tick_ 变成 0 之后 Tick() 直接 return，听写看起来就是「卡住不动了」。
-    // 手动翻页本来就有「下一个」按钮，不需要把间隔设成 0 来表达。
-    static const int kSteps[] = {5, 10, 15, 20, 30};
+    static const int kSteps[] = {5, 10, 15, 20, 30, 0};
     constexpr int kCount = sizeof(kSteps) / sizeof(kSteps[0]);
     int idx = 0;
     for (int i = 0; i < kCount; ++i) {
@@ -178,15 +175,18 @@ void EnglishPlayer::CycleInterval() {
         }
     }
     interval_ = kSteps[idx];
-    ESP_LOGI(TAG, "间隔改为 %d 秒", interval_);
-    // 立刻按新间隔重新计时（next_tick_ 用毫秒）
+    if (interval_ > 0) {
+        ESP_LOGI(TAG, "间隔改为 %d 秒", interval_);
+    } else {
+        ESP_LOGI(TAG, "间隔改为手动");
+    }
+    // 立刻按新间隔重新计时（next_tick_ 用毫秒）；手动模式不再自动翻页
     if (active_) {
         if (pending_cn_) {
             next_tick_ = NowMs() + 200;
         } else {
-            next_tick_ = NowMs() + static_cast<uint32_t>(interval_) * 1000 + 1000;
-            // 若上一轮停在「设备忙等重试」或手动暂停，重置状态让它继续走
-            retry_current_ = false;
+            next_tick_ =
+                interval_ > 0 ? NowMs() + static_cast<uint32_t>(interval_) * 1000 + 1000 : 0;
         }
     }
 }
@@ -432,13 +432,30 @@ bool EnglishPlayer::PlayCurrent() {
     const bool server_busy = !app.GetAudioService().IsPlaybackIdle();
     const bool state_busy =
         app.GetDeviceState() != kDeviceStateIdle && app.GetDeviceState() != kDeviceStateListening;
+    // 忙状态超时兜底：长对话结束后 IsPlaybackIdle() 有可能迟迟不返回 true
+    // （解码/输出标志残留），此时如果一直"稍后重试"，听写就永久卡住。
+    // 连续忙超过 10 秒就认为空闲判断不可信，放行播放。
+    const uint32_t now_ms = NowMs();
+    bool force_play = false;
     if (server_busy || state_busy) {
-        ESP_LOGW(TAG, "设备忙，稍后重试：%s (server_busy=%d state_busy=%d state=%d)", 
-                 store.WordAt(current_).data(), (int)server_busy, (int)state_busy,
-                 (int)app.GetDeviceState());
-        next_tick_ = NowMs() + 500;
-        retry_current_ = true;
-        return false;
+        if (busy_since_ms_ == 0) {
+            busy_since_ms_ = now_ms;
+        } else if (now_ms - busy_since_ms_ >= 10000) {
+            ESP_LOGW(TAG, "设备忙超过 10 秒（server_busy=%d state_busy=%d state=%d），放行播放",
+                     (int)server_busy, (int)state_busy, (int)app.GetDeviceState());
+            busy_since_ms_ = 0;
+            force_play = true;
+        }
+        if (!force_play) {
+            ESP_LOGW(TAG, "设备忙，稍后重试：%s (server_busy=%d state_busy=%d state=%d)",
+                     store.WordAt(current_).data(), (int)server_busy, (int)state_busy,
+                     (int)app.GetDeviceState());
+            next_tick_ = now_ms + 500;
+            retry_current_ = true;
+            return false;
+        }
+    } else {
+        busy_since_ms_ = 0;
     }
     // 真正播出去了，清掉“忙时重试”标记。双语分支下面会进入 pending_cn_，
     // 若这里不清，Tick 会每 200ms 再走一次重试，导致同一个词无限重播。

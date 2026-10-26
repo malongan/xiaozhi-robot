@@ -125,6 +125,8 @@ private:
     bool pending_cn_ = false;
     // 上一次播放因设备忙被推迟：下一轮 Tick 先重试当前词，避免跳词
     bool retry_current_ = false;
+    // 设备忙的起始时刻：超过 10 秒就强制播放，避免长对话后永久卡住
+    uint32_t busy_since_ms_ = 0;
     uint32_t paused_remaining_ms_ = 0;
     RefreshCallback refresh_cb_ = nullptr;
     uint32_t last_manual_ = 0;
