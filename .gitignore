@@ -19,6 +19,14 @@ main/mmap_generate_emoji.h
 mmap_generate_*.h
 .clangd
 
+# 本地构建/烧录日志（体积大且只对当次排查有用）
+*.log
+flash_*.txt
+
+# 本地 agent 工作目录
+.workbuddy/
+.opencode/
+
 # stroke pipeline generated data (regenerate with fetch.py/build.py)
 tools/stroke-pipeline/raw/
 tools/stroke-pipeline/output/
