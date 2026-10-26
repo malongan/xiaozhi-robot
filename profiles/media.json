@@ -1,0 +1,12 @@
+{
+  "name": "media",
+  "description": "音乐播放 + 英语听写 + 笔顺 + 网络传输（不含聊天记录与蓝牙键盘）",
+  "features": {
+    "english_dictation": true,
+    "stroke_order": true,
+    "ble_keyboard": false,
+    "web_file_transfer": true,
+    "music_player": true,
+    "chat_history": false
+  }
+}
