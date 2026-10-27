@@ -2,11 +2,13 @@
 """按 profile 组合功能包并构建。
 
 当前只切换功能包 Kconfig；板型等既有配置从根目录 sdkconfig 复制，避免
-profile 构建意外改变板级配置。构建目录默认在 build/profiles/<name>。
+profile 构建意外改变板级配置。构建目录默认 build/profiles/<name>，可用
+环境变量 XIAOZHI_BUILD_ROOT 指到更快的磁盘（机械盘上构建极慢）。
 """
 
 import argparse
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -73,15 +75,22 @@ def prepare_config(profile, features, sdkconfig, output):
         text = set_kconfig(text, symbol, enabled)
     for symbol, enabled in profile.get("sdkconfig", {}).items():
         text = set_kconfig(text, symbol, enabled)
+
+    # 内容没变就不要碰文件。sdkconfig 的 mtime 一变，cmake 就会 reconfigure，
+    # 进而把整仓重新编译一遍——切回同一个 profile 也要等十分钟。
+    if output.is_file() and output.read_text(encoding="utf-8") == text:
+        return False
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(text, encoding="utf-8")
+    return True
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--profile", default="english", help="profiles/<name>.json")
-    parser.add_argument("--build-dir", help="构建目录，默认 build/profiles/<profile>")
+    parser.add_argument("--build-dir", help="构建目录，默认 $XIAOZHI_BUILD_ROOT/<profile> 或 build/profiles/<profile>")
     parser.add_argument("--sdkconfig", default=str(ROOT / "sdkconfig"), help="基础 sdkconfig")
+    parser.add_argument("--jobs", type=int, help="并行编译任务数，默认让 ninja 自己决定")
     parser.add_argument("--no-build", action="store_true", help="只生成 profile 配置")
     parser.add_argument("--list", action="store_true", help="列出 profile 和功能包")
     args = parser.parse_args()
@@ -108,13 +117,16 @@ def main():
     if not sdkconfig.is_file():
         raise SystemExit(f"找不到基础配置: {sdkconfig}")
 
-    build_dir = Path(args.build_dir or ROOT / "build" / "profiles" / args.profile)
+    # 构建目录优先级：--build-dir > $XIAOZHI_BUILD_ROOT/<profile> > build/profiles/<profile>。
+    # 仓库放在机械盘上时，把 build 指向 SSD（Windows 例：set XIAOZHI_BUILD_ROOT=C:\esp-build）。
+    default_root = Path(os.environ.get("XIAOZHI_BUILD_ROOT") or ROOT / "build" / "profiles")
+    build_dir = Path(args.build_dir or default_root / args.profile)
     if not build_dir.is_absolute():
         build_dir = ROOT / build_dir
     profile_sdkconfig = build_dir / "sdkconfig"
-    prepare_config(profile, features, sdkconfig, profile_sdkconfig)
+    changed = prepare_config(profile, features, sdkconfig, profile_sdkconfig)
     print(f"profile: {args.profile}")
-    print(f"config : {profile_sdkconfig}")
+    print(f"config : {profile_sdkconfig}" + ("" if changed else "  (内容未变，跳过重写)"))
     for name, enabled in profile["features"].items():
         print(f"  {name}: {'on' if enabled else 'off'}")
 
@@ -123,11 +135,16 @@ def main():
 
     idf_py = shutil.which("idf.py")
     if idf_py is None:
-        raise SystemExit("找不到 idf.py，请先 source ESP-IDF 的 export.sh")
+        raise SystemExit("找不到 idf.py，请先 source ESP-IDF 的 export.sh / export.ps1")
 
     cmd = [idf_py, "-B", str(build_dir), "-D", f"SDKCONFIG={profile_sdkconfig}", "build"]
     print("+", " ".join(cmd))
-    return subprocess.call(cmd, cwd=ROOT)
+
+    # idf.py 自己没有 -j，并行度靠 CMAKE_BUILD_PARALLEL_LEVEL 透传给 ninja。
+    env = os.environ.copy()
+    if args.jobs:
+        env["CMAKE_BUILD_PARALLEL_LEVEL"] = str(args.jobs)
+    return subprocess.call(cmd, cwd=ROOT, env=env)
 
 
 if __name__ == "__main__":
