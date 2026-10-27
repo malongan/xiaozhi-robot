@@ -217,6 +217,15 @@ protected:
     lv_obj_t* settings_standby_value_ = nullptr;
     lv_obj_t* settings_standby_minus_icon_ = nullptr;
     lv_obj_t* settings_standby_plus_icon_ = nullptr;
+    /* 档 2 深省电与自动休眠：两行档位选择 */
+    lv_obj_t* settings_deep_label_ = nullptr;
+    lv_obj_t* settings_deep_value_ = nullptr;
+    lv_obj_t* settings_deep_minus_icon_ = nullptr;
+    lv_obj_t* settings_deep_plus_icon_ = nullptr;
+    lv_obj_t* settings_auto_label_ = nullptr;
+    lv_obj_t* settings_auto_value_ = nullptr;
+    lv_obj_t* settings_auto_minus_icon_ = nullptr;
+    lv_obj_t* settings_auto_plus_icon_ = nullptr;
     lv_obj_t* settings_vol_plus_icon_ = nullptr;
     lv_obj_t* settings_bright_minus_icon_ = nullptr;
     lv_obj_t* settings_bright_plus_icon_ = nullptr;
@@ -519,6 +528,10 @@ protected:
     static void OnSettingsIdleUpClicked(lv_event_t* e);
     static void OnSettingsStandbyBrightDownClicked(lv_event_t* e);
     static void OnSettingsStandbyBrightUpClicked(lv_event_t* e);
+    static void OnSettingsDeepSaveDownClicked(lv_event_t* e);
+    static void OnSettingsDeepSaveUpClicked(lv_event_t* e);
+    static void OnSettingsAutoSleepDownClicked(lv_event_t* e);
+    static void OnSettingsAutoSleepUpClicked(lv_event_t* e);
     void ShowSettingsScreen(bool show);
     void UpdateSettingsValues();
     void RebindSettingsFonts(const lv_font_t* text_font, const lv_font_t* icon_font,

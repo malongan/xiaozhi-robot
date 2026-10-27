@@ -20,6 +20,10 @@ public:
     // 关机前主动熄灭指示灯（WS2812 点亮时十几 mA，关机流程需要关掉）
     void TurnOff();
 
+    /* 直接指定颜色并立即刷新，用于省电提示（蓝色呼吸、极暗闪一下）。
+       绕开基类按设备状态驱动的那套颜色，调用后要记得恢复。 */
+    void SetRgb(uint8_t r, uint8_t g, uint8_t b);
+
 private:
     std::mutex mutex_;
     TaskHandle_t blink_task_ = nullptr;

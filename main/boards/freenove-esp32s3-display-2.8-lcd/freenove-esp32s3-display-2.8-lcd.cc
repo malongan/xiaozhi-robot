@@ -40,6 +40,7 @@
 #include <esp_err.h>
 #include <esp_log.h>
 #include <esp_timer.h>
+#include <esp_wifi.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
@@ -51,6 +52,11 @@
 
 class FreenoveESP32S3Display : public WifiBoard {
 private:
+    /* BOOT 长按关机后，下次开机的音量。关机时不再用 SetOutputVolume(0) 静音：
+       它会把 NVS 里的 output_volume 一起写成 0，而 AudioCodec::Start() 读到
+       <=0 会走「太小」兜底改成 10，等于关一次机音量就掉下去。 */
+    static constexpr int kBootVolumeAfterPowerOff = 80;
+
     Button boot_button_;
     LcdDisplay* display_;
     i2c_master_bus_handle_t codec_i2c_bus_;
@@ -65,6 +71,10 @@ private:
     /* 轮询 LVGL 输入空闲时间：触摸屏幕即退出省电并重置空闲计时，
        否则进省电后背光一直暗着，只能靠按键或重启恢复。 */
     esp_timer_handle_t touch_wake_timer_ = nullptr;
+    /* 档 2（深省电）期间的存活指示：每 10 秒让 WS2812 极暗闪一下。
+       屏幕此时全黑，没有这点微光就分不清「在待机」还是「已关机」。 */
+    esp_timer_handle_t led_pulse_timer_ = nullptr;
+    esp_timer_handle_t led_pulse_off_timer_ = nullptr;
 
     bool MountSdSdmmc() {
         esp_vfs_fat_mount_config_t mount_cfg = {
@@ -308,30 +318,46 @@ private:
     // 电源在吃电（整机约 1~3mA），所以关机前主动关：音频输出/PA、背光、WS2812、
     // 屏幕 SLPIN、SD 卸载。做完落在百 µA 量级，电池能放几个月。
     // 注意：插着 USB 时供电路径仍在，真正断电仍需拔线或拔电池。
-    void PowerOff() {
-        ESP_LOGW(TAG, "BOOT long press: power off");
-        if (display_ != nullptr) {
-            display_->ShowNotification("正在关机", 1200);
+    //
+    // wait_button_release：长按 BOOT 触发时必须等手松开，否则低电平唤醒条件
+    // 立刻满足，刚睡下就被自己叫醒；定时自动休眠没人按键，不必等。
+    void PowerOff(bool wait_button_release = true) {
+        ESP_LOGW(TAG, "Power off (manual=%d)", wait_button_release ? 1 : 0);
+        if (wait_button_release) {
+            if (display_ != nullptr) {
+                display_->ShowNotification("正在关机", 1200);
+            }
+            // 留时间把提示画出来，再开始关外设
+            vTaskDelay(pdMS_TO_TICKS(900));
+        } else {
+            /* 自动休眠时屏幕是全黑的，提示画了也看不见，让蓝色呼吸先播完即可 */
+            vTaskDelay(pdMS_TO_TICKS(200));
         }
-        // 留时间把提示画出来，再开始关外设
-        vTaskDelay(pdMS_TO_TICKS(900));
 
-        // 关键：必须等按键松开再睡，否则低电平唤醒条件立刻满足，
-        // 刚进 deep sleep 就被唤醒，看起来像重启。
-        for (int i = 0; i < 100 && gpio_get_level(BOOT_BUTTON_GPIO) == 0; ++i) {
-            vTaskDelay(pdMS_TO_TICKS(50));
+        if (wait_button_release) {
+            // 关键：必须等按键松开再睡，否则低电平唤醒条件立刻满足，
+            // 刚进 deep sleep 就被唤醒，看起来像重启。
+            for (int i = 0; i < 100 && gpio_get_level(BOOT_BUTTON_GPIO) == 0; ++i) {
+                vTaskDelay(pdMS_TO_TICKS(50));
+            }
         }
         if (gpio_get_level(BOOT_BUTTON_GPIO) == 0) {
             ESP_LOGW(TAG, "BOOT still held, skip power off");
             return;
         }
 
-        // 1) 音频：静音 -> 关 PA 输出 -> 关麦克风输入
+        // 1) 音频：先关 PA 输出与麦克风输入（此刻无声）。
+        //    下次开机的音量直接落 NVS，刻意不走 SetOutputVolume：
+        //    唤醒词任务此刻仍在 ReadAudioData()，发现麦被关掉会立刻
+        //    EnableInput(true) 把 codec 重新打开（dev_ 重建），那时
+        //    SetOutputVolume 就会真的推寄存器。写 NVS 语义明确且不碰硬件。
         if (auto* codec = GetAudioCodec(); codec != nullptr) {
-            codec->SetOutputVolume(0);
             codec->EnableOutput(false);
             codec->EnableInput(false);
         }
+        Settings audio_settings("audio", true);
+        audio_settings.SetInt("output_volume", kBootVolumeAfterPowerOff);
+        ESP_LOGI(TAG, "Next boot volume: %d", kBootVolumeAfterPowerOff);
         // 2) 背光与指示灯
         GetBacklight()->SetBrightness(0);
         if (auto* led = static_cast<SingleLed*>(GetLed()); led != nullptr) {
@@ -364,6 +390,107 @@ private:
         esp_deep_sleep_start();
     }
 
+    /* Wi-Fi 省电策略。档 2 用 MAX_MODEM，只在 DTIM 间隔醒来收包，比长连接省
+       十几 mA；恢复回 MIN_MODEM（IDF 默认档），避免对话/播放时因为睡得太深卡顿。
+       未连上 Wi-Fi 时调用会返回 NOT_INIT，忽略即可。 */
+    void SetWifiPowerSave(bool deep) {
+        const wifi_ps_type_t mode = deep ? WIFI_PS_MAX_MODEM : WIFI_PS_MIN_MODEM;
+        esp_err_t err = esp_wifi_set_ps(mode);
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "esp_wifi_set_ps(%d) failed: %s", static_cast<int>(mode),
+                     esp_err_to_name(err));
+        } else {
+            ESP_LOGI(TAG, "Wi-Fi power save -> %s", deep ? "MAX_MODEM" : "MIN_MODEM");
+        }
+    }
+
+    /* 档 2 的存活指示：屏幕全黑时每 10 秒让 WS2812 极暗闪一下，
+       否则用户分不清「设备在待机」和「已经关机了」。 */
+    void StartDeepSaveIndication() {
+        auto* led = static_cast<SingleLed*>(GetLed());
+        if (led == nullptr) {
+            return;
+        }
+        led->TurnOff();
+
+        if (led_pulse_off_timer_ == nullptr) {
+            esp_timer_create_args_t off_args = {
+                .callback = [](void* arg) {
+                    auto self = static_cast<FreenoveESP32S3Display*>(arg);
+                    if (auto* l = static_cast<SingleLed*>(self->GetLed()); l != nullptr) {
+                        l->TurnOff();
+                    }
+                },
+                .arg = this,
+                .dispatch_method = ESP_TIMER_TASK,
+                .name = "led_pulse_off",
+                .skip_unhandled_events = true,
+            };
+            if (esp_timer_create(&off_args, &led_pulse_off_timer_) != ESP_OK) {
+                led_pulse_off_timer_ = nullptr;
+            }
+        }
+
+        if (led_pulse_timer_ == nullptr) {
+            esp_timer_create_args_t args = {
+                .callback = [](void* arg) {
+                    auto self = static_cast<FreenoveESP32S3Display*>(arg);
+                    if (auto* l = static_cast<SingleLed*>(self->GetLed()); l != nullptr) {
+                        l->SetRgb(0, 0, 6);
+                        if (self->led_pulse_off_timer_ != nullptr) {
+                            esp_timer_start_once(self->led_pulse_off_timer_, 250 * 1000);
+                        }
+                    }
+                },
+                .arg = this,
+                .dispatch_method = ESP_TIMER_TASK,
+                .name = "led_pulse",
+                .skip_unhandled_events = true,
+            };
+            if (esp_timer_create(&args, &led_pulse_timer_) != ESP_OK) {
+                led_pulse_timer_ = nullptr;
+            }
+        }
+
+        if (led_pulse_timer_ != nullptr) {
+            esp_timer_start_periodic(led_pulse_timer_, 10LL * 1000 * 1000);
+            ESP_LOGI(TAG, "Deep save indicator on");
+        }
+    }
+
+    void StopDeepSaveIndication() {
+        if (led_pulse_timer_ != nullptr) {
+            esp_timer_stop(led_pulse_timer_);
+        }
+        if (led_pulse_off_timer_ != nullptr) {
+            esp_timer_stop(led_pulse_off_timer_);
+        }
+        // 交还给按设备状态驱动的常态灯效
+        if (auto* led = GetLed(); led != nullptr) {
+            led->OnStateChanged();
+        }
+    }
+
+    /* 睡前蓝呼吸一次：此刻屏幕已黑，用指示灯「呼一口气」告诉用户它要睡了。 */
+    void BreatheLedBlue() {
+        auto* led = static_cast<SingleLed*>(GetLed());
+        if (led == nullptr) {
+            return;
+        }
+        constexpr int kSteps = 16;
+        constexpr int kStepMs = 35;
+        constexpr uint8_t kPeak = 64;
+        for (int i = 0; i <= kSteps; ++i) {
+            led->SetRgb(0, 0, static_cast<uint8_t>(kPeak * i / kSteps));
+            vTaskDelay(pdMS_TO_TICKS(kStepMs));
+        }
+        for (int i = kSteps; i >= 0; --i) {
+            led->SetRgb(0, 0, static_cast<uint8_t>(kPeak * i / kSteps));
+            vTaskDelay(pdMS_TO_TICKS(kStepMs));
+        }
+        led->TurnOff();
+    }
+
     void InitializePowerSaveTimer() {
         Settings power_settings("power", false);
         if (!power_settings.GetBool("power_save_enabled", true)) {
@@ -371,11 +498,17 @@ private:
             return;
         }
         const int idle_seconds = static_cast<int>(power_settings.GetInt("idle_seconds", 60));
+        const int deep_save_seconds =
+            static_cast<int>(power_settings.GetInt("deep_save_seconds", 3600));
+        const int auto_sleep_seconds =
+            static_cast<int>(power_settings.GetInt("auto_sleep_seconds", 4 * 3600));
         /* cpu_max_freq 240 保持满频上限，空闲时由 PM 自动降到 40MHz。
            allow_light_sleep=false：不真睡，Wi-Fi 长连接不掉；
            keep_wake_word=true：省电时仍保持唤醒词和麦克风，喊一声就能醒，
-           只靠降背光和降频省电。 */
-        power_save_timer_ = new PowerSaveTimer(240, idle_seconds, -1, false, true);
+           只靠降背光和降频省电。
+           auto_sleep_seconds 传 0 表示关闭自动休眠。 */
+        power_save_timer_ = new PowerSaveTimer(240, idle_seconds, auto_sleep_seconds, false, true,
+                                               deep_save_seconds);
         power_save_timer_->OnEnterSleepMode([this]() {
             Settings settings("power", false);
             const uint8_t standby =
@@ -386,6 +519,34 @@ private:
         power_save_timer_->OnExitSleepMode([this]() {
             GetBacklight()->RestoreBrightness();
             ESP_LOGI(TAG, "Idle power save: backlight restored");
+        });
+        /* 档 2：背光归零 + Wi-Fi 进 modem sleep，麦克风与唤醒词照常工作。
+           屏幕虽然黑了，喊一声「你好小智」依然能唤醒。 */
+        power_save_timer_->OnEnterDeepSaveMode([this]() {
+            GetBacklight()->SetBrightness(0, false);
+            StartDeepSaveIndication();
+            SetWifiPowerSave(true);
+            ESP_LOGI(TAG, "Deep save: backlight off, wake word kept");
+        });
+        power_save_timer_->OnExitDeepSaveMode([this]() {
+            StopDeepSaveIndication();
+            SetWifiPowerSave(false);
+            ESP_LOGI(TAG, "Deep save: exited");
+        });
+        /* 长时间无交互 -> 真·深度休眠。PowerOff 里有秒级延时并最终 deep sleep，
+           直接在 esp_timer 回调里做会堵住定时器服务任务，改开独立任务。 */
+        power_save_timer_->OnShutdownRequest([this]() {
+            BaseType_t ok = xTaskCreate(
+                [](void* arg) {
+                    auto self = static_cast<FreenoveESP32S3Display*>(arg);
+                    self->BreatheLedBlue();
+                    self->PowerOff(false);
+                    vTaskDelete(nullptr);
+                },
+                "auto_sleep", 4096, this, 3, nullptr);
+            if (ok != pdPASS) {
+                ESP_LOGW(TAG, "auto sleep task create failed");
+            }
         });
         power_save_timer_->SetEnabled(true);
 
@@ -417,7 +578,8 @@ private:
                 ESP_LOGW(TAG, "failed to create touch wake timer");
             }
         }
-        ESP_LOGI(TAG, "Idle power save enabled: %d s", idle_seconds);
+        ESP_LOGI(TAG, "Idle power save: light=%ds deep=%ds auto_sleep=%ds", idle_seconds,
+                 deep_save_seconds, auto_sleep_seconds);
     }
 
     void InitializeButtons() {

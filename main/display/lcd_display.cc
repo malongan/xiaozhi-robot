@@ -2452,10 +2452,12 @@ void LcdDisplay::SetupUI() {
                         LV_EVENT_VALUE_CHANGED, this);
 #endif  // CONFIG_FEATURE_BLE_KEYBOARD
 
-    /* Power saving card: idle timeout + standby backlight */
-    lv_obj_t* settings_power_card = make_card(settings_screen_, 8, 280, 224, 130);
+    /* Power saving card: 三档休眠策略（待机省电 / 深度省电 / 自动休眠）+ 待机亮度 */
+    lv_obj_t* settings_power_card = make_card(settings_screen_, 8, 280, 224, 214);
     make_divider(settings_power_card, 10, 42, 204);
     make_divider(settings_power_card, 10, 84, 204);
+    make_divider(settings_power_card, 10, 126, 204);
+    make_divider(settings_power_card, 10, 168, 204);
 
     make_icon(settings_power_card, 10, 11, MATERIAL_SYMBOLS_BATTERY_ANDROID_FRAME_BOLT,
               kDarkGood);
@@ -2482,33 +2484,57 @@ void LcdDisplay::SetupUI() {
                         LV_EVENT_VALUE_CHANGED, this);
 
     make_icon(settings_power_card, 10, 53, MATERIAL_SYMBOLS_SCHEDULE, kDarkBlue);
-    settings_idle_label_ = make_text_label(settings_power_card, "空闲时长");
+    settings_idle_label_ = make_text_label(settings_power_card, "待机省电");
     lv_obj_set_pos(settings_idle_label_, 34, 52);
-    settings_idle_value_ = make_text_label(settings_power_card, "60s");
-    lv_obj_set_width(settings_idle_value_, 44);
+    settings_idle_value_ = make_text_label(settings_power_card, "1min");
+    lv_obj_set_width(settings_idle_value_, 56);
     lv_obj_set_style_text_align(settings_idle_value_, LV_TEXT_ALIGN_RIGHT, 0);
-    lv_obj_set_pos(settings_idle_value_, 94, 52);
+    lv_obj_set_pos(settings_idle_value_, 82, 52);
     settings_idle_minus_icon_ = make_adjust_button(settings_power_card, 142, 45, "-",
                                                    &LcdDisplay::OnSettingsIdleDownClicked);
     settings_idle_plus_icon_ = make_adjust_button(settings_power_card, 180, 45, "+",
                                                   &LcdDisplay::OnSettingsIdleUpClicked);
 
-    make_icon(settings_power_card, 10, 95, MATERIAL_SYMBOLS_BRIGHTNESS_6, kDarkOrange);
+    make_icon(settings_power_card, 10, 95, MATERIAL_SYMBOLS_BATTERY_ANDROID_FRAME_1, kDarkTeal);
+    settings_deep_label_ = make_text_label(settings_power_card, "深度省电");
+    lv_obj_set_pos(settings_deep_label_, 34, 94);
+    settings_deep_value_ = make_text_label(settings_power_card, "1h");
+    lv_obj_set_width(settings_deep_value_, 56);
+    lv_obj_set_style_text_align(settings_deep_value_, LV_TEXT_ALIGN_RIGHT, 0);
+    lv_obj_set_pos(settings_deep_value_, 82, 94);
+    settings_deep_minus_icon_ = make_adjust_button(settings_power_card, 142, 87, "-",
+                                                   &LcdDisplay::OnSettingsDeepSaveDownClicked);
+    settings_deep_plus_icon_ = make_adjust_button(settings_power_card, 180, 87, "+",
+                                                  &LcdDisplay::OnSettingsDeepSaveUpClicked);
+
+    make_icon(settings_power_card, 10, 137, MATERIAL_SYMBOLS_ALARM, kDarkOrange);
+    settings_auto_label_ = make_text_label(settings_power_card, "自动休眠");
+    lv_obj_set_pos(settings_auto_label_, 34, 136);
+    settings_auto_value_ = make_text_label(settings_power_card, "4h");
+    lv_obj_set_width(settings_auto_value_, 56);
+    lv_obj_set_style_text_align(settings_auto_value_, LV_TEXT_ALIGN_RIGHT, 0);
+    lv_obj_set_pos(settings_auto_value_, 82, 136);
+    settings_auto_minus_icon_ = make_adjust_button(settings_power_card, 142, 129, "-",
+                                                   &LcdDisplay::OnSettingsAutoSleepDownClicked);
+    settings_auto_plus_icon_ = make_adjust_button(settings_power_card, 180, 129, "+",
+                                                  &LcdDisplay::OnSettingsAutoSleepUpClicked);
+
+    make_icon(settings_power_card, 10, 179, MATERIAL_SYMBOLS_BRIGHTNESS_6, kDarkMuted);
     settings_standby_label_ = make_text_label(settings_power_card, "待机亮度");
-    lv_obj_set_pos(settings_standby_label_, 34, 94);
+    lv_obj_set_pos(settings_standby_label_, 34, 178);
     settings_standby_value_ = make_text_label(settings_power_card, "10%");
-    lv_obj_set_width(settings_standby_value_, 44);
+    lv_obj_set_width(settings_standby_value_, 56);
     lv_obj_set_style_text_align(settings_standby_value_, LV_TEXT_ALIGN_RIGHT, 0);
-    lv_obj_set_pos(settings_standby_value_, 94, 94);
+    lv_obj_set_pos(settings_standby_value_, 82, 178);
     settings_standby_minus_icon_ = make_adjust_button(
-        settings_power_card, 142, 87, "-", &LcdDisplay::OnSettingsStandbyBrightDownClicked);
+        settings_power_card, 142, 171, "-", &LcdDisplay::OnSettingsStandbyBrightDownClicked);
     settings_standby_plus_icon_ = make_adjust_button(
-        settings_power_card, 180, 87, "+", &LcdDisplay::OnSettingsStandbyBrightUpClicked);
+        settings_power_card, 180, 171, "+", &LcdDisplay::OnSettingsStandbyBrightUpClicked);
 
     /* Reboot */
     lv_obj_t* settings_reboot = lv_button_create(settings_screen_);
     lv_obj_set_size(settings_reboot, 224, 34);
-    lv_obj_set_pos(settings_reboot, 8, 420);
+    lv_obj_set_pos(settings_reboot, 8, 504);
     lv_obj_set_style_radius(settings_reboot, 10, 0);
     lv_obj_set_style_bg_color(settings_reboot, lv_color_hex(0x17151A), 0);
     lv_obj_set_style_bg_opa(settings_reboot, LV_OPA_COVER, 0);
@@ -3532,6 +3558,59 @@ void LcdDisplay::ShowSettingsScreen(bool show) {
     UpdateMediaBarVisibility();
 }
 
+/* 休眠策略档位表。
+ * 用固定档位而不是 ±10 秒步进：要到 1 小时得按几十次，实际操作中没人会那么调。
+ * auto_sleep 的 0 表示关闭自动休眠。 */
+static constexpr int kIdleOptions[] = {30, 60, 300, 600, 1800};
+static constexpr int kDeepSaveOptions[] = {1800, 3600, 7200};
+static constexpr int kAutoSleepOptions[] = {3600, 7200, 14400, 28800, 0};
+
+static constexpr int kStandbyBrightStep = 5;
+static constexpr int kStandbyBrightMin = 5;
+static constexpr int kStandbyBrightMax = 50;
+
+/* 在档位表里上下移动一格，到边界就停住。旧配置不在表里时就近落到较大的一档。 */
+template <int N>
+static int StepOption(const int (&options)[N], int current, int delta) {
+    int index = -1;
+    for (int i = 0; i < N; ++i) {
+        if (options[i] == current) {
+            index = i;
+            break;
+        }
+    }
+    if (index < 0) {
+        index = N - 1;
+        for (int i = 0; i < N; ++i) {
+            if (options[i] >= current) {
+                index = i;
+                break;
+            }
+        }
+    }
+    int next = index + delta;
+    if (next < 0) {
+        next = 0;
+    } else if (next >= N) {
+        next = N - 1;
+    }
+    return options[next];
+}
+
+static void FormatDuration(char* buf, size_t size, int seconds, bool zero_as_off) {
+    if (seconds <= 0) {
+        snprintf(buf, size, "%s", zero_as_off ? "关闭" : "-");
+    } else if (seconds < 60) {
+        snprintf(buf, size, "%ds", seconds);
+    } else if (seconds < 3600) {
+        snprintf(buf, size, "%dmin", seconds / 60);
+    } else if (seconds % 3600 == 0) {
+        snprintf(buf, size, "%dh", seconds / 3600);
+    } else {
+        snprintf(buf, size, "%dh%02d", seconds / 3600, (seconds % 3600) / 60);
+    }
+}
+
 void LcdDisplay::UpdateSettingsValues() {
     auto* theme = static_cast<LvglTheme*>(GetTheme());
     const lv_color_t text_color = theme != nullptr ? theme->text_color() : lv_color_hex(0xE8EAF0);
@@ -3556,8 +3635,22 @@ void LcdDisplay::UpdateSettingsValues() {
         }
     }
     if (settings_idle_value_ != nullptr) {
-        lv_label_set_text_fmt(settings_idle_value_, "%ds",
-                              static_cast<int>(power_settings.GetInt("idle_seconds", 60)));
+        char buf[16];
+        FormatDuration(buf, sizeof(buf),
+                       static_cast<int>(power_settings.GetInt("idle_seconds", 60)), false);
+        lv_label_set_text(settings_idle_value_, buf);
+    }
+    if (settings_deep_value_ != nullptr) {
+        char buf[16];
+        FormatDuration(buf, sizeof(buf),
+                       static_cast<int>(power_settings.GetInt("deep_save_seconds", 3600)), false);
+        lv_label_set_text(settings_deep_value_, buf);
+    }
+    if (settings_auto_value_ != nullptr) {
+        char buf[16];
+        FormatDuration(buf, sizeof(buf),
+                       static_cast<int>(power_settings.GetInt("auto_sleep_seconds", 14400)), true);
+        lv_label_set_text(settings_auto_value_, buf);
     }
     if (settings_standby_value_ != nullptr) {
         lv_label_set_text_fmt(settings_standby_value_, "%d%%",
@@ -4221,14 +4314,9 @@ void LcdDisplay::OnBrightnessUpClicked(lv_event_t* e) {
     }
 }
 
-/* Power saving settings, persisted in the "power" NVS namespace. */
-static constexpr int kIdleStepSeconds = 10;
-static constexpr int kIdleMinSeconds = 10;
-static constexpr int kIdleMaxSeconds = 600;
-static constexpr int kStandbyBrightStep = 5;
-static constexpr int kStandbyBrightMin = 5;
-static constexpr int kStandbyBrightMax = 50;
-
+/* Power saving settings, persisted in the "power" NVS namespace.
+   三档必须满足 待机省电 < 深度省电 < 自动休眠，否则前档永远轮不到，
+   所以调某一档时顺带把冲突的相邻档推开。 */
 void LcdDisplay::OnSettingsPowerSaveToggleClicked(lv_event_t* e) {
     auto* sw = static_cast<lv_obj_t*>(lv_event_get_target(e));
     if (sw != nullptr) {
@@ -4243,11 +4331,12 @@ void LcdDisplay::OnSettingsIdleDownClicked(lv_event_t* e) {
         return;
     }
     Settings settings("power", true);
-    int idle = settings.GetInt("idle_seconds", 60) - kIdleStepSeconds;
-    if (idle < kIdleMinSeconds) {
-        idle = kIdleMinSeconds;
-    }
+    const int idle = StepOption(kIdleOptions, settings.GetInt("idle_seconds", 60), -1);
     settings.SetInt("idle_seconds", idle);
+    if (settings.GetInt("deep_save_seconds", 3600) <= idle) {
+        settings.SetInt("deep_save_seconds",
+                        StepOption(kDeepSaveOptions, settings.GetInt("deep_save_seconds", 3600), 1));
+    }
     self->UpdateSettingsValues();
 }
 
@@ -4257,11 +4346,75 @@ void LcdDisplay::OnSettingsIdleUpClicked(lv_event_t* e) {
         return;
     }
     Settings settings("power", true);
-    int idle = settings.GetInt("idle_seconds", 60) + kIdleStepSeconds;
-    if (idle > kIdleMaxSeconds) {
-        idle = kIdleMaxSeconds;
-    }
+    const int idle = StepOption(kIdleOptions, settings.GetInt("idle_seconds", 60), 1);
     settings.SetInt("idle_seconds", idle);
+    if (settings.GetInt("deep_save_seconds", 3600) <= idle) {
+        settings.SetInt("deep_save_seconds",
+                        StepOption(kDeepSaveOptions, settings.GetInt("deep_save_seconds", 3600), 1));
+    }
+    self->UpdateSettingsValues();
+}
+
+void LcdDisplay::OnSettingsDeepSaveDownClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self == nullptr) {
+        return;
+    }
+    Settings settings("power", true);
+    const int deep = StepOption(kDeepSaveOptions, settings.GetInt("deep_save_seconds", 3600), -1);
+    settings.SetInt("deep_save_seconds", deep);
+    const int idle = settings.GetInt("idle_seconds", 60);
+    if (idle >= deep) {
+        settings.SetInt("idle_seconds", StepOption(kIdleOptions, idle, -1));
+    }
+    self->UpdateSettingsValues();
+}
+
+void LcdDisplay::OnSettingsDeepSaveUpClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self == nullptr) {
+        return;
+    }
+    Settings settings("power", true);
+    const int deep = StepOption(kDeepSaveOptions, settings.GetInt("deep_save_seconds", 3600), 1);
+    settings.SetInt("deep_save_seconds", deep);
+    const int auto_sleep = settings.GetInt("auto_sleep_seconds", 14400);
+    if (auto_sleep > 0 && auto_sleep <= deep) {
+        settings.SetInt("auto_sleep_seconds", StepOption(kAutoSleepOptions, auto_sleep, 1));
+    }
+    self->UpdateSettingsValues();
+}
+
+void LcdDisplay::OnSettingsAutoSleepDownClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self == nullptr) {
+        return;
+    }
+    Settings settings("power", true);
+    const int auto_sleep =
+        StepOption(kAutoSleepOptions, settings.GetInt("auto_sleep_seconds", 14400), -1);
+    settings.SetInt("auto_sleep_seconds", auto_sleep);
+    const int deep = settings.GetInt("deep_save_seconds", 3600);
+    if (auto_sleep > 0 && deep >= auto_sleep) {
+        settings.SetInt("deep_save_seconds", StepOption(kDeepSaveOptions, deep, -1));
+    }
+    self->UpdateSettingsValues();
+}
+
+void LcdDisplay::OnSettingsAutoSleepUpClicked(lv_event_t* e) {
+    auto* self = static_cast<LcdDisplay*>(lv_event_get_user_data(e));
+    if (self == nullptr) {
+        return;
+    }
+    Settings settings("power", true);
+    const int auto_sleep =
+        StepOption(kAutoSleepOptions, settings.GetInt("auto_sleep_seconds", 14400), 1);
+    settings.SetInt("auto_sleep_seconds", auto_sleep);
+    // 关闭自动休眠（0）不需要给深度省电让位
+    if (auto_sleep > 0 && settings.GetInt("deep_save_seconds", 3600) >= auto_sleep) {
+        settings.SetInt("deep_save_seconds",
+                        StepOption(kDeepSaveOptions, settings.GetInt("deep_save_seconds", 3600), -1));
+    }
     self->UpdateSettingsValues();
 }
 

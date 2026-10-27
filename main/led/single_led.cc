@@ -69,6 +69,11 @@ void SingleLed::TurnOn() {
     led_strip_refresh(led_strip_);
 }
 
+void SingleLed::SetRgb(uint8_t r, uint8_t g, uint8_t b) {
+    SetColor(r, g, b);
+    TurnOn();
+}
+
 void SingleLed::TurnOff() {
     if (led_strip_ == nullptr) {
         return;
