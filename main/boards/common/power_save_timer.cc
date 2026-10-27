@@ -72,6 +72,10 @@ void PowerSaveTimer::OnShutdownRequest(std::function<void()> callback) {
     on_shutdown_request_ = callback;
 }
 
+void PowerSaveTimer::SetDeepSaveAllowed(std::function<bool()> allowed) {
+    deep_save_allowed_ = std::move(allowed);
+}
+
 void PowerSaveTimer::EnterSleepMode() {
     ESP_LOGI(TAG, "Enabling power save mode");
     in_sleep_mode_ = true;
@@ -132,6 +136,29 @@ void PowerSaveTimer::PowerSaveCheck() {
     if (!in_sleep_mode_ && seconds_to_sleep_ > 0 && ticks_ >= seconds_to_sleep_) {
         EnterSleepMode();
     }
+
+    /* 外部供电（插着 USB）时不做档 2，也不自动深度休眠：档 2 会让屏幕全黑，
+       自动休眠则会让 USB 掉线、必须物理按键才能重新烧录。档 1 照常生效。
+       判定从 false 变回 true（拔线）时把计时清零，避免一拔线就立刻黑屏。 */
+    const bool deep_allowed = !deep_save_allowed_ || deep_save_allowed_();
+    if (deep_allowed != last_deep_allowed_) {
+        last_deep_allowed_ = deep_allowed;
+        if (deep_allowed) {
+            ESP_LOGI(TAG, "External power removed, idle timing restarts");
+            ticks_ = 0;
+            shutdown_requested_ = false;
+        } else {
+            ESP_LOGI(TAG, "External power detected: hold off deep save / auto shutdown");
+        }
+    }
+    if (!deep_allowed) {
+        if (in_deep_save_mode_) {
+            ESP_LOGI(TAG, "External power: leaving deep save mode");
+            ExitDeepSaveMode();
+        }
+        return;
+    }
+
     if (!in_deep_save_mode_ && seconds_to_deep_save_ > 0 && ticks_ >= seconds_to_deep_save_) {
         EnterDeepSaveMode();
     }
@@ -144,19 +171,24 @@ void PowerSaveTimer::PowerSaveCheck() {
     }
 }
 
+void PowerSaveTimer::ExitDeepSaveMode() {
+    if (!in_deep_save_mode_) {
+        return;
+    }
+    in_deep_save_mode_ = false;
+    ESP_LOGI(TAG, "Exiting deep save mode");
+    if (on_exit_deep_save_) {
+        on_exit_deep_save_();
+    }
+}
+
 void PowerSaveTimer::WakeUp() {
     ticks_ = 0;
     shutdown_requested_ = false;
 
     /* 先退档 2：恢复指示灯与 Wi-Fi 省电策略。
        背光由档 1 的回调统一恢复，避免两处各写一次亮度。 */
-    if (in_deep_save_mode_) {
-        in_deep_save_mode_ = false;
-        ESP_LOGI(TAG, "Exiting deep save mode");
-        if (on_exit_deep_save_) {
-            on_exit_deep_save_();
-        }
-    }
+    ExitDeepSaveMode();
 
     if (in_sleep_mode_) {
         ESP_LOGI(TAG, "Exiting power save mode");

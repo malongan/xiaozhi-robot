@@ -30,7 +30,13 @@ public:
     void OnEnterDeepSaveMode(std::function<void()> callback);
     void OnExitDeepSaveMode(std::function<void()> callback);
     void OnShutdownRequest(std::function<void()> callback);
+    /* deep_save_allowed：返回 false 时跳过档 2 与自动深度休眠（档 1 不受影响）。
+       接外部供电检测用——插着 USB 时既不需要省电，也不该让设备自己关机。 */
+    void SetDeepSaveAllowed(std::function<bool()> allowed);
     void WakeUp();
+    /* 只退档 2、回落到档 1，用于「档 2 期间插上外部供电」：
+       不必整机唤醒到满亮度，但屏幕要从全黑恢复到待机亮度。 */
+    void ExitDeepSaveMode();
 
     bool in_sleep_mode() const { return in_sleep_mode_; }
     bool in_deep_save_mode() const { return in_deep_save_mode_; }
@@ -47,6 +53,8 @@ private:
     bool is_wake_word_running_ = false;
     /* on_shutdown_request_ 每秒都会被判定一次，必须只触发一次 */
     bool shutdown_requested_ = false;
+    /* 上次的「允许档 2/自动休眠」判定，用来捕捉插拔外部供电的边沿 */
+    bool last_deep_allowed_ = true;
     int ticks_ = 0;
     int cpu_max_freq_;
     int seconds_to_sleep_;
@@ -62,4 +70,5 @@ private:
     std::function<void()> on_enter_deep_save_;
     std::function<void()> on_exit_deep_save_;
     std::function<void()> on_shutdown_request_;
+    std::function<bool()> deep_save_allowed_;
 };

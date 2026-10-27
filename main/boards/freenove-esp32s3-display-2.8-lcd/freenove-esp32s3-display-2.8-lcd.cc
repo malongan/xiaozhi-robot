@@ -37,6 +37,7 @@
 #include <driver/sdmmc_host.h>
 #include <driver/sdspi_host.h>
 #include <driver/spi_common.h>
+#include <driver/usb_serial_jtag.h>
 #include <esp_err.h>
 #include <esp_log.h>
 #include <esp_timer.h>
@@ -390,6 +391,27 @@ private:
         esp_deep_sleep_start();
     }
 
+    /* 是否由外部（USB）供电。插着线时不做档 2，也不自动深度休眠：
+       档 2 会让屏幕全黑，自动休眠则会让 USB 掉线、必须物理按键才能重新烧录。
+       这台板没有 VBUS 检测，只能按可靠性分三层推断：
+         1) USB Serial/JTAG 与主机枚举成功 —— 插在电脑上必定命中；
+         2) 没装电池 —— 只可能靠 USB 供电；
+         3) 正在充电 —— TP4054 正在从 USB 拉电流。
+       注意边界：插充电器且电池已充满时三条都不命中（CHRG 没引到 GPIO、
+       电压也不再上升），此时仍会进档 2。要彻底解决只能把 CHRG 飞线到 IO2/IO3/IO14/IO21。 */
+    bool IsExternalPower() const {
+        if (usb_serial_jtag_is_driver_installed() && usb_serial_jtag_is_connected()) {
+            return true;
+        }
+        if (power_monitor_ == nullptr) {
+            return false;
+        }
+        if (!power_monitor_->IsBatteryPresent()) {
+            return true;
+        }
+        return power_monitor_->IsCharging();
+    }
+
     /* Wi-Fi 省电策略。档 2 用 MAX_MODEM，只在 DTIM 间隔醒来收包，比长连接省
        十几 mA；恢复回 MIN_MODEM（IDF 默认档），避免对话/播放时因为睡得太深卡顿。
        未连上 Wi-Fi 时调用会返回 NOT_INIT，忽略即可。 */
@@ -531,8 +553,17 @@ private:
         power_save_timer_->OnExitDeepSaveMode([this]() {
             StopDeepSaveIndication();
             SetWifiPowerSave(false);
+            /* 只退档 2（换电/插线）时不会走档 1 的恢复回调，这里补上待机亮度；
+               真正的整机唤醒会紧接着由档 1 的 OnExitSleepMode 恢复满亮度。 */
+            if (power_save_timer_ != nullptr && power_save_timer_->in_sleep_mode()) {
+                Settings settings("power", false);
+                GetBacklight()->SetBrightness(
+                    static_cast<uint8_t>(settings.GetInt("standby_brightness", 10)), false);
+            }
             ESP_LOGI(TAG, "Deep save: exited");
         });
+        /* 插着 USB 时封住档 2 与自动休眠，只保留档 1。 */
+        power_save_timer_->SetDeepSaveAllowed([this]() { return !IsExternalPower(); });
         /* 长时间无交互 -> 真·深度休眠。PowerOff 里有秒级延时并最终 deep sleep，
            直接在 esp_timer 回调里做会堵住定时器服务任务，改开独立任务。 */
         power_save_timer_->OnShutdownRequest([this]() {
