@@ -391,25 +391,22 @@ private:
         esp_deep_sleep_start();
     }
 
-    /* 是否由外部（USB）供电。插着线时不做档 2，也不自动深度休眠：
+    /* 是否由外部电源供电。插着线时不做档 2，也不自动深度休眠：
        档 2 会让屏幕全黑，自动休眠则会让 USB 掉线、必须物理按键才能重新烧录。
-       这台板没有 VBUS 检测，只能按可靠性分三层推断：
+       这台板没有 VBUS 检测，四条判据全部收在 FreenovePowerMonitor 里：
          1) USB Serial/JTAG 与主机枚举成功 —— 插在电脑上必定命中；
          2) 没装电池 —— 只可能靠 USB 供电；
-         3) 正在充电 —— TP4054 正在从 USB 拉电流。
-       注意边界：插充电器且电池已充满时三条都不命中（CHRG 没引到 GPIO、
-       电压也不再上升），此时仍会进档 2。要彻底解决只能把 CHRG 飞线到 IO2/IO3/IO14/IO21。 */
+         3) 电压阶跃/斜率判定正在充电 —— TP4054 正在从外接电源拉电流；
+         4) 满电平坦 —— 电压够高、且 90 分钟内没有下滑趋势，只可能是纯充电头还接着。
+       第 4 条是给"插充电头 + 电池已充满"补的：这种形态没有阶跃、斜率也不动，
+       前三条都失效。实测满电读数约 4170mV，拔线后的开路电压只低 10mV 左右，
+       落在 ADC 噪声里，所以只能靠长时间趋势区分，不能只看电压绝对值。
+       代价是拔线后最迟约 90 分钟才会恢复省电（这段时间不做档 2、不关机）。 */
     bool IsExternalPower() const {
-        if (usb_serial_jtag_is_driver_installed() && usb_serial_jtag_is_connected()) {
-            return true;
-        }
         if (power_monitor_ == nullptr) {
-            return false;
+            return usb_serial_jtag_is_driver_installed() && usb_serial_jtag_is_connected();
         }
-        if (!power_monitor_->IsBatteryPresent()) {
-            return true;
-        }
-        return power_monitor_->IsCharging();
+        return power_monitor_->IsExternalPower();
     }
 
     /* Wi-Fi 省电策略。档 2 用 MAX_MODEM，只在 DTIM 间隔醒来收包，比长连接省

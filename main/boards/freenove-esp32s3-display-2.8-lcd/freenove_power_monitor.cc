@@ -141,8 +141,18 @@ void FreenovePowerMonitor::Sample() {
         history_.pop_front();
     }
 
+    // 分钟级慢历史：只用来判断"几分钟到一小时里到底在升、在降、还是纹丝不动"。
+    // 2 秒一采的 history_ 只有 12 分钟，撑不起满电场景需要的观察窗口。
+    if (slow_history_.empty() || now - slow_history_.back().time_us >= kSlowSampleIntervalUs) {
+        slow_history_.push_back({now, mv});
+        while (!slow_history_.empty() && now - slow_history_.front().time_us > kSlowHistoryUs) {
+            slow_history_.pop_front();
+        }
+    }
+
     UpdateLevel();
     UpdateChargingState();
+    UpdateExternalPower();
 
     if (charging_pin_ == GPIO_NUM_NC) {
         ESP_LOGD(TAG, "battery %d mV, %u%%, charging=%d, usb=%d, samples=%u", battery_mv_, level_,
@@ -268,5 +278,57 @@ void FreenovePowerMonitor::SetCharging(bool charging) {
     charging_ = charging;
     if (on_charging_status_changed_) {
         on_charging_status_changed_(charging_);
+    }
+}
+
+// 长时间尺度上电压是否在明显下滑。用于把"满电但已拔线"和"满电仍在恒压充电"
+// 区分开：前者开路电压会持续下掉，后者被 TP4054 顶住、纹丝不动。
+// 用慢历史的首尾各取几点中位数，避开单点噪声。
+bool FreenovePowerMonitor::IsBatteryDeclining() const {
+    if (slow_history_.size() < 3) {
+        return false;  // 历史不足，先不下"在放电"的结论
+    }
+    auto median_of = [](std::vector<int>& v) {
+        std::sort(v.begin(), v.end());
+        return v[v.size() / 2];
+    };
+
+    const size_t take = std::min<size_t>(3, slow_history_.size());
+    std::vector<int> old_vals, new_vals;
+    for (size_t i = 0; i < take; ++i) {
+        old_vals.push_back(slow_history_[i].mv);
+    }
+    for (size_t i = slow_history_.size() - take; i < slow_history_.size(); ++i) {
+        new_vals.push_back(slow_history_[i].mv);
+    }
+    const int delta = median_of(old_vals) - median_of(new_vals);
+    return delta >= kDeclineThresholdMv;
+}
+
+// 判断当前是否接在外接电源上。与"是否正在充电"分开：
+// 电池充满后 TP4054 停止灌电流，charging_ 会变 false，但线还插着。
+// 省电逻辑关心的是"有没有外接电"，不是"在不在充电"。
+void FreenovePowerMonitor::UpdateExternalPower() {
+    bool external = false;
+    if (!battery_present_) {
+        external = true;  // 没装电池：只能靠 USB 供电
+    } else if (charging_pin_ != GPIO_NUM_NC) {
+        external = charging_;  // 有 CHRG 引脚时以硬件为准
+    } else if (usb_serial_jtag_is_connected()) {
+        external = true;  // 明确插着 USB 主机
+    } else if (charging_) {
+        external = true;  // 阶跃/斜率已判定为正在充电
+    } else if (battery_mv_ >= kHighVoltageMv && !IsBatteryDeclining()) {
+        // 满电平坦：电压高、又没有下滑趋势，只可能是纯充电头还接着。
+        // 这是此前漏判的形态 —— 插充电头、电池已充满、电压纹丝不动。
+        // 拔线后开路电压会持续往下走，最长 90 分钟内一定能被 IsBatteryDeclining 抓到。
+        external = true;
+    }
+
+    if (external != external_power_) {
+        external_power_ = external;
+        ESP_LOGI(TAG, "external power %s (battery %d mV, %u%%, charging=%d, declining=%d)",
+                 external ? "detected" : "lost", battery_mv_, level_, charging_,
+                 IsBatteryDeclining());
     }
 }
