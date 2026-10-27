@@ -514,16 +514,19 @@ private:
     }
 
     void InitializePowerSaveTimer() {
+        if (power_save_timer_ != nullptr) {
+            return;
+        }
         Settings power_settings("power", false);
-        if (!power_settings.GetBool("power_save_enabled", true)) {
+        if (!power_settings.GetBool("power_save_en", true)) {
             ESP_LOGI(TAG, "Idle power save disabled by settings");
             return;
         }
         const int idle_seconds = static_cast<int>(power_settings.GetInt("idle_seconds", 60));
         const int deep_save_seconds =
-            static_cast<int>(power_settings.GetInt("deep_save_seconds", 3600));
+            static_cast<int>(power_settings.GetInt("deep_save_sec", 3600));
         const int auto_sleep_seconds =
-            static_cast<int>(power_settings.GetInt("auto_sleep_seconds", 4 * 3600));
+            static_cast<int>(power_settings.GetInt("auto_sleep_sec", 4 * 3600));
         /* cpu_max_freq 240 保持满频上限，空闲时由 PM 自动降到 40MHz。
            allow_light_sleep=false：不真睡，Wi-Fi 长连接不掉；
            keep_wake_word=true：省电时仍保持唤醒词和麦克风，喊一声就能醒，
@@ -534,7 +537,7 @@ private:
         power_save_timer_->OnEnterSleepMode([this]() {
             Settings settings("power", false);
             const uint8_t standby =
-                static_cast<uint8_t>(settings.GetInt("standby_brightness", 10));
+                static_cast<uint8_t>(settings.GetInt("standby_bright", 10));
             GetBacklight()->SetBrightness(standby, false);
             ESP_LOGI(TAG, "Idle power save: backlight -> %u%%", standby);
         });
@@ -558,7 +561,7 @@ private:
             if (power_save_timer_ != nullptr && power_save_timer_->in_sleep_mode()) {
                 Settings settings("power", false);
                 GetBacklight()->SetBrightness(
-                    static_cast<uint8_t>(settings.GetInt("standby_brightness", 10)), false);
+                    static_cast<uint8_t>(settings.GetInt("standby_bright", 10)), false);
             }
             ESP_LOGI(TAG, "Deep save: exited");
         });
@@ -727,6 +730,38 @@ public:
         discharging = !charging;
         level = power_monitor_->GetBatteryLevel();
         return true;
+    }
+
+    /* 设置页改过四个省电项之后调一次。PowerSaveTimer 在构造时按值保存了三个档位，
+       不推给它的话新设定要等重启才生效。开机时省电被关掉的情况 timer 是空的，
+       这里按需补建。 */
+    virtual void ApplyPowerSaveSettings() override {
+        Settings power_settings("power", false);
+        if (power_save_timer_ == nullptr) {
+            /* 只有「用户刚把省电打开」才会走到这里；Initialize 内部会再读一次 NVS。 */
+            if (power_settings.GetBool("power_save_en", true)) {
+                InitializePowerSaveTimer();
+            }
+            return;
+        }
+
+        const bool enabled = power_settings.GetBool("power_save_en", true);
+        const int idle_seconds = static_cast<int>(power_settings.GetInt("idle_seconds", 60));
+        const int deep_save_seconds = static_cast<int>(power_settings.GetInt("deep_save_sec", 3600));
+        const int auto_sleep_seconds =
+            static_cast<int>(power_settings.GetInt("auto_sleep_sec", 4 * 3600));
+
+        power_save_timer_->SetIntervals(idle_seconds, deep_save_seconds, auto_sleep_seconds);
+        power_save_timer_->SetEnabled(enabled);
+
+        /* 正停在档 1 时调「待机亮度」，得当场亮暗变化才看得出改没改。 */
+        if (power_save_timer_->in_sleep_mode()) {
+            const uint8_t standby =
+                static_cast<uint8_t>(power_settings.GetInt("standby_bright", 10));
+            GetBacklight()->SetBrightness(standby, false);
+        }
+        ESP_LOGI(TAG, "Power settings applied: light=%ds deep=%ds auto_sleep=%ds enabled=%d",
+                 idle_seconds, deep_save_seconds, auto_sleep_seconds, enabled ? 1 : 0);
     }
 };
 

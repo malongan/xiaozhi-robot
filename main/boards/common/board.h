@@ -80,6 +80,10 @@ public:
     virtual bool GetBatteryLevel(int &level, bool& charging, bool& discharging);
     virtual std::string GetSystemInfoJson();
     virtual void SetPowerSaveLevel(PowerSaveLevel level) = 0;
+    /* 设置页改过待机省电 / 深度省电 / 自动休眠 / 待机亮度之后调用一次，
+       让板子把新值推给运行中的 PowerSaveTimer，不必重启设备。
+       基类默认什么都不做——没有省电定时器的板子不用关心。 */
+    virtual void ApplyPowerSaveSettings() {}
     virtual std::string GetBoardJson() = 0;
     virtual std::string GetDeviceStatusJson() = 0;
 };

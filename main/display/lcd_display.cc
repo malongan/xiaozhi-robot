@@ -3628,7 +3628,7 @@ void LcdDisplay::UpdateSettingsValues() {
     }
     Settings power_settings("power", false);
     if (settings_power_switch_ != nullptr) {
-        if (power_settings.GetBool("power_save_enabled", true)) {
+        if (power_settings.GetBool("power_save_en", true)) {
             lv_obj_add_state(settings_power_switch_, LV_STATE_CHECKED);
         } else {
             lv_obj_remove_state(settings_power_switch_, LV_STATE_CHECKED);
@@ -3643,18 +3643,18 @@ void LcdDisplay::UpdateSettingsValues() {
     if (settings_deep_value_ != nullptr) {
         char buf[16];
         FormatDuration(buf, sizeof(buf),
-                       static_cast<int>(power_settings.GetInt("deep_save_seconds", 3600)), false);
+                       static_cast<int>(power_settings.GetInt("deep_save_sec", 3600)), false);
         lv_label_set_text(settings_deep_value_, buf);
     }
     if (settings_auto_value_ != nullptr) {
         char buf[16];
         FormatDuration(buf, sizeof(buf),
-                       static_cast<int>(power_settings.GetInt("auto_sleep_seconds", 14400)), true);
+                       static_cast<int>(power_settings.GetInt("auto_sleep_sec", 14400)), true);
         lv_label_set_text(settings_auto_value_, buf);
     }
     if (settings_standby_value_ != nullptr) {
         lv_label_set_text_fmt(settings_standby_value_, "%d%%",
-                              static_cast<int>(power_settings.GetInt("standby_brightness", 10)));
+                              static_cast<int>(power_settings.GetInt("standby_bright", 10)));
     }
     auto& wifi = WifiManager::GetInstance();
     const bool wifi_connected = wifi.IsConnected();
@@ -4321,8 +4321,9 @@ void LcdDisplay::OnSettingsPowerSaveToggleClicked(lv_event_t* e) {
     auto* sw = static_cast<lv_obj_t*>(lv_event_get_target(e));
     if (sw != nullptr) {
         Settings settings("power", true);
-        settings.SetBool("power_save_enabled", lv_obj_has_state(sw, LV_STATE_CHECKED));
+        settings.SetBool("power_save_en", lv_obj_has_state(sw, LV_STATE_CHECKED));
     }
+    Board::GetInstance().ApplyPowerSaveSettings();
 }
 
 void LcdDisplay::OnSettingsIdleDownClicked(lv_event_t* e) {
@@ -4330,13 +4331,16 @@ void LcdDisplay::OnSettingsIdleDownClicked(lv_event_t* e) {
     if (self == nullptr) {
         return;
     }
-    Settings settings("power", true);
-    const int idle = StepOption(kIdleOptions, settings.GetInt("idle_seconds", 60), -1);
-    settings.SetInt("idle_seconds", idle);
-    if (settings.GetInt("deep_save_seconds", 3600) <= idle) {
-        settings.SetInt("deep_save_seconds",
-                        StepOption(kDeepSaveOptions, settings.GetInt("deep_save_seconds", 3600), 1));
+    {
+        Settings settings("power", true);
+        const int idle = StepOption(kIdleOptions, settings.GetInt("idle_seconds", 60), -1);
+        settings.SetInt("idle_seconds", idle);
+        if (settings.GetInt("deep_save_sec", 3600) <= idle) {
+            settings.SetInt("deep_save_sec",
+                            StepOption(kDeepSaveOptions, settings.GetInt("deep_save_sec", 3600), 1));
+        }
     }
+    Board::GetInstance().ApplyPowerSaveSettings();
     self->UpdateSettingsValues();
 }
 
@@ -4345,13 +4349,16 @@ void LcdDisplay::OnSettingsIdleUpClicked(lv_event_t* e) {
     if (self == nullptr) {
         return;
     }
-    Settings settings("power", true);
-    const int idle = StepOption(kIdleOptions, settings.GetInt("idle_seconds", 60), 1);
-    settings.SetInt("idle_seconds", idle);
-    if (settings.GetInt("deep_save_seconds", 3600) <= idle) {
-        settings.SetInt("deep_save_seconds",
-                        StepOption(kDeepSaveOptions, settings.GetInt("deep_save_seconds", 3600), 1));
+    {
+        Settings settings("power", true);
+        const int idle = StepOption(kIdleOptions, settings.GetInt("idle_seconds", 60), 1);
+        settings.SetInt("idle_seconds", idle);
+        if (settings.GetInt("deep_save_sec", 3600) <= idle) {
+            settings.SetInt("deep_save_sec",
+                            StepOption(kDeepSaveOptions, settings.GetInt("deep_save_sec", 3600), 1));
+        }
     }
+    Board::GetInstance().ApplyPowerSaveSettings();
     self->UpdateSettingsValues();
 }
 
@@ -4360,13 +4367,16 @@ void LcdDisplay::OnSettingsDeepSaveDownClicked(lv_event_t* e) {
     if (self == nullptr) {
         return;
     }
-    Settings settings("power", true);
-    const int deep = StepOption(kDeepSaveOptions, settings.GetInt("deep_save_seconds", 3600), -1);
-    settings.SetInt("deep_save_seconds", deep);
-    const int idle = settings.GetInt("idle_seconds", 60);
-    if (idle >= deep) {
-        settings.SetInt("idle_seconds", StepOption(kIdleOptions, idle, -1));
+    {
+        Settings settings("power", true);
+        const int deep = StepOption(kDeepSaveOptions, settings.GetInt("deep_save_sec", 3600), -1);
+        settings.SetInt("deep_save_sec", deep);
+        const int idle = settings.GetInt("idle_seconds", 60);
+        if (idle >= deep) {
+            settings.SetInt("idle_seconds", StepOption(kIdleOptions, idle, -1));
+        }
     }
+    Board::GetInstance().ApplyPowerSaveSettings();
     self->UpdateSettingsValues();
 }
 
@@ -4375,13 +4385,16 @@ void LcdDisplay::OnSettingsDeepSaveUpClicked(lv_event_t* e) {
     if (self == nullptr) {
         return;
     }
-    Settings settings("power", true);
-    const int deep = StepOption(kDeepSaveOptions, settings.GetInt("deep_save_seconds", 3600), 1);
-    settings.SetInt("deep_save_seconds", deep);
-    const int auto_sleep = settings.GetInt("auto_sleep_seconds", 14400);
-    if (auto_sleep > 0 && auto_sleep <= deep) {
-        settings.SetInt("auto_sleep_seconds", StepOption(kAutoSleepOptions, auto_sleep, 1));
+    {
+        Settings settings("power", true);
+        const int deep = StepOption(kDeepSaveOptions, settings.GetInt("deep_save_sec", 3600), 1);
+        settings.SetInt("deep_save_sec", deep);
+        const int auto_sleep = settings.GetInt("auto_sleep_sec", 14400);
+        if (auto_sleep > 0 && auto_sleep <= deep) {
+            settings.SetInt("auto_sleep_sec", StepOption(kAutoSleepOptions, auto_sleep, 1));
+        }
     }
+    Board::GetInstance().ApplyPowerSaveSettings();
     self->UpdateSettingsValues();
 }
 
@@ -4390,14 +4403,17 @@ void LcdDisplay::OnSettingsAutoSleepDownClicked(lv_event_t* e) {
     if (self == nullptr) {
         return;
     }
-    Settings settings("power", true);
-    const int auto_sleep =
-        StepOption(kAutoSleepOptions, settings.GetInt("auto_sleep_seconds", 14400), -1);
-    settings.SetInt("auto_sleep_seconds", auto_sleep);
-    const int deep = settings.GetInt("deep_save_seconds", 3600);
-    if (auto_sleep > 0 && deep >= auto_sleep) {
-        settings.SetInt("deep_save_seconds", StepOption(kDeepSaveOptions, deep, -1));
+    {
+        Settings settings("power", true);
+        const int auto_sleep =
+            StepOption(kAutoSleepOptions, settings.GetInt("auto_sleep_sec", 14400), -1);
+        settings.SetInt("auto_sleep_sec", auto_sleep);
+        const int deep = settings.GetInt("deep_save_sec", 3600);
+        if (auto_sleep > 0 && deep >= auto_sleep) {
+            settings.SetInt("deep_save_sec", StepOption(kDeepSaveOptions, deep, -1));
+        }
     }
+    Board::GetInstance().ApplyPowerSaveSettings();
     self->UpdateSettingsValues();
 }
 
@@ -4406,15 +4422,19 @@ void LcdDisplay::OnSettingsAutoSleepUpClicked(lv_event_t* e) {
     if (self == nullptr) {
         return;
     }
-    Settings settings("power", true);
-    const int auto_sleep =
-        StepOption(kAutoSleepOptions, settings.GetInt("auto_sleep_seconds", 14400), 1);
-    settings.SetInt("auto_sleep_seconds", auto_sleep);
-    // 关闭自动休眠（0）不需要给深度省电让位
-    if (auto_sleep > 0 && settings.GetInt("deep_save_seconds", 3600) >= auto_sleep) {
-        settings.SetInt("deep_save_seconds",
-                        StepOption(kDeepSaveOptions, settings.GetInt("deep_save_seconds", 3600), -1));
+    {
+        Settings settings("power", true);
+        const int auto_sleep =
+            StepOption(kAutoSleepOptions, settings.GetInt("auto_sleep_sec", 14400), 1);
+        settings.SetInt("auto_sleep_sec", auto_sleep);
+        // 关闭自动休眠（0）不需要给深度省电让位
+        if (auto_sleep > 0 && settings.GetInt("deep_save_sec", 3600) >= auto_sleep) {
+            settings.SetInt(
+                "deep_save_sec",
+                StepOption(kDeepSaveOptions, settings.GetInt("deep_save_sec", 3600), -1));
+        }
     }
+    Board::GetInstance().ApplyPowerSaveSettings();
     self->UpdateSettingsValues();
 }
 
@@ -4423,12 +4443,15 @@ void LcdDisplay::OnSettingsStandbyBrightDownClicked(lv_event_t* e) {
     if (self == nullptr) {
         return;
     }
-    Settings settings("power", true);
-    int brightness = settings.GetInt("standby_brightness", 10) - kStandbyBrightStep;
-    if (brightness < kStandbyBrightMin) {
-        brightness = kStandbyBrightMin;
+    {
+        Settings settings("power", true);
+        int brightness = settings.GetInt("standby_bright", 10) - kStandbyBrightStep;
+        if (brightness < kStandbyBrightMin) {
+            brightness = kStandbyBrightMin;
+        }
+        settings.SetInt("standby_bright", brightness);
     }
-    settings.SetInt("standby_brightness", brightness);
+    Board::GetInstance().ApplyPowerSaveSettings();
     self->UpdateSettingsValues();
 }
 
@@ -4437,12 +4460,15 @@ void LcdDisplay::OnSettingsStandbyBrightUpClicked(lv_event_t* e) {
     if (self == nullptr) {
         return;
     }
-    Settings settings("power", true);
-    int brightness = settings.GetInt("standby_brightness", 10) + kStandbyBrightStep;
-    if (brightness > kStandbyBrightMax) {
-        brightness = kStandbyBrightMax;
+    {
+        Settings settings("power", true);
+        int brightness = settings.GetInt("standby_bright", 10) + kStandbyBrightStep;
+        if (brightness > kStandbyBrightMax) {
+            brightness = kStandbyBrightMax;
+        }
+        settings.SetInt("standby_bright", brightness);
     }
-    settings.SetInt("standby_brightness", brightness);
+    Board::GetInstance().ApplyPowerSaveSettings();
     self->UpdateSettingsValues();
 }
 

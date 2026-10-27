@@ -25,6 +25,9 @@ public:
     ~PowerSaveTimer();
 
     void SetEnabled(bool enabled);
+    /* 运行时改档位。三个 seconds 的语义与构造函数一致（<=0 关闭该档）。
+       设置页改完 NVS 必须调这个，否则新值要等重启才生效。 */
+    void SetIntervals(int seconds_to_sleep, int seconds_to_deep_save, int seconds_to_shutdown);
     void OnEnterSleepMode(std::function<void()> callback);
     void OnExitSleepMode(std::function<void()> callback);
     void OnEnterDeepSaveMode(std::function<void()> callback);

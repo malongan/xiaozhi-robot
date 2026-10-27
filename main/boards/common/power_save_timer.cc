@@ -31,6 +31,29 @@ PowerSaveTimer::~PowerSaveTimer() {
     esp_timer_delete(power_save_timer_);
 }
 
+void PowerSaveTimer::SetIntervals(int seconds_to_sleep, int seconds_to_deep_save,
+                                  int seconds_to_shutdown) {
+    seconds_to_sleep_ = seconds_to_sleep;
+    seconds_to_deep_save_ = seconds_to_deep_save;
+    seconds_to_shutdown_ = seconds_to_shutdown;
+    /* 档位换了，之前那条「已经请求过关机」的记录就失效了，否则把自动休眠
+       从「关闭」改成「4 小时」时会因为旧标记直接跳过。 */
+    shutdown_requested_ = false;
+
+    /* 只处理「新设定把当前档位关掉了」这一种冲突：把对应档退回去。
+       反过来（新的档位要求更早进入）不在这里抢跑，留给下一秒的 PowerSaveCheck，
+       那里 ticks_ 已经攒够，判定条件天然成立。 */
+    if (in_deep_save_mode_ && seconds_to_deep_save_ <= 0) {
+        ExitDeepSaveMode();
+    }
+    if (in_sleep_mode_ && seconds_to_sleep_ <= 0) {
+        WakeUp();
+    }
+
+    ESP_LOGI(TAG, "Intervals updated: light=%ds deep=%ds shutdown=%ds", seconds_to_sleep_,
+             seconds_to_deep_save_, seconds_to_shutdown_);
+}
+
 void PowerSaveTimer::SetEnabled(bool enabled) {
     if (enabled && !enabled_) {
         Settings settings("wifi", false);

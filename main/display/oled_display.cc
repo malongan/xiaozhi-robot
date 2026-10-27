@@ -426,7 +426,8 @@ void OledDisplay::SetTheme(Theme* theme) {
 void OledDisplay::SetPowerSaveMode(bool on) {
     if (panel_) {
         Settings settings("wifi", false);
-        if (settings.GetBool("power_save_display_off", false)) {
+        /* key 保持 ≤15 字符：NVS 的上限，超长会连读取都拿不到值。 */
+        if (settings.GetBool("ps_display_off", false)) {
             esp_lcd_panel_disp_on_off(panel_, !on);
         }
     }
