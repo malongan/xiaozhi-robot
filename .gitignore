@@ -38,3 +38,6 @@ tools/stroke-pipeline/sdcard-data.zip
 # english pipeline generated data (regenerate with build.py)
 tools/english-pipeline/dist/
 tools/english-pipeline/__pycache__/
+
+# 设备 NVS / 分区表备份（含 Wi-Fi 密码、MQTT token，禁止入库）
+.backup/
